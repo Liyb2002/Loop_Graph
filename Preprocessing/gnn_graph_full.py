@@ -288,6 +288,5 @@ def build_loop_connectivity(face_to_stroke):
                     connectivity_matrix[i, j] = 1
                     connectivity_matrix[j, i] = 1  # Ensure symmetry
     
-    print("connectivity_matrix,", connectivity_matrix)
     return connectivity_matrix
 

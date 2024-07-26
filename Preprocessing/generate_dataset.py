@@ -21,7 +21,7 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 1, start = 0)
+        self.generate_dataset('dataset/test', number_data = 10, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -70,10 +70,10 @@ class dataset_generator():
         with open(stroke_cloud_save_path, 'wb') as f:
             pickle.dump({
                 'node_features': node_features,
-                'operations_matrix': operations_matrix,
-                'intersection_matrix': intersection_matrix,
                 'operations_order_matrix': operations_order_matrix,
-                'face_aggregate': face_to_stroke
+                'loop_features': loop_features,
+                'loop_edges': loop_edges,
+                'face_to_stroke': face_to_stroke
             }, f)
 
 
