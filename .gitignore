@@ -1,0 +1,9 @@
+*.csv
+*.stl
+*.png
+*.step
+*.stp
+*.json
+*.pkl
+*.pyc
+*.DS_Store
