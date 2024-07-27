@@ -243,38 +243,6 @@ def build_graph(stroke_dict):
     return node_features, operations_matrix, intersection_matrix, operations_order_matrix
 
 
-def build_loop_graph(node_features, face_to_stroke):
-    # Initialize the output matrix
-    output_matrix = np.zeros((len(face_to_stroke), 16), dtype=np.float32)
-    
-    for i, face_indices in enumerate(face_to_stroke):
-        # Collect the points from the given indices
-        points = []
-        for index in face_indices:
-            points.append(node_features[index, :3])
-            points.append(node_features[index, 3:])
-        
-        # Convert points to a NumPy array
-        points = np.array(points)
-        
-        # Find unique points
-        unique_points = np.unique(points, axis=0)
-        
-        # Flatten unique points and make sure it has 12 elements
-        unique_points_flat = unique_points.flatten()
-        if unique_points_flat.size < 12:
-            unique_points_flat = np.concatenate([unique_points_flat, np.zeros(12 - unique_points_flat.size, dtype=np.float32)])
-        
-        # Add three 0s to each feature to get 15 feature values
-        padded_features = np.concatenate([unique_points_flat, np.zeros(3, dtype=np.float32)])
-        
-        # Concat the face_to_stroke list id
-        output_matrix[i, :-1] = padded_features
-        output_matrix[i, -1] = i
-    
-    return output_matrix
-
-
 def build_loop_connectivity(face_to_stroke):
     num_faces = len(face_to_stroke)
     connectivity_matrix = np.zeros((num_faces, num_faces), dtype=np.float32)
@@ -289,4 +257,6 @@ def build_loop_connectivity(face_to_stroke):
                     connectivity_matrix[j, i] = 1  # Ensure symmetry
     
     return connectivity_matrix
+
+
 

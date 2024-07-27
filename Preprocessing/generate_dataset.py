@@ -5,7 +5,7 @@ import Preprocessing.proc_CAD.Program_to_STL
 import Preprocessing.proc_CAD.helper
 import Preprocessing.proc_CAD.render_images
 
-import Preprocessing.gnn_graph_full
+import Preprocessing.gnn_graph
 import Preprocessing.SBGCN.run_SBGCN
 import Preprocessing.SBGCN.brep_read
 
@@ -21,7 +21,7 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 10, start = 0)
+        self.generate_dataset('dataset/test', number_data = 1, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -60,20 +60,17 @@ class dataset_generator():
         
         # 1) Save matrices for stroke_cloud_graph
         stroke_cloud_edges, stroke_cloud_faces= Preprocessing.proc_CAD.CAD_to_stroke_cloud.run(data_directory)
-        node_features, operations_matrix, intersection_matrix, operations_order_matrix= Preprocessing.gnn_graph_full.build_graph(stroke_cloud_edges)
-        face_to_stroke = Preprocessing.proc_CAD.helper.face_to_stroke(stroke_cloud_faces, node_features)
-        loop_features = Preprocessing.gnn_graph_full.build_loop_graph(node_features, face_to_stroke)
-        loop_edges = Preprocessing.gnn_graph_full.build_loop_connectivity(face_to_stroke)
-
+        node_features, operations_matrix, intersection_matrix, operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_edges)
         stroke_cloud_save_path = os.path.join(data_directory, 'stroke_cloud_graph.pkl')
 
+        face_to_stroke = Preprocessing.proc_CAD.helper.face_to_stroke(stroke_cloud_faces, node_features)
         with open(stroke_cloud_save_path, 'wb') as f:
             pickle.dump({
                 'node_features': node_features,
+                'operations_matrix': operations_matrix,
+                'intersection_matrix': intersection_matrix,
                 'operations_order_matrix': operations_order_matrix,
-                'loop_features': loop_features,
-                'loop_edges': loop_edges,
-                'face_to_stroke': face_to_stroke
+                'face_aggregate': face_to_stroke
             }, f)
 
 
@@ -92,6 +89,7 @@ class dataset_generator():
             edge_features = Preprocessing.proc_CAD.helper.preprocess_features(edge_features_list)
             vertex_features = Preprocessing.proc_CAD.helper.preprocess_features(vertex_features_list)
 
+            Preprocessing.proc_CAD.helper.brep_to_stroke(face_feature_gnn_list, edge_features)
             # extract index i
             index = file_name.split('_')[1].split('.')[0]
             os.makedirs(os.path.join(data_directory, 'brep_embedding'), exist_ok=True)

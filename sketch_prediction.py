@@ -13,6 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+import Models.loop_embeddings
 
 # Load the dataset
 dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
@@ -30,6 +31,7 @@ train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=1, shuffle=True)
 
 
+loop_embed_model = Models.loop_embeddings.LoopEmbeddingNetwork()
 
 
 def train():
@@ -40,16 +42,21 @@ def train():
         total_train_loss = 0.0
         
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} - Training"):
-            node_features, operations_order_matrix, loop_features, loop_edges, face_to_stroke, program, face_boundary_points, face_feature_gnn_list, face_features, edge_features, vertex_features, edge_index_face_edge_list, edge_index_edge_vertex_list, edge_index_face_face_list, index_id = batch
+            node_features, operations_matrix, intersection_matrix, operations_order_matrix, stroke_to_loop, program, face_boundary_points, face_feature_gnn_list, face_features, edge_features, vertex_features, edge_index_face_edge_list, edge_index_edge_vertex_list, edge_index_face_face_list, index_id = batch
             
-            
-            node_features = node_features.to(torch.float32).to(device).squeeze(0)
-            operations_order_matrix = operations_order_matrix.to(torch.float32).to(device)
-            loop_features = loop_features.to(torch.float32).to(device).squeeze(0)
-            loop_edges = loop_edges.to(torch.float32).to(device).squeeze(0)
+        
+            if edge_features.shape[1] == 0:
+                continue
 
-            print("loop_features", loop_features.shape) 
-            print("loop_features", loop_edges.shape)
+            node_features = node_features.to(torch.float32).to(device).squeeze(0)
+            operations_matrix = operations_matrix.to(torch.float32).to(device)
+            intersection_matrix = intersection_matrix.to(torch.float32).to(device)
+            operations_order_matrix = operations_order_matrix.to(torch.float32).to(device)
+            edge_features = edge_features.to(torch.float32).to(device).squeeze(0)
+
+            sketch_loop_embeddings = loop_embed_model(node_features, stroke_to_loop)
+            print("face_feature_gnn_list", face_feature_gnn_list[0])
+            print("-----")
 
 
 

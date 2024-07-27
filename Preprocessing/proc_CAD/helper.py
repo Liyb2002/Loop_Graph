@@ -415,7 +415,7 @@ def preprocess_features(features):
     for _, f in features:
         processed_features.append(f)
     
-    return torch.tensor(processed_features)
+    return processed_features
 
 
 
@@ -449,6 +449,33 @@ def face_to_stroke(stroke_cloud_faces, stroke_features):
     return stroke_ids_per_face
 
 
+
+def brep_to_stroke(face_feature_gnn_list, edge_features):
+    stroke_features_list = [tuple(round(coord, 3) for coord in edge)  for edge in edge_features]
+    face_to_stroke_indices = []
+
+    for face in face_feature_gnn_list:
+        face_indices = []
+        for element in face:
+            point1 = tuple(round(coord, 3) for coord in element[:3])
+            point2 = tuple(round(coord, 3) for coord in element[3:])
+            
+            found_index = -1
+            for idx, stroke in enumerate(stroke_features_list):
+                stroke_point1 = stroke[:3]
+                stroke_point2 = stroke[3:]
+                if (point1 == stroke_point1 and point2 == stroke_point2) or (point1 == stroke_point2 and point2 == stroke_point1):
+                    found_index = idx
+                    break
+            
+            face_indices.append(found_index)
+        face_to_stroke_indices.append(face_indices)
+    
+    print("face_to_stroke_indices", face_to_stroke_indices)
+    return face_to_stroke_indices
+
+
+  
 
 #----------------------------------------------------------------------------------#
 
