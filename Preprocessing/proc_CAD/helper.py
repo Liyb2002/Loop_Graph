@@ -471,10 +471,21 @@ def brep_to_stroke(face_feature_gnn_list, edge_features):
             face_indices.append(found_index)
         face_to_stroke_indices.append(face_indices)
     
-    print("face_to_stroke_indices", face_to_stroke_indices)
     return face_to_stroke_indices
 
 
+def gnn_brep_edge(brep_to_stroke):
+    num_faces = len(brep_to_stroke)
+    edge_matrix = np.zeros((num_faces, num_faces), dtype=np.float32)
+
+    for i in range(num_faces):
+        for j in range(num_faces):
+            if i == j or any(index in brep_to_stroke[j] for index in brep_to_stroke[i]):
+                edge_matrix[i, j] = 1
+    
+    print("edge_matrix", edge_matrix)
+    return edge_matrix
+    
   
 
 #----------------------------------------------------------------------------------#
