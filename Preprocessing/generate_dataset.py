@@ -63,7 +63,7 @@ class dataset_generator():
         node_features, operations_matrix, intersection_matrix, operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_edges)
         stroke_cloud_save_path = os.path.join(data_directory, 'stroke_cloud_graph.pkl')
         face_to_stroke = Preprocessing.proc_CAD.helper.face_to_stroke(stroke_cloud_faces, node_features)
-        gnn_strokeCloud_edges = Preprocessing.proc_CAD.helper.gnn_brep_edge(face_to_stroke)
+        gnn_strokeCloud_edges = Preprocessing.proc_CAD.helper.gnn_edges(face_to_stroke)
 
         with open(stroke_cloud_save_path, 'wb') as f:
             pickle.dump({
@@ -91,7 +91,9 @@ class dataset_generator():
             vertex_features = Preprocessing.proc_CAD.helper.preprocess_features(vertex_features_list)
 
             brep_to_stroke = Preprocessing.proc_CAD.helper.brep_to_stroke(face_feature_gnn_list, edge_features)
-            gnn_brep_edges = Preprocessing.proc_CAD.helper.gnn_brep_edge(brep_to_stroke)
+            gnn_brep_edges = Preprocessing.proc_CAD.helper.gnn_edges(brep_to_stroke)
+
+            Preprocessing.proc_CAD.helper.stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, edge_features)
 
             # extract index i
             index = file_name.split('_')[1].split('.')[0]

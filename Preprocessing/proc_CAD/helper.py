@@ -474,7 +474,7 @@ def brep_to_stroke(face_feature_gnn_list, edge_features):
     return face_to_stroke_indices
 
 
-def gnn_brep_edge(brep_to_stroke):
+def gnn_edges(brep_to_stroke):
     num_faces = len(brep_to_stroke)
     edge_matrix = np.zeros((num_faces, num_faces), dtype=np.float32)
 
@@ -483,10 +483,42 @@ def gnn_brep_edge(brep_to_stroke):
             if i == j or any(index in brep_to_stroke[j] for index in brep_to_stroke[i]):
                 edge_matrix[i, j] = 1
     
-    print("edge_matrix", edge_matrix)
     return edge_matrix
     
-  
+
+def stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, brep_edge_features):
+    num_faces = len(face_to_stroke)
+    num_breps = len(brep_to_stroke)
+    
+    result_matrix = np.zeros((num_faces, num_breps), dtype=int)
+    
+    node_features = np.round(node_features, 3)
+    brep_edge_features = np.round(brep_edge_features, 3)
+    
+    for j, brep_indices in enumerate(brep_to_stroke):
+        brep_lines = [brep_edge_features[idx] for idx in brep_indices]
+        brep_lines_reversed = [line[3:].tolist() + line[:3].tolist() for line in brep_lines]
+        
+        for i, face_indices in enumerate(face_to_stroke):
+            face_lines = [node_features[idx] for idx in face_indices]
+            face_lines_reversed = [line[3:].tolist() + line[:3].tolist() for line in face_lines]
+
+            all_connected = True
+            
+            for face_line, face_line_rev in zip(face_lines, face_lines_reversed):
+                if not any(is_line_contained(face_line, brep_line) or is_line_contained(face_line_rev, brep_line)
+                           for brep_line in brep_lines + brep_lines_reversed):
+                    all_connected = False
+                    break
+            
+            if all_connected:
+                result_matrix[i, j] = 1
+    
+    all_columns_connected = np.all(result_matrix.sum(axis=0) >= 1)
+
+    print('all_columns_connected', all_columns_connected)
+    return result_matrix
+
 
 #----------------------------------------------------------------------------------#
 
@@ -496,3 +528,22 @@ def chosen_face_id(boundary_points, edge_features):
     print("boundary_points", len(boundary_points))
 
     
+
+def is_point_on_line(point, line_start, line_end):
+    """Check if a point lies on a line segment between line_start and line_end."""
+    epsilon = 1e-3
+    line_vec = np.array(line_end) - np.array(line_start)
+    point_vec = np.array(point) - np.array(line_start)
+    cross_product = np.cross(line_vec, point_vec)
+    if np.linalg.norm(cross_product) > epsilon:
+        return False
+    dot_product = np.dot(point_vec, line_vec)
+    if dot_product < 0 or dot_product > np.dot(line_vec, line_vec):
+        return False
+    return True
+
+def is_line_contained(line1, line2):
+    """Check if line1 is contained in line2."""
+    line1_start, line1_end = line1[:3], line1[3:]
+    line2_start, line2_end = line2[:3], line2[3:]
+    return is_point_on_line(line1_start, line2_start, line2_end) and is_point_on_line(line1_end, line2_start, line2_end)
