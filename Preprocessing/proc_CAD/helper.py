@@ -423,6 +423,23 @@ def preprocess_features(features):
 
 
 def face_to_stroke(stroke_features):
+    valid_groups = face_aggregate(stroke_features)
+    stroke_indices_per_face = []
+
+    for face in valid_groups:
+        face_indices = []
+        for stroke in face:
+            # Find the index of the stroke in stroke_features
+            for i, stroke_feature in enumerate(stroke_features):
+                if np.array_equal(stroke, stroke_feature):
+                    face_indices.append(i)
+                    break
+        stroke_indices_per_face.append(face_indices)
+
+    return stroke_indices_per_face
+
+
+def face_aggregate(stroke_features):
     """
     This function permutes all the strokes and groups them into groups of 3 or 4.
 
@@ -467,7 +484,6 @@ def face_to_stroke(stroke_features):
     coplanar_groups = [group for group in all_groups if are_strokes_coplanar(np.array(group))]
     valid_groups = [group for group in coplanar_groups if are_strokes_connected(np.array(group))]
 
-    print("valid_groups", len(valid_groups))
     return valid_groups
 
 
