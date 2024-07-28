@@ -62,7 +62,7 @@ class dataset_generator():
         stroke_cloud_edges, stroke_cloud_faces= Preprocessing.proc_CAD.CAD_to_stroke_cloud.run(data_directory)
         node_features, operations_matrix, intersection_matrix, operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_edges)
         stroke_cloud_save_path = os.path.join(data_directory, 'stroke_cloud_graph.pkl')
-        face_to_stroke = Preprocessing.proc_CAD.helper.face_to_stroke(stroke_cloud_faces, node_features)
+        face_to_stroke = Preprocessing.proc_CAD.helper.face_to_stroke(node_features)
         gnn_strokeCloud_edges = Preprocessing.proc_CAD.helper.gnn_edges(face_to_stroke)
 
         with open(stroke_cloud_save_path, 'wb') as f:
