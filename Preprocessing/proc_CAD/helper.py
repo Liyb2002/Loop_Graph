@@ -9,6 +9,7 @@ import torch
 
 import matplotlib.pyplot as plt
 from itertools import permutations, combinations
+import Models.sketch_model_helper
 
 
 def compute_normal(face_vertices, other_point):
@@ -526,7 +527,7 @@ def gnn_edges(brep_to_stroke):
 def stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, brep_edge_features):
     num_faces = len(face_to_stroke)
     num_breps = len(brep_to_stroke)
-    
+
     result_matrix = np.zeros((num_faces, num_breps), dtype=int)
     
     node_features = np.round(node_features, 3)
@@ -534,53 +535,137 @@ def stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, brep_edge_feat
     
     for j, brep_indices in enumerate(brep_to_stroke):
         brep_lines = [brep_edge_features[idx] for idx in brep_indices]
-        brep_lines_reversed = [line[3:].tolist() + line[:3].tolist() for line in brep_lines]
-        
+        polygon = []
+
+        for line in brep_lines:
+            polygon.append(line)
+            
         for i, face_indices in enumerate(face_to_stroke):
             face_lines = [node_features[idx] for idx in face_indices]
-            face_lines_reversed = [line[3:].tolist() + line[:3].tolist() for line in face_lines]
+            points = []
 
-            all_connected = True
-            
-            for face_line, face_line_rev in zip(face_lines, face_lines_reversed):
-                if not any(is_line_contained(face_line, brep_line) or is_line_contained(face_line_rev, brep_line)
-                           for brep_line in brep_lines + brep_lines_reversed):
-                    all_connected = False
+            all_points_inside = True
+            for line in face_lines:
+                points.append(line[:3])
+                points.append(line[3:])
+
+            for point in points:
+                valid_plane, plane_type, plane_value = on_same_plane(point, polygon)
+                
+                if valid_plane:
+                    if not is_point_in_polygon(point, polygon, plane_type):
+                        all_points_inside = False
+                        break
+                else:
+                    all_points_inside = False
                     break
             
-            if all_connected:
+            if all_points_inside:
                 result_matrix[i, j] = 1
-    
-    all_columns_connected = np.all(result_matrix.sum(axis=0) >= 1)
 
-    print('all_columns_connected', all_columns_connected)
+    all_columns_connected = np.all(result_matrix.sum(axis=0) >= 1)
+    print('result_matrix', result_matrix)
+    print("all_columns_connected", all_columns_connected)
     return result_matrix
 
 
 #----------------------------------------------------------------------------------#
 
-
-def chosen_face_id(boundary_points, edge_features):
-    print("edge_features", len(edge_features))
-    print("boundary_points", len(boundary_points))
-
+def get_plane(polygon):
+    # Extract the unique x, y, and z values from the polygon
+    x_values = set()
+    y_values = set()
+    z_values = set()
     
+    for line in polygon:
+        x_values.add(line[0])
+        y_values.add(line[1])
+        z_values.add(line[2])
+        x_values.add(line[3])
+        y_values.add(line[4])
+        z_values.add(line[5])
+    
+    # Determine the plane type and the value
+    if len(x_values) == 1:
+        return 'x', next(iter(x_values))
+    elif len(y_values) == 1:
+        return 'y', next(iter(y_values))
+    elif len(z_values) == 1:
+        return 'z', next(iter(z_values))
+    else:
+        return None, None
 
-def is_point_on_line(point, line_start, line_end):
-    """Check if a point lies on a line segment between line_start and line_end."""
-    epsilon = 1e-3
-    line_vec = np.array(line_end) - np.array(line_start)
-    point_vec = np.array(point) - np.array(line_start)
-    cross_product = np.cross(line_vec, point_vec)
-    if np.linalg.norm(cross_product) > epsilon:
-        return False
-    dot_product = np.dot(point_vec, line_vec)
-    if dot_product < 0 or dot_product > np.dot(line_vec, line_vec):
-        return False
-    return True
 
-def is_line_contained(line1, line2):
-    """Check if line1 is contained in line2."""
-    line1_start, line1_end = line1[:3], line1[3:]
-    line2_start, line2_end = line2[:3], line2[3:]
-    return is_point_on_line(line1_start, line2_start, line2_end) and is_point_on_line(line1_end, line2_start, line2_end)
+def on_same_plane(point, polygon):
+    # Extract the unique x, y, and z values from the polygon
+    x_values = set()
+    y_values = set()
+    z_values = set()
+    
+    for line in polygon:
+        x_values.add(line[0])
+        y_values.add(line[1])
+        z_values.add(line[2])
+        x_values.add(line[3])
+        y_values.add(line[4])
+        z_values.add(line[5])
+    
+    # Check if the polygon is on a specific plane and if the point is on that plane
+    if len(x_values) == 1 and point[0] in x_values:
+        return True, 'x', point[0]
+    elif len(y_values) == 1 and point[1] in y_values:
+        return True, 'y', point[1]
+    elif len(z_values) == 1 and point[2] in z_values:
+        return True, 'z', point[2]
+    else:
+        return False, None, None
+
+
+
+
+
+def is_point_in_polygon(point, polygon, plane_type):
+    # Extract 2D polygon based on the plane_type
+    if plane_type == 'x':
+        polygon_2d = [(line[1], line[2], line[4], line[5]) for line in polygon]
+        point_2d = (point[1], point[2])
+    elif plane_type == 'y':
+        polygon_2d = [(line[0], line[2], line[3], line[5]) for line in polygon]
+        point_2d = (point[0], point[2])
+    elif plane_type == 'z':
+        polygon_2d = [(line[0], line[1], line[3], line[4]) for line in polygon]
+        point_2d = (point[0], point[1])
+    else:
+        raise ValueError("Invalid plane_type. Must be 'x', 'y', or 'z'.")
+
+    # Helper function to check if point is on a line segment
+    def is_point_on_line(px, py, x0, y0, x1, y1):
+        if min(x0, x1) <= px <= max(x0, x1) and min(y0, y1) <= py <= max(y0, y1):
+            if (x1 - x0) * (py - y0) == (y1 - y0) * (px - x0):
+                return True
+        return False
+
+    # Ray casting algorithm to check if point is in polygon
+    def is_point_in_2d_polygon(point, polygon_2d):
+        x, y = point
+        n = len(polygon_2d)
+        inside = False
+
+        for i in range(n):
+            x0, y0, x1, y1 = polygon_2d[i]
+            
+            # Check if the point is on a vertex
+            if (x, y) == (x0, y0) or (x, y) == (x1, y1):
+                return True
+
+            # Check if the point is on an edge
+            if is_point_on_line(x, y, x0, y0, x1, y1):
+                return True
+
+            # Ray casting algorithm
+            if ((y0 > y) != (y1 > y)) and (x < (x1 - x0) * (y - y0) / (y1 - y0) + x0):
+                inside = not inside
+        
+        return inside
+
+    return is_point_in_2d_polygon(point_2d, polygon_2d)
