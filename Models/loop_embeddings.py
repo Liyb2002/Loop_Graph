@@ -57,6 +57,5 @@ class LoopEmbeddingNetwork(nn.Module):
         # Stack the embeddings for all faces to form the output tensor
         face_embeddings = torch.cat(face_embeddings, dim=0)  # shape: (len(stroke_to_loop), 32)
 
-        print("face_embeddings", face_embeddings.shape)
         return face_embeddings
 

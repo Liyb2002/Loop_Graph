@@ -48,8 +48,17 @@ def train():
                 continue
 
             node_features = node_features.to(torch.float32).to(device).squeeze(0)
+            edge_features = torch.tensor(edge_features)
+            edge_features = edge_features.to(torch.float32).to(device)
+
 
             sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
+            brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
+            print("node_features", node_features.shape)
+            print("sketch_loop_embeddings", sketch_loop_embeddings.shape)
+            print("edge_features", edge_features.shape)
+            print("brep_loop_embeddings", brep_loop_embeddings.shape)
+
             print("-----")
 
 

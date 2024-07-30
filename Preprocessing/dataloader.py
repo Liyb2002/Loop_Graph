@@ -71,10 +71,10 @@ class Program_Graph_Dataset(Dataset):
 
         # 3) Load Brep embedding
         if int(index) == -1:
-            brep_to_stroke = torch.empty(0, dtype=torch.float32)
-            edge_features = torch.empty(0, dtype=torch.float32)
-            gnn_brep_edges = torch.empty(0, dtype=torch.float32)
-            brep_stroke_connection = torch.empty(0, dtype=torch.float32)
+            brep_to_stroke = []
+            edge_features = []
+            gnn_brep_edges = []
+            brep_stroke_connection = []
 
         else:
             embedding_path = os.path.join(self.data_path, data_dir, 'brep_embedding', f'brep_info_{index}.pkl')
