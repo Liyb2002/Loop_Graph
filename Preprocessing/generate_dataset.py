@@ -17,11 +17,11 @@ import torch
 class dataset_generator():
 
     def __init__(self):
-        # if os.path.exists('dataset'):
-        #     shutil.rmtree('dataset')
-        # os.makedirs('dataset', exist_ok=True)
+        if os.path.exists('dataset'):
+            shutil.rmtree('dataset')
+        os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 200, start = 0)
+        self.generate_dataset('dataset/test', number_data = 10, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -68,10 +68,9 @@ class dataset_generator():
         with open(stroke_cloud_save_path, 'wb') as f:
             pickle.dump({
                 'node_features': node_features,
-                'operations_matrix': operations_matrix,
-                'intersection_matrix': intersection_matrix,
                 'operations_order_matrix': operations_order_matrix,
-                'face_aggregate': face_to_stroke
+                'gnn_strokeCloud_edges': gnn_strokeCloud_edges,
+                'face_to_stroke': face_to_stroke
             }, f)
 
 
@@ -86,14 +85,12 @@ class dataset_generator():
             brep_file_path = os.path.join(brep_directory, file_name)
             face_feature_gnn_list, face_features_list, edge_features_list, vertex_features_list, edge_index_face_edge_list, edge_index_edge_vertex_list, edge_index_face_face_list, index_id= Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
 
-            face_features = Preprocessing.proc_CAD.helper.preprocess_features(face_features_list)
             edge_features = Preprocessing.proc_CAD.helper.preprocess_features(edge_features_list)
-            vertex_features = Preprocessing.proc_CAD.helper.preprocess_features(vertex_features_list)
 
             brep_to_stroke = Preprocessing.proc_CAD.helper.brep_to_stroke(face_feature_gnn_list, edge_features)
             gnn_brep_edges = Preprocessing.proc_CAD.helper.gnn_edges(brep_to_stroke)
 
-            Preprocessing.proc_CAD.helper.stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, edge_features)
+            brep_stroke_connection = Preprocessing.proc_CAD.helper.stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, edge_features)
 
             # extract index i
             index = file_name.split('_')[1].split('.')[0]
@@ -101,16 +98,10 @@ class dataset_generator():
             embeddings_file_path = os.path.join(data_directory, 'brep_embedding', f'brep_info_{index}.pkl')
             with open(embeddings_file_path, 'wb') as f:
                 pickle.dump({
-                    'face_feature_gnn_list': face_feature_gnn_list, 
-                    'face_features': face_features,
+                    'brep_to_stroke': brep_to_stroke, 
                     'edge_features': edge_features,
-                    'vertex_features': vertex_features,
-                    
-                    'edge_index_face_edge_list': edge_index_face_edge_list,
-                    'edge_index_edge_vertex_list': edge_index_edge_vertex_list,
-                    'edge_index_face_face_list': edge_index_face_face_list,
-
-                    'index_id': torch.tensor(index_id, dtype=torch.int64)
+                    'gnn_brep_edges': gnn_brep_edges,
+                    'brep_stroke_connection': brep_stroke_connection
 
                 }, f)
 

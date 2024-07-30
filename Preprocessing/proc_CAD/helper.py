@@ -564,8 +564,6 @@ def stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, brep_edge_feat
                 result_matrix[i, j] = 1
 
     all_columns_connected = np.all(result_matrix.sum(axis=0) >= 1)
-    print('result_matrix', result_matrix)
-    print("all_columns_connected", all_columns_connected)
     return result_matrix
 
 

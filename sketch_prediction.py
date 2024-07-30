@@ -17,7 +17,7 @@ import Models.loop_embeddings
 
 # Load the dataset
 dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
-good_data_indices = [i for i, data in enumerate(dataset) if data[5][-1] == 1]
+good_data_indices = [i for i, data in enumerate(dataset) if data[0][-1] == 1]
 filtered_dataset = Subset(dataset, good_data_indices)
 print(f"Total number of sketch data: {len(filtered_dataset)}")
 
@@ -42,20 +42,14 @@ def train():
         total_train_loss = 0.0
         
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} - Training"):
-            node_features, operations_matrix, intersection_matrix, operations_order_matrix, stroke_to_loop, program, face_boundary_points, face_feature_gnn_list, face_features, edge_features, vertex_features, edge_index_face_edge_list, edge_index_edge_vertex_list, edge_index_face_face_list, index_id = batch
-            
+            program, node_features, operations_order_matrix, gnn_strokeCloud_edges, face_to_stroke, brep_to_stroke, edge_features, gnn_brep_edges, brep_stroke_connection = batch            
         
-            if edge_features.shape[1] == 0:
+            if len(edge_features) == 0:
                 continue
 
             node_features = node_features.to(torch.float32).to(device).squeeze(0)
-            operations_matrix = operations_matrix.to(torch.float32).to(device)
-            intersection_matrix = intersection_matrix.to(torch.float32).to(device)
-            operations_order_matrix = operations_order_matrix.to(torch.float32).to(device)
-            edge_features = edge_features.to(torch.float32).to(device).squeeze(0)
 
-            sketch_loop_embeddings = loop_embed_model(node_features, stroke_to_loop)
-            print("face_feature_gnn_list", face_feature_gnn_list[0])
+            sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
             print("-----")
 
 
