@@ -1,5 +1,5 @@
 import Preprocessing.dataloader
-import Preprocessing.gnn_graph_full
+import Preprocessing.gnn_graph
 
 
 from torch.utils.data import DataLoader, random_split, Subset
@@ -50,14 +50,17 @@ def train():
             node_features = node_features.to(torch.float32).to(device).squeeze(0)
             edge_features = torch.tensor(edge_features)
             edge_features = edge_features.to(torch.float32).to(device)
+            gnn_strokeCloud_edges = gnn_strokeCloud_edges.to(torch.float32).to(device).squeeze(0)
+            gnn_brep_edges = gnn_brep_edges.to(torch.float32).to(device).squeeze(0)
+            brep_stroke_connection = brep_stroke_connection.to(torch.float32).to(device).squeeze(0)
 
 
             sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
             brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
-            print("node_features", node_features.shape)
-            print("sketch_loop_embeddings", sketch_loop_embeddings.shape)
-            print("edge_features", edge_features.shape)
-            print("brep_loop_embeddings", brep_loop_embeddings.shape)
+
+            # Build graph
+            gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection)
+
 
             print("-----")
 
