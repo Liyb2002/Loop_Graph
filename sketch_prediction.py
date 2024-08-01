@@ -1,5 +1,6 @@
 import Preprocessing.dataloader
 import Preprocessing.gnn_graph
+import Encoders.gnn.gnn
 
 
 from torch.utils.data import DataLoader, random_split, Subset
@@ -32,6 +33,8 @@ val_loader = DataLoader(val_dataset, batch_size=1, shuffle=True)
 
 
 loop_embed_model = Models.loop_embeddings.LoopEmbeddingNetwork()
+graph_encoder = Encoders.gnn.gnn.SemanticModule()
+graph_decoder = Encoders.gnn.gnn.Sketch_brep_prediction()
 
 
 def train():
@@ -60,7 +63,17 @@ def train():
 
             # Build graph
             gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection)
+            x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
 
+            # Predict
+            prediction = graph_decoder(x_dict)
+            print("prediction", prediction.shape)
+
+            # Prepare Ground_truth
+            target_op_index = len(program[0]) - 1
+            op_to_index_matrix = operations_order_matrix
+            kth_operation = Models.sketch_arguments.face_aggregate.get_kth_operation(op_to_index_matrix, target_op_index).to(device)
+            print("kth_operation", kth_operation.shape)
 
             print("-----")
 

@@ -24,7 +24,7 @@ class SketchHeteroData(HeteroData):
 
         # Node features
         self['stroke'].x = torch.tensor(stroke_loop, dtype=torch.float)
-        self['brep'].z = torch.tensor(brep_loop, dtype=torch.float)
+        self['brep'].x = torch.tensor(brep_loop, dtype=torch.float)
 
         # Converting adjacency matrices to edge indices
         stroke_edges_indices = torch.nonzero(torch.tensor(stroke_edges, dtype=torch.long))
@@ -32,8 +32,7 @@ class SketchHeteroData(HeteroData):
         stroke_brep_connect_indices = torch.nonzero(torch.tensor(stroke_brep_connect, dtype=torch.long))
 
         # Setting edge indices
-        self['stroke', 'connects', 'stroke'].edge_index = stroke_edges_indices.t().contiguous()
-        self['brep', 'connects', 'brep'].edge_index = brep_edges_indices.t().contiguous()
-        self['stroke', 'connects', 'brep'].edge_index = stroke_brep_connect_indices.t().contiguous()
-        self['brep', 'connects', 'stroke'].edge_index = stroke_brep_connect_indices.flip(1).t().contiguous()
+        self['stroke', 'strokeIntersect', 'stroke'].edge_index = stroke_edges_indices.t().contiguous()
+        self['brep', 'brepIntersect', 'brep'].edge_index = brep_edges_indices.t().contiguous()
+        self['stroke', 'represented_by', 'brep'].edge_index = stroke_brep_connect_indices.t().contiguous()
 
