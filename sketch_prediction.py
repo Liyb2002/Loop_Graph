@@ -1,7 +1,7 @@
 import Preprocessing.dataloader
 import Preprocessing.gnn_graph
 import Encoders.gnn.gnn
-
+import Encoders.helper
 
 from torch.utils.data import DataLoader, random_split, Subset
 from tqdm import tqdm
@@ -67,12 +67,13 @@ def train():
 
             # Predict
             prediction = graph_decoder(x_dict)
-            print("prediction", prediction.shape)
 
             # Prepare Ground_truth
             target_op_index = len(program[0]) - 1
             op_to_index_matrix = operations_order_matrix
-            kth_operation = Models.sketch_arguments.face_aggregate.get_kth_operation(op_to_index_matrix, target_op_index).to(device)
+            kth_operation = Encoders.helper.get_kth_operation(op_to_index_matrix, target_op_index).to(device)
+            face_choice = Encoders.helper.stroke_to_face(kth_operation, face_to_stroke)
+
             print("kth_operation", kth_operation.shape)
 
             print("-----")
