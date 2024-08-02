@@ -74,7 +74,10 @@ def train():
             kth_operation = Encoders.helper.get_kth_operation(op_to_index_matrix, target_op_index).to(device)
             face_choice = Encoders.helper.stroke_to_face(kth_operation, face_to_stroke)
 
-            print("kth_operation", kth_operation.shape)
+            # Vis
+            # Encoders.helper.vis_stroke_cloud(edge_features)
+            # Encoders.helper.vis_stroke_cloud(node_features)
+            # Encoders.helper.vis_gt(face_choice, face_to_stroke, node_features)
 
             print("-----")
 
