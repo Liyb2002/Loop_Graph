@@ -567,6 +567,40 @@ def stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, brep_edge_feat
     return result_matrix
 
 
+def coplanar_matrix(face_to_stroke, node_features):
+    num_faces = len(face_to_stroke)
+    coplanar_matrix = np.zeros((num_faces, num_faces), dtype=int)
+
+    face_planes = []
+
+    for face_indices in face_to_stroke:
+        points = []
+        for idx in face_indices:
+            stroke = node_features[idx]
+            points.append(stroke[:3])
+            points.append(stroke[3:])
+
+        points = np.array(points)
+        unique_x = np.unique(points[:, 0])
+        unique_y = np.unique(points[:, 1])
+        unique_z = np.unique(points[:, 2])
+
+        if len(unique_x) == 1:
+            face_planes.append(('x', unique_x[0]))
+        elif len(unique_y) == 1:
+            face_planes.append(('y', unique_y[0]))
+        elif len(unique_z) == 1:
+            face_planes.append(('z', unique_z[0]))
+        else:
+            face_planes.append(('none', unique_x[0]))
+
+    for i in range(num_faces):
+        for j in range(i, num_faces):
+            if face_planes[i] == face_planes[j]:
+                coplanar_matrix[i, j] = 1
+                coplanar_matrix[j, i] = 1
+
+    return coplanar_matrix
 #----------------------------------------------------------------------------------#
 
 def get_plane(polygon):

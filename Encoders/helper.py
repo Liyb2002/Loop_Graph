@@ -39,18 +39,18 @@ def vis_stroke_cloud(node_features):
 
     plt.show()
 
-
+    
+#------------------------------------------------------------------------------------------------------#
 def vis_gt(matrix, face_to_stroke, node_features):
     # Initialize a list to keep track of stroke colors
     stroke_colors = ['blue'] * node_features.shape[0]
 
-    # Iterate over each face
-    for i, strokes in enumerate(face_to_stroke):
-        # Check if the face is chosen
-        if matrix[i].item() == 1:
-            # Set the strokes in this face to red
-            for stroke in strokes:
-                stroke_colors[stroke] = 'red'
+    # Find the index of the item with the highest value in the matrix
+    max_index = torch.argmax(matrix).item()
+
+    # Set the strokes in the face with the highest value to red
+    for stroke in face_to_stroke[max_index]:
+        stroke_colors[stroke] = 'red'
     
     # Create the plot
     fig = plt.figure()
@@ -64,4 +64,3 @@ def vis_gt(matrix, face_to_stroke, node_features):
         ax.plot(x, y, z, color=stroke_colors[i])
     
     plt.show()
-    

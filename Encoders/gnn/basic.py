@@ -81,7 +81,9 @@ class GeneralHeteroConv(torch.nn.Module):
     def create_HeteroConv_dict(self):
         heteroConv_dict = {}
         edges_types = [('stroke', 'strokeIntersect', 'stroke'),
+                    ('stroke', 'strokeCoplanar', 'stroke'),
                        ('brep', 'brepIntersect', 'brep'),
+                     ('brep', 'brepCoplanar', 'brep'),
                     ('stroke', 'represent_by', 'brep')]
         
         aggr_fns = self.find_aggr_fun()

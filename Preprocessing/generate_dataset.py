@@ -17,11 +17,12 @@ import torch
 class dataset_generator():
 
     def __init__(self):
-        if os.path.exists('dataset'):
-            shutil.rmtree('dataset')
-        os.makedirs('dataset', exist_ok=True)
+        # if os.path.exists('dataset'):
+        #     shutil.rmtree('dataset')
+        # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 10, start = 0)
+        self.generate_dataset('dataset/test', number_data = 6000, start = 2990)
+        self.generate_dataset('dataset/eval', number_data = 500, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -60,17 +61,19 @@ class dataset_generator():
         
         # 1) Save matrices for stroke_cloud_graph
         stroke_cloud_edges, stroke_cloud_faces= Preprocessing.proc_CAD.CAD_to_stroke_cloud.run(data_directory)
-        node_features, operations_matrix, intersection_matrix, operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_edges)
+        node_features, operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_edges)
         stroke_cloud_save_path = os.path.join(data_directory, 'stroke_cloud_graph.pkl')
         face_to_stroke = Preprocessing.proc_CAD.helper.face_to_stroke(node_features)
         gnn_strokeCloud_edges = Preprocessing.proc_CAD.helper.gnn_edges(face_to_stroke)
+        stroke_cloud_coplanar = Preprocessing.proc_CAD.helper.coplanar_matrix(face_to_stroke, node_features)
 
         with open(stroke_cloud_save_path, 'wb') as f:
             pickle.dump({
                 'node_features': node_features,
                 'operations_order_matrix': operations_order_matrix,
                 'gnn_strokeCloud_edges': gnn_strokeCloud_edges,
-                'face_to_stroke': face_to_stroke
+                'face_to_stroke': face_to_stroke,
+                'stroke_cloud_coplanar': stroke_cloud_coplanar
             }, f)
 
 
@@ -91,6 +94,7 @@ class dataset_generator():
             gnn_brep_edges = Preprocessing.proc_CAD.helper.gnn_edges(brep_to_stroke)
 
             brep_stroke_connection = Preprocessing.proc_CAD.helper.stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, edge_features)
+            brep_coplanar = Preprocessing.proc_CAD.helper.coplanar_matrix(brep_to_stroke, edge_features)
 
             # extract index i
             index = file_name.split('_')[1].split('.')[0]
@@ -101,7 +105,8 @@ class dataset_generator():
                     'brep_to_stroke': brep_to_stroke, 
                     'edge_features': edge_features,
                     'gnn_brep_edges': gnn_brep_edges,
-                    'brep_stroke_connection': brep_stroke_connection
+                    'brep_stroke_connection': brep_stroke_connection,
+                    'brep_coplanar': brep_coplanar
 
                 }, f)
 

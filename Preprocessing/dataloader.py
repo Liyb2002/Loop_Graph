@@ -51,6 +51,7 @@ class Program_Graph_Dataset(Dataset):
         operations_order_matrix = graph_data['operations_order_matrix']
         gnn_strokeCloud_edges = graph_data['gnn_strokeCloud_edges']
         face_to_stroke = graph_data['face_to_stroke']
+        stroke_cloud_coplanar = graph_data['stroke_cloud_coplanar']
 
 
         # 2) Load Program
@@ -75,6 +76,7 @@ class Program_Graph_Dataset(Dataset):
             edge_features = []
             gnn_brep_edges = []
             brep_stroke_connection = []
+            brep_coplanar = []
 
         else:
             embedding_path = os.path.join(self.data_path, data_dir, 'brep_embedding', f'brep_info_{index}.pkl')
@@ -85,8 +87,9 @@ class Program_Graph_Dataset(Dataset):
             edge_features = embedding_data['edge_features']
             gnn_brep_edges = embedding_data['gnn_brep_edges']
             brep_stroke_connection = embedding_data['brep_stroke_connection']
+            brep_coplanar = embedding_data['brep_coplanar']
 
-        return program, node_features, operations_order_matrix, gnn_strokeCloud_edges, face_to_stroke, brep_to_stroke, edge_features, gnn_brep_edges, brep_stroke_connection
+        return program, node_features, operations_order_matrix, gnn_strokeCloud_edges, face_to_stroke, stroke_cloud_coplanar, brep_to_stroke, edge_features, gnn_brep_edges, brep_stroke_connection, brep_coplanar
 
     
 
