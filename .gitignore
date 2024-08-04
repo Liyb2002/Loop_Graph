@@ -6,4 +6,5 @@
 *.json
 *.pkl
 *.pyc
+*.pth
 *.DS_Store

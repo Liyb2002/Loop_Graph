@@ -29,7 +29,7 @@ optimizer = optim.Adam(list(loop_embed_model.parameters()) + list(graph_encoder.
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
+save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction_noBrep')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -75,7 +75,7 @@ def train():
 
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} - Training"):
             program, node_features, operations_order_matrix, gnn_strokeCloud_edges, face_to_stroke, stroke_cloud_coplanar, brep_to_stroke, edge_features, gnn_brep_edges, brep_stroke_connection, brep_coplanar = Preprocessing.dataloader.process_batch(batch)
-            if edge_features.shape[1] ==0:
+            if edge_features.shape[1] != 0:
                 continue
             optimizer.zero_grad()
 
@@ -122,7 +122,7 @@ def train():
         with torch.no_grad():
             for batch in tqdm(val_loader, desc=f"Epoch {epoch+1}/{epochs} - Validation"):
                 program, node_features, operations_order_matrix, gnn_strokeCloud_edges, face_to_stroke, stroke_cloud_coplanar, brep_to_stroke, edge_features, gnn_brep_edges, brep_stroke_connection, brep_coplanar = Preprocessing.dataloader.process_batch(batch)
-                if edge_features.shape[1] ==0:
+                if edge_features.shape[1] != 0:
                     continue
 
                 # Loop embeddings
@@ -173,14 +173,12 @@ def eval():
     graph_decoder.eval()
 
     total_eval_loss = 0.0
-    total_predictions = 0
     correct_predictions = 0
-    valid_predictions = 0
 
     with torch.no_grad():
         for batch in tqdm(eval_loader, desc="Evaluation"):
             program, node_features, operations_order_matrix, gnn_strokeCloud_edges, face_to_stroke, stroke_cloud_coplanar, brep_to_stroke, edge_features, gnn_brep_edges, brep_stroke_connection, brep_coplanar = Preprocessing.dataloader.process_batch(batch)
-            if edge_features.shape[1] == 0:
+            if edge_features.shape[1] != 0:
                 continue
 
             # Loop embeddings
@@ -209,34 +207,18 @@ def eval():
             ground_truth_face_index = torch.argmax(face_choice).item()
 
             # Vis
-            # Encoders.helper.vis_brep_and_nextSketch(face_choice, face_to_stroke, node_features, edge_features)
-            # Encoders.helper.vis_brep_and_nextSketch(prediction, face_to_stroke, node_features, edge_features)
-
-            # Encoders.helper.vis_stroke_cloud(edge_features)
-            # Encoders.helper.vis_stroke_cloud(node_features)
             # Encoders.helper.vis_gt(face_choice, face_to_stroke, node_features)
             # Encoders.helper.vis_gt(prediction, face_to_stroke, node_features)
 
-            total_predictions += 1
             # Check if the prediction is correct
             if predicted_face_index == ground_truth_face_index:
                 correct_predictions += 1
-            
-            if Encoders.helper.predict_face_coplanar_with_brep(prediction, face_to_stroke, brep_to_stroke, node_features, edge_features) and Encoders.helper.face_is_not_in_brep(prediction, face_to_stroke, node_features, edge_features):
-                valid_predictions += 1
-            else:
-                pass
-                # Encoders.helper.vis_brep_and_nextSketch(face_choice, face_to_stroke, node_features, edge_features)
-                # Encoders.helper.vis_brep_and_nextSketch(prediction, face_to_stroke, node_features, edge_features)
 
-
-    avg_eval_loss = total_eval_loss / total_predictions
-    accuracy = correct_predictions / total_predictions
-    valid_rate = valid_predictions / total_predictions
-
+    avg_eval_loss = total_eval_loss / len(eval_loader)
+    accuracy = correct_predictions / len(eval_loader)
+    
     print(f"Average evaluation loss: {avg_eval_loss:.4f}")
     print(f"Model accuracy: {accuracy:.4f}")
-    print(f"Model valid_rate: {valid_rate:.4f}")
 
 
 #---------------------------------- Public Functions ----------------------------------#

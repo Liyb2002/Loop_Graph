@@ -28,6 +28,9 @@ class LoopEmbeddingNetwork(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, node_features, stroke_to_loop):
+        if node_features.shape[1] ==0:
+            return torch.zeros((1, 32), dtype=torch.float32)
+
         face_embeddings = []
         
         for indices in stroke_to_loop:
