@@ -20,7 +20,7 @@ from sklearn.metrics import confusion_matrix
 
 loop_embed_model = Models.loop_embeddings.LoopEmbeddingNetwork()
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
-graph_decoder = Encoders.gnn.gnn.Program_prediction()
+graph_decoder = Encoders.gnn.gnn.ExtrudePrediction()
 loop_embed_model.to(device)
 graph_encoder.to(device)
 graph_decoder.to(device)
@@ -51,12 +51,15 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
-    
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/eval')
+    good_data_indices = [i for i, data in enumerate(dataset) if data[0][-1] == 2]
+    filtered_dataset = Subset(dataset, good_data_indices)
+    print(f"Total number of sketch data: {len(filtered_dataset)}")
+
     # Split the dataset into training and validation sets
-    train_size = int(0.8 * len(dataset))
-    val_size = len(dataset) - train_size
-    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    train_size = int(0.8 * len(filtered_dataset))
+    val_size = len(filtered_dataset) - train_size
+    train_dataset, val_dataset = random_split(filtered_dataset, [train_size, val_size])
 
     # Create DataLoaders for training and validation
     train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
@@ -79,16 +82,23 @@ def train():
             sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
             brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
 
+            # Prev sketch
+            sketch_op_index = len(program[0]) - 2
+            kth_operation = Encoders.helper.get_kth_operation(operations_order_matrix, sketch_op_index).to(device)
+            prev_sketch_choice = Encoders.helper.stroke_to_face(kth_operation, face_to_stroke).float()
+
             # Build graph
             gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
-            x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
-
-            # Prepare Program
-            gt_next_token = program[0][-1]
-            current_program = program[0][:-1]
+            x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)            
+            
+            # Current extrude
+            # target_op_index = len(program[0]) - 1
+            # kth_operation = Encoders.helper.get_kth_operation(operations_order_matrix, target_op_index).to(device)
+            # extrude_strokes = Models.sketch_model_helper.choose_extrude_strokes(sketch_strokes, kth_operation, node_features)
 
             # Predict
-            prediction = graph_decoder(x_dict, current_program).squeeze(0)
+            prediction = graph_decoder(x_dict, gnn_graph.edge_index_dict, prev_sketch_choice).squeeze(0)
+            print("prediction", prediction.shape)
 
             # Loss
             loss = criterion(prediction, gt_next_token)
@@ -199,4 +209,4 @@ def eval():
 
 #---------------------------------- Public Functions ----------------------------------#
 
-eval()
+train()

@@ -87,21 +87,27 @@ class Sketch_brep_prediction(nn.Module):
 
 
 
-class ExtrudingStrokePrediction(nn.Module):
+class ExtrudePrediction(nn.Module):
     def __init__(self, hidden_channels=64):
-        super(ExtrudingStrokePrediction, self).__init__()
+        super(ExtrudePrediction, self).__init__()
 
-        self.edge_conv = Encoders.gnn_full.basic.ResidualGeneralHeteroConvBlock(['intersects_mean','temp_previous_add',  'represented_by_mean', 'brepcoplanar_max', 'strokecoplanar_max'], 32, 32)
+        self.edge_conv = Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_mean'], 33, 33)
 
-        self.local_head = nn.Linear(32, 64) 
+        self.local_head = nn.Linear(33, 64) 
         self.decoder = nn.Sequential(
             nn.Linear(64, hidden_channels),
             nn.ReLU(inplace=True),
             nn.Linear(hidden_channels, 1),
         )
 
-    def forward(self, x_dict, edge_index_dict, sketch_strokes_id):
-        x_dict['stroke'] = x_dict['stroke'] + x_dict['stroke'] * (sketch_strokes_id)
+    def forward(self, x_dict, edge_index_dict, prev_sketch_choice):
+        combined_stroke = torch.cat([x_dict['stroke'], prev_sketch_choice], dim=1)
+
+        zeros = torch.zeros((x_dict['brep'].shape[0], 1), device=x_dict['brep'].device)
+        combined_brep = torch.cat([x_dict['brep'], zeros], dim=1)
+
+        x_dict['stroke'] = combined_stroke
+        x_dict['brep'] = combined_brep
 
         x_dict = self.edge_conv(x_dict, edge_index_dict)
         features = self.local_head(x_dict['stroke'])

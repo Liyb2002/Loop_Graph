@@ -93,8 +93,7 @@ def train():
 
             # Prepare Ground_truth
             target_op_index = len(program[0]) - 1
-            op_to_index_matrix = operations_order_matrix
-            kth_operation = Encoders.helper.get_kth_operation(op_to_index_matrix, target_op_index).to(device)
+            kth_operation = Encoders.helper.get_kth_operation(operations_order_matrix, target_op_index).to(device)
             face_choice = Encoders.helper.stroke_to_face(kth_operation, face_to_stroke).float()
 
             # Vis
@@ -138,8 +137,7 @@ def train():
 
                 # Prepare Ground_truth
                 target_op_index = len(program[0]) - 1
-                op_to_index_matrix = operations_order_matrix
-                kth_operation = Encoders.helper.get_kth_operation(op_to_index_matrix, target_op_index).to(device)
+                kth_operation = Encoders.helper.get_kth_operation(operations_order_matrix, target_op_index).to(device)
                 face_choice = Encoders.helper.stroke_to_face(kth_operation, face_to_stroke).float()
 
                 # Loss
