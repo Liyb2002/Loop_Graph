@@ -86,54 +86,9 @@ class Sketch_brep_prediction(nn.Module):
 
 
 
-class Empty_brep_prediction(nn.Module):
-    def __init__(self, hidden_channels=128):
-        super(Empty_brep_prediction, self).__init__()
-
-        self.local_head = nn.Linear(32, 64) 
-        self.decoder = nn.Sequential(
-            nn.Linear(64, hidden_channels),
-            nn.ReLU(inplace=True),
-            nn.Linear(hidden_channels, 1),
-        )
-
-    def forward(self, x_dict):
-        features = self.local_head(x_dict['stroke'])
-        return torch.sigmoid(self.decoder(features))
-
-
-
-class Final_stroke_finding(nn.Module):
-    def __init__(self, hidden_channels=128):
-        super(Final_stroke_finding, self).__init__()
-
-        self.edge_conv = Encoders.gnn_full.basic.ResidualGeneralHeteroConvBlock(['intersects_mean','temp_previous_add',  'represented_by_mean', 'brepcoplanar_max', 'strokecoplanar_max'], 33, 33)
-
-        self.local_head = nn.Linear(33, 64) 
-        self.decoder = nn.Sequential(
-            nn.Linear(64, hidden_channels),
-            nn.ReLU(inplace=True),
-            nn.Linear(hidden_channels, 1),
-        )
-
-    def forward(self, x_dict, edge_index_dict, stroke_weights):
-        brep_stroke_edges = edge_index_dict[('stroke', 'represented_by', 'brep')]
-        stroke_indices = brep_stroke_edges[0]
-        stroke_weights[stroke_indices] = 0
-        
-        x_dict['stroke'] = torch.cat((x_dict['stroke'], stroke_weights), dim=-1)
-        
-        zero_column = torch.zeros(x_dict['brep'].size(0), 1)
-        x_dict['brep'] = torch.cat((x_dict['brep'], zero_column), dim=-1)
-
-        x_dict = self.edge_conv(x_dict, edge_index_dict)
-        features = self.local_head(x_dict['stroke'])
-        return torch.sigmoid(self.decoder(features))
-
-
 
 class ExtrudingStrokePrediction(nn.Module):
-    def __init__(self, in_channels=32, hidden_channels=64):
+    def __init__(self, hidden_channels=64):
         super(ExtrudingStrokePrediction, self).__init__()
 
         self.edge_conv = Encoders.gnn_full.basic.ResidualGeneralHeteroConvBlock(['intersects_mean','temp_previous_add',  'represented_by_mean', 'brepcoplanar_max', 'strokecoplanar_max'], 32, 32)
@@ -157,7 +112,7 @@ class ExtrudingStrokePrediction(nn.Module):
 # ----------------------------------- Other Models ----------------------------------- #
 
 class ProgramEncoder(nn.Module):
-    def __init__(self, vocab_size=10, embedding_dim=8, hidden_dim=32):
+    def __init__(self, vocab_size=5, embedding_dim=8, hidden_dim=32):
         super(ProgramEncoder, self).__init__()
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.lstm = nn.LSTM(embedding_dim, hidden_dim, batch_first=True)
