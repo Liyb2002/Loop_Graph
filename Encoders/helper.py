@@ -167,4 +167,28 @@ def vis_brep_and_nextSketch(matrix, face_to_stroke, node_features, edge_features
             ax.plot(x, y, z, color=stroke_colors[i])
 
     plt.show()
-    
+
+
+def vis_strokes(node_features, color_matrix):
+    print("color_matrix", color_matrix)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    node_features = node_features.squeeze(0)
+
+    # Plot strokes in the specified colors
+    for i, stroke in enumerate(node_features):
+        start = stroke[:3].numpy()
+        end = stroke[3:].numpy()
+        
+        # Determine color based on color_matrix
+        color = 'red' if color_matrix[i] == 1 else 'blue'
+        
+        # Plot the line segment for the stroke
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], marker='o', color=color)
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    plt.show()

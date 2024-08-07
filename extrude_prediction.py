@@ -84,18 +84,20 @@ def train():
 
             # Prev sketch
             sketch_op_index = len(program[0]) - 2
-            kth_operation = Encoders.helper.get_kth_operation(operations_order_matrix, sketch_op_index).to(device)
-            prev_sketch_choice = Encoders.helper.stroke_to_face(kth_operation, face_to_stroke).float()
+            prev_sketch_strokes = Encoders.helper.get_kth_operation(operations_order_matrix, sketch_op_index).to(device)
+            prev_sketch_choice = Encoders.helper.stroke_to_face(prev_sketch_strokes, face_to_stroke).float()
+            
+            # Current extrude
+            target_op_index = len(program[0]) - 1
+            extrude_strokes_raw = Encoders.helper.get_kth_operation(operations_order_matrix, target_op_index).to(device)
+            # extrude_strokes = Models.sketch_model_helper.choose_extrude_strokes(prev_sketch_strokes, extrude_strokes_raw, node_features)
+            Encoders.helper.vis_gt(prev_sketch_choice, face_to_stroke, node_features)
+            Encoders.helper.vis_strokes(node_features, extrude_strokes_raw)
 
             # Build graph
             gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
             x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)            
             
-            # Current extrude
-            # target_op_index = len(program[0]) - 1
-            # kth_operation = Encoders.helper.get_kth_operation(operations_order_matrix, target_op_index).to(device)
-            # extrude_strokes = Models.sketch_model_helper.choose_extrude_strokes(sketch_strokes, kth_operation, node_features)
-
             # Predict
             prediction = graph_decoder(x_dict, gnn_graph.edge_index_dict, prev_sketch_choice).squeeze(0)
             print("prediction", prediction.shape)
