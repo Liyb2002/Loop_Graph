@@ -24,7 +24,7 @@ graph_decoder = Encoders.gnn.gnn.ExtrudePrediction()
 loop_embed_model.to(device)
 graph_encoder.to(device)
 graph_decoder.to(device)
-criterion = nn.CrossEntropyLoss()
+criterion = nn.BCELoss()
 optimizer = optim.Adam(list(loop_embed_model.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
 
 # ------------------------------------------------------------------------------# 
@@ -51,7 +51,7 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
     good_data_indices = [i for i, data in enumerate(dataset) if data[0][-1] == 2]
     filtered_dataset = Subset(dataset, good_data_indices)
     print(f"Total number of sketch data: {len(filtered_dataset)}")
@@ -90,9 +90,8 @@ def train():
             # Current extrude
             target_op_index = len(program[0]) - 1
             extrude_strokes_raw = Encoders.helper.get_kth_operation(operations_order_matrix, target_op_index).to(device)
-            # extrude_strokes = Models.sketch_model_helper.choose_extrude_strokes(prev_sketch_strokes, extrude_strokes_raw, node_features)
-            Encoders.helper.vis_gt(prev_sketch_choice, face_to_stroke, node_features)
-            Encoders.helper.vis_strokes(node_features, extrude_strokes_raw)
+            extrude_opposite_face_strokes = Models.sketch_model_helper.choose_extrude_strokes(prev_sketch_strokes, extrude_strokes_raw, node_features)
+            extruded_face_choice = Encoders.helper.stroke_to_face(extrude_opposite_face_strokes, face_to_stroke).float()
 
             # Build graph
             gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
@@ -100,10 +99,9 @@ def train():
             
             # Predict
             prediction = graph_decoder(x_dict, gnn_graph.edge_index_dict, prev_sketch_choice).squeeze(0)
-            print("prediction", prediction.shape)
 
             # Loss
-            loss = criterion(prediction, gt_next_token)
+            loss = criterion(prediction, extruded_face_choice)
             loss.backward()
             optimizer.step()
 
@@ -127,19 +125,26 @@ def train():
                 sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
                 brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
 
+                # Prev sketch
+                sketch_op_index = len(program[0]) - 2
+                prev_sketch_strokes = Encoders.helper.get_kth_operation(operations_order_matrix, sketch_op_index).to(device)
+                prev_sketch_choice = Encoders.helper.stroke_to_face(prev_sketch_strokes, face_to_stroke).float()
+                
+                # Current extrude
+                target_op_index = len(program[0]) - 1
+                extrude_strokes_raw = Encoders.helper.get_kth_operation(operations_order_matrix, target_op_index).to(device)
+                extrude_opposite_face_strokes = Models.sketch_model_helper.choose_extrude_strokes(prev_sketch_strokes, extrude_strokes_raw, node_features)
+                extruded_face_choice = Encoders.helper.stroke_to_face(extrude_opposite_face_strokes, face_to_stroke).float()
+
                 # Build graph
                 gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
-                x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
-
-                # Prepare Program
-                gt_next_token = program[0][-1]
-                current_program = program[0][:-1]
-
+                x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)            
+                
                 # Predict
-                prediction = graph_decoder(x_dict, current_program).squeeze(0)
-
+                prediction = graph_decoder(x_dict, gnn_graph.edge_index_dict, prev_sketch_choice).squeeze(0)
+                
                 # Loss
-                val_loss = criterion(prediction, gt_next_token)
+                val_loss = criterion(prediction, extruded_face_choice)
                 total_val_loss += val_loss.item()
         
         avg_val_loss = total_val_loss / len(val_loader)
@@ -157,7 +162,10 @@ def eval():
 
     # Load the evaluation dataset
     eval_dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/eval')
-    eval_loader = DataLoader(eval_dataset, batch_size=1, shuffle=False)
+    good_data_indices = [i for i, data in enumerate(eval_dataset) if data[0][-1] == 2]
+    filtered_dataset = Subset(eval_dataset, good_data_indices)
+
+    eval_loader = DataLoader(filtered_dataset, batch_size=1, shuffle=False)
 
     loop_embed_model.eval()
     graph_encoder.eval()
@@ -166,8 +174,6 @@ def eval():
     total_eval_loss = 0.0
     total_predictions = 0
     correct_predictions = 0
-    all_gt_tokens = []
-    all_predicted_tokens = []
 
     with torch.no_grad():
         for batch in tqdm(eval_loader, desc="Evaluation"):
@@ -177,38 +183,39 @@ def eval():
             sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
             brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
 
+            # Prev sketch
+            sketch_op_index = len(program[0]) - 2
+            prev_sketch_strokes = Encoders.helper.get_kth_operation(operations_order_matrix, sketch_op_index).to(device)
+            prev_sketch_choice = Encoders.helper.stroke_to_face(prev_sketch_strokes, face_to_stroke).float()
+            
+            # Current extrude
+            target_op_index = len(program[0]) - 1
+            extrude_strokes_raw = Encoders.helper.get_kth_operation(operations_order_matrix, target_op_index).to(device)
+            extrude_opposite_face_strokes = Models.sketch_model_helper.choose_extrude_strokes(prev_sketch_strokes, extrude_strokes_raw, node_features)
+            extruded_face_choice = Encoders.helper.stroke_to_face(extrude_opposite_face_strokes, face_to_stroke).float()
+
             # Build graph
             gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
-            x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
-
-            # Prepare Program
-            gt_next_token = program[0][-1]
-            current_program = program[0][:-1]
-
+            x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)            
+                        
             # Predict
-            prediction = graph_decoder(x_dict, current_program).squeeze(0)
-            predicted_token = torch.argmax(prediction)
+            prediction = graph_decoder(x_dict, gnn_graph.edge_index_dict, prev_sketch_choice).squeeze(0)
+            predicted_face_index = torch.argmax(prediction).item()
+            ground_truth_face_index = torch.argmax(extruded_face_choice).item()
 
             total_predictions += 1
-            all_gt_tokens.append(gt_next_token.item())
-            all_predicted_tokens.append(predicted_token.item())
             
             # Check if the prediction is correct
-            if predicted_token == gt_next_token:
+            if predicted_face_index == ground_truth_face_index:
                 correct_predictions += 1
             
     avg_eval_loss = total_eval_loss / total_predictions
     accuracy = correct_predictions / total_predictions
 
-    print(f"Average evaluation loss: {avg_eval_loss:.4f}")
     print(f"Model accuracy: {accuracy:.4f}")
 
-    # Compute and print confusion matrix
-    cm = confusion_matrix(all_gt_tokens, all_predicted_tokens)
-    print("Confusion Matrix:")
-    print(cm)
 
 
 #---------------------------------- Public Functions ----------------------------------#
 
-train()
+eval()
