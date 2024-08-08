@@ -90,7 +90,7 @@ def train():
             # Current extrude
             target_op_index = len(program[0]) - 1
             extrude_strokes_raw = Encoders.helper.get_kth_operation(operations_order_matrix, target_op_index).to(device)
-            extrude_opposite_face_strokes = Models.sketch_model_helper.choose_extrude_strokes(prev_sketch_strokes, extrude_strokes_raw, node_features)
+            extrude_opposite_face_strokes = Models.sketch_model_helper.choose_extrude_opposite_face(prev_sketch_strokes, extrude_strokes_raw, node_features)
             extruded_face_choice = Encoders.helper.stroke_to_face(extrude_opposite_face_strokes, face_to_stroke).float()
 
             # Build graph
@@ -133,7 +133,7 @@ def train():
                 # Current extrude
                 target_op_index = len(program[0]) - 1
                 extrude_strokes_raw = Encoders.helper.get_kth_operation(operations_order_matrix, target_op_index).to(device)
-                extrude_opposite_face_strokes = Models.sketch_model_helper.choose_extrude_strokes(prev_sketch_strokes, extrude_strokes_raw, node_features)
+                extrude_opposite_face_strokes = Models.sketch_model_helper.choose_extrude_opposite_face(prev_sketch_strokes, extrude_strokes_raw, node_features)
                 extruded_face_choice = Encoders.helper.stroke_to_face(extrude_opposite_face_strokes, face_to_stroke).float()
 
                 # Build graph
@@ -191,7 +191,7 @@ def eval():
             # Current extrude
             target_op_index = len(program[0]) - 1
             extrude_strokes_raw = Encoders.helper.get_kth_operation(operations_order_matrix, target_op_index).to(device)
-            extrude_opposite_face_strokes = Models.sketch_model_helper.choose_extrude_strokes(prev_sketch_strokes, extrude_strokes_raw, node_features)
+            extrude_opposite_face_strokes = Models.sketch_model_helper.choose_extrude_opposite_face(prev_sketch_strokes, extrude_strokes_raw, node_features)
             extruded_face_choice = Encoders.helper.stroke_to_face(extrude_opposite_face_strokes, face_to_stroke).float()
 
             # Build graph

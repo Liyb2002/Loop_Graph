@@ -751,7 +751,7 @@ def choose_extrude_strokes(sketch_strokes, extrude_strokes_raw, node_features):
                         break
 
             # If the chosen stroke has one of its points in any of the sketch strokes, mark it as chosen
-            if not chosen:
+            if chosen:
                 extrude_strokes[i] = 1
     
     return extrude_strokes

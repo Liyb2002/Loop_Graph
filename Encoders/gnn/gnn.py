@@ -20,7 +20,7 @@ class SemanticModule(nn.Module):
 
 
     def forward(self, x_dict, edge_index_dict):
-        
+
         x_dict = self.local_head(x_dict, edge_index_dict)
 
         for layer in self.layers:

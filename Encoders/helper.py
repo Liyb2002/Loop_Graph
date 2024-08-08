@@ -192,3 +192,28 @@ def vis_strokes(node_features, color_matrix):
     ax.set_zlabel('Z')
 
     plt.show()
+
+
+
+#------------------------------------------------------------------------------------------------------#
+
+
+def build_intersection_matrix(node_features):
+    num_strokes = node_features.shape[0]
+    intersection_matrix = torch.zeros((num_strokes, num_strokes), dtype=torch.int32)
+
+    for i in range(num_strokes):
+        for j in range(i + 1, num_strokes):
+            # Extract points for strokes i and j
+            stroke_i_points = node_features[i].view(2, 3)
+            stroke_j_points = node_features[j].view(2, 3)
+            
+            # Check for intersection
+            if (stroke_i_points[0] == stroke_j_points[0]).all() or \
+               (stroke_i_points[0] == stroke_j_points[1]).all() or \
+               (stroke_i_points[1] == stroke_j_points[0]).all() or \
+               (stroke_i_points[1] == stroke_j_points[1]).all():
+                intersection_matrix[i, j] = 1
+                intersection_matrix[j, i] = 1
+
+    return intersection_matrix
