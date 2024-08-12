@@ -106,8 +106,18 @@ def do_extrude(node_features, face_to_stroke, edge_features, brep_to_stroke, gnn
         stroke_index = stroke_tensor.item()
         stroke_choice[stroke_index] = 1
 
-    print("stroke_choice", stroke_choice)
+    # Create graph
+    intersection_matrix = Encoders.helper.build_intersection_matrix(node_features).to(torch.float32).to(device)
+    gnn_graph = Preprocessing.gnn_graph_stroke.SketchHeteroData(node_features, intersection_matrix)
+    gnn_graph.set_brep_connection(edge_features)
 
+    # Forward pass
+    x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+    output = graph_decoder(x_dict, gnn_graph.edge_index_dict, stroke_choice)
+
+    # Get values of extrude_amount, direction
+    extrude_amount, direction = Preprocessing.proc_CAD.helper.get_extrude_amount(node_features, output, stroke_choice, gnn_graph.x_dict['brep'])
+    return extrude_amount, direction
 
 
 # --------------------- Program Prediction Network --------------------- #
@@ -177,8 +187,8 @@ for batch in tqdm(data_loader):
 
         # Extrude
         if next_op == 2:
-            do_extrude(node_features, face_to_stroke, edge_features, brep_to_stroke, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar, prev_sketch_matrix)
-
+            extrude_amount, direction = do_extrude(node_features, face_to_stroke, edge_features, brep_to_stroke, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar, prev_sketch_matrix)
+            cur__brep_class.extrude_op(extrude_amount, direction.tolist())
         
         # Write the Program
         cur__brep_class.write_to_json(output_dir)
