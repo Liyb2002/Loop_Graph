@@ -74,14 +74,40 @@ def do_sketch(node_features, face_to_stroke, edge_features, brep_to_stroke, gnn_
 
     # Predict
     prediction = graph_decoder(x_dict, face_to_stroke).squeeze(0)
+    predicted_face_index = torch.argmax(prediction).item()
+    choice_tensor = torch.zeros_like(prediction, dtype=torch.int)
+    choice_tensor[predicted_face_index] = 1
 
     # Output
-    predicted_face_index = torch.argmax(prediction).item()
     sketch_strokes = Preprocessing.proc_CAD.helper.get_sketch_points(predicted_face_index, face_to_stroke, node_features)
     sketch_points = Preprocessing.proc_CAD.helper.extract_unique_points(sketch_strokes)
     normal = [1, 0, 0]
 
-    return prediction, sketch_points, normal
+    return choice_tensor, sketch_points, normal
+
+
+# --------------------- Extrude Network --------------------- #
+def do_extrude(node_features, face_to_stroke, edge_features, brep_to_stroke, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar, face_choice):
+    # Load models
+    graph_encoder = Encoders.gnn_stroke.gnn.SemanticModule()
+    graph_decoder = Encoders.gnn_stroke.gnn.ExtrudingStrokePrediction()
+    graph_encoder.to(device)
+    graph_decoder.to(device)
+    dir = os.path.join(current_dir, 'checkpoints', 'extrude_stroke')
+    graph_encoder.load_state_dict(torch.load(os.path.join(dir, 'graph_encoder.pth')))
+    graph_decoder.load_state_dict(torch.load(os.path.join(dir, 'graph_decoder.pth')))
+
+    # Prev sketch
+    chosen_face_index = torch.argmax(face_choice).item()
+    chosen_strokes = face_to_stroke[chosen_face_index]
+    num_strokes = node_features.shape[0]
+    stroke_choice = torch.zeros((num_strokes, 1), dtype=torch.int)
+    for stroke_tensor in chosen_strokes:
+        stroke_index = stroke_tensor.item()
+        stroke_choice[stroke_index] = 1
+
+    print("stroke_choice", stroke_choice)
+
 
 
 # --------------------- Program Prediction Network --------------------- #
@@ -103,14 +129,13 @@ def do_ProgramPredict(node_features, face_to_stroke, edge_features, brep_to_stro
     brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
 
     # Build graph
-    print("gnn_brep_edges", gnn_brep_edges)
     gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
     x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
 
     # Predict
     prediction = graph_decoder(x_dict, cur_program).squeeze(0)
-    print('prediction', prediction)
-    return prediction
+    predicted_token = torch.argmax(prediction)
+    return predicted_token
 
 
 # --------------------- Main Code --------------------- #
@@ -152,7 +177,8 @@ for batch in tqdm(data_loader):
 
         # Extrude
         if next_op == 2:
-            pass
+            do_extrude(node_features, face_to_stroke, edge_features, brep_to_stroke, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar, prev_sketch_matrix)
+
         
         # Write the Program
         cur__brep_class.write_to_json(output_dir)
@@ -190,3 +216,4 @@ for batch in tqdm(data_loader):
         # Predict next Operation
         cur_program = torch.cat((cur_program, torch.tensor([next_op], dtype=torch.int64)))
         next_op = do_ProgramPredict(node_features, face_to_stroke, cur_edge_features, cur_brep_to_stroke, gnn_strokeCloud_edges, cur_gnn_brep_edges, cur_brep_stroke_connection, stroke_cloud_coplanar, cur_brep_coplanar, cur_program)
+        print("------------")
