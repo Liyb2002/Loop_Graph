@@ -30,7 +30,7 @@ optimizer = optim.Adam(list(loop_embed_model.parameters()) + list(graph_encoder.
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'program_prediction')
+save_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
