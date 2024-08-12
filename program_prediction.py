@@ -75,6 +75,7 @@ def train():
             program, node_features, operations_order_matrix, gnn_strokeCloud_edges, face_to_stroke, stroke_cloud_coplanar, brep_to_stroke, edge_features, gnn_brep_edges, brep_stroke_connection, brep_coplanar = Preprocessing.dataloader.process_batch(batch)
             optimizer.zero_grad()
 
+
             # Loop embeddings
             sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
             brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
@@ -86,6 +87,15 @@ def train():
             # Prepare Program
             gt_next_token = program[0][-1]
             current_program = program[0][:-1]
+            if len(program[0]) == 1:
+                print("edge_features", edge_features.shape)
+                print("brep_to_stroke", brep_to_stroke.shape)
+                print("current_program", current_program.shape)
+                print("gnn_brep_edges", gnn_brep_edges.shape)
+                print("brep_stroke_connection", brep_stroke_connection.shape)
+                print("brep_coplanar", brep_coplanar.shape)
+                print("-------")
+
 
             # Predict
             prediction = graph_decoder(x_dict, current_program).squeeze(0)
@@ -199,4 +209,4 @@ def eval():
 
 #---------------------------------- Public Functions ----------------------------------#
 
-eval()
+train()

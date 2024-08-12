@@ -529,7 +529,6 @@ def stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, brep_edge_feat
     num_breps = len(brep_to_stroke)
 
     result_matrix = np.zeros((num_faces, num_breps), dtype=int)
-    
     node_features = np.round(node_features, 3)
     brep_edge_features = np.round(brep_edge_features, 3)
     
@@ -701,3 +700,60 @@ def is_point_in_polygon(point, polygon, plane_type):
         return inside
 
     return is_point_in_2d_polygon(point_2d, polygon_2d)
+
+
+#----------------------------------------------------------------------------------#
+
+def get_sketch_points(predicted_face_index, face_to_stroke, node_features):
+    """
+    Returns the strokes associated with the predicted face.
+
+    Parameters:
+    - predicted_face_index: int, the index of the predicted face.
+    - face_to_stroke: list of lists, where each sublist contains indices of strokes for a face.
+    - node_features: torch.Tensor, shape (num_strokes, 6), containing 3D points of strokes.
+
+    Returns:
+    - torch.Tensor, shape (k, 6), where k is the number of strokes for the predicted face.
+    """
+
+    # Find the stroke indices associated with the predicted face
+    selected_stroke_indices = face_to_stroke[predicted_face_index]
+    selected_stroke_indices = torch.tensor(selected_stroke_indices, dtype=torch.long)
+
+    # Get the strokes corresponding to the selected indices from node_features
+    selected_strokes = node_features[selected_stroke_indices]
+
+    return selected_strokes
+
+
+
+def extract_unique_points(sketch):
+    # Convert sketch to a list of tuples for easier manipulation
+    strokes = [((stroke[:3].tolist(), stroke[3:].tolist())) for stroke in sketch]
+
+    # Start with the first stroke
+    current_stroke = strokes.pop(0)
+    points_list = [current_stroke[1]]
+    # Find the next stroke and continue until a loop is formed
+    while strokes:
+        end_point = points_list[-1]
+        found = False
+        for i, (start_point, next_point) in enumerate(strokes):
+            if start_point == end_point:
+                points_list.append(next_point)
+                strokes.pop(i)
+                found = True
+                break
+            elif next_point == end_point:
+                points_list.append(start_point)
+                strokes.pop(i)
+                found = True
+                break
+        if not found:
+            raise ValueError("Cannot find a continuous path with the given strokes")
+
+    # Convert the list of points to a numpy array
+    unique_points_np = np.array(points_list)
+
+    return unique_points_np

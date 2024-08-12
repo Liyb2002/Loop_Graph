@@ -21,8 +21,9 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 8000, start = 5990)
+        self.generate_dataset('dataset/test', number_data = 0, start = 5990)
         self.generate_dataset('dataset/eval', number_data = 0, start = 0)
+        self.generate_dataset('dataset/play', number_data = 1, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -95,6 +96,7 @@ class dataset_generator():
 
             brep_stroke_connection = Preprocessing.proc_CAD.helper.stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, edge_features)
             brep_coplanar = Preprocessing.proc_CAD.helper.coplanar_matrix(brep_to_stroke, edge_features)
+
 
             # extract index i
             index = file_name.split('_')[1].split('.')[0]
