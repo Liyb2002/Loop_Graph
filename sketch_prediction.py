@@ -86,7 +86,6 @@ def train():
             # Build graph
             gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
             x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
-
             # Predict
             prediction = graph_decoder(x_dict, face_to_stroke).squeeze(0)
 
@@ -97,10 +96,12 @@ def train():
             kth_operation = Encoders.helper.get_kth_operation(op_to_index_matrix, target_op_index).to(device)
             face_choice = Encoders.helper.stroke_to_face(kth_operation, face_to_stroke).float()
 
+            # print("clean face: ", Encoders.helper.clean_face_choice(brep_stroke_connection, face_choice))
+
             # Vis
-            # Encoders.helper.vis_stroke_cloud(edge_features)
-            # Encoders.helper.vis_stroke_cloud(node_features)
             # Encoders.helper.vis_gt(face_choice, face_to_stroke, node_features)
+            # Encoders.helper.vis_clean_strokes(node_features, edge_features)
+            # Encoders.helper.vis_brep_and_nextSketch(face_choice, face_to_stroke, node_features, edge_features)
 
             # Loss
             loss = criterion(prediction, face_choice)
@@ -141,7 +142,7 @@ def train():
                 op_to_index_matrix = operations_order_matrix
                 kth_operation = Encoders.helper.get_kth_operation(op_to_index_matrix, target_op_index).to(device)
                 face_choice = Encoders.helper.stroke_to_face(kth_operation, face_to_stroke).float()
-
+                
                 # Loss
                 val_loss = criterion(prediction, face_choice)
                 total_val_loss += val_loss.item()
@@ -209,11 +210,15 @@ def eval():
             ground_truth_face_index = torch.argmax(face_choice).item()
 
             # Vis
-            # Encoders.helper.vis_brep_and_nextSketch(face_choice, face_to_stroke, node_features, edge_features)
-            # Encoders.helper.vis_brep_and_nextSketch(prediction, face_to_stroke, node_features, edge_features)
+            Encoders.helper.vis_brep_and_nextSketch(face_choice, face_to_stroke, node_features, edge_features)
+            Encoders.helper.vis_brep_and_nextSketch(prediction, face_to_stroke, node_features, edge_features)
+            print("clean gt face: ", Encoders.helper.clean_face_choice(brep_stroke_connection, face_choice))  
+            print("clean prediction face: ", Encoders.helper.clean_face_choice(brep_stroke_connection, prediction))  
+            print("-----------")
+            # Encoders.helper.vis_stroke_cloud(node_features)
+            # Encoders.helper.vis_gt(face_choice, face_to_stroke, node_features)
 
             # Encoders.helper.vis_stroke_cloud(edge_features)
-            # Encoders.helper.vis_stroke_cloud(node_features)
             # Encoders.helper.vis_gt(face_choice, face_to_stroke, node_features)
             # Encoders.helper.vis_gt(prediction, face_to_stroke, node_features)
 
@@ -221,8 +226,11 @@ def eval():
             # Check if the prediction is correct
             if predicted_face_index == ground_truth_face_index:
                 correct_predictions += 1
-            
-            if Encoders.helper.predict_face_coplanar_with_brep(prediction, face_to_stroke, brep_to_stroke, node_features, edge_features) and Encoders.helper.face_is_not_in_brep(prediction, face_to_stroke, node_features, edge_features):
+            # else:
+            #     Encoders.helper.vis_brep_and_nextSketch(face_choice, face_to_stroke, node_features, edge_features)
+            #     Encoders.helper.vis_brep_and_nextSketch(prediction, face_to_stroke, node_features, edge_features)
+
+            if Encoders.helper.predict_face_coplanar_with_brep(prediction, face_to_stroke, brep_to_stroke, node_features, edge_features) and Encoders.helper.clean_face_choice(brep_stroke_connection, prediction):
                 valid_predictions += 1
             else:
                 pass

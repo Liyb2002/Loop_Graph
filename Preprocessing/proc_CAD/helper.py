@@ -531,40 +531,25 @@ def stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, brep_edge_feat
     result_matrix = np.zeros((num_faces, num_breps), dtype=int)
     node_features = np.round(node_features, 3)
     brep_edge_features = np.round(brep_edge_features, 3)
-    
-    for j, brep_indices in enumerate(brep_to_stroke):
-        brep_lines = [brep_edge_features[idx] for idx in brep_indices]
-        polygon = []
 
-        for line in brep_lines:
-            polygon.append(line)
-            
-        for i, face_indices in enumerate(face_to_stroke):
-            face_lines = [node_features[idx] for idx in face_indices]
-            points = []
+    for i, face_indices in enumerate(face_to_stroke):
+        face_lines = [node_features[idx] for idx in face_indices]
 
-            all_points_inside = True
-            for line in face_lines:
-                points.append(line[:3])
-                points.append(line[3:])
-
-            for point in points:
-                valid_plane, plane_type, plane_value = on_same_plane(point, polygon)
-                
-                if valid_plane:
-                    if not is_point_in_polygon(point, polygon, plane_type):
-                        all_points_inside = False
-                        break
-                else:
-                    all_points_inside = False
+        for j, brep_indices in enumerate(brep_to_stroke):
+            brep_lines = [brep_edge_features[idx] for idx in brep_indices]
+            all_lines_match = True
+            for face_line in face_lines:
+                reversed_face_line = face_line[[3, 4, 5, 0, 1, 2]]  # Reverse the order of the points
+                if not any(np.array_equal(face_line, brep_line) or np.array_equal(reversed_face_line, brep_line) for brep_line in brep_lines):
+                    all_lines_match = False
                     break
-            
-            if all_points_inside:
-                result_matrix[i, j] = 1
 
-    all_columns_connected = np.all(result_matrix.sum(axis=0) >= 1)
+            if all_lines_match:
+                result_matrix[i, j] = 1
+    
     return result_matrix
 
+        
 
 def coplanar_matrix(face_to_stroke, node_features):
     num_faces = len(face_to_stroke)
@@ -868,3 +853,47 @@ def subtract_or_extrude(sketch_stroke_features, brep_features, extrude_direction
     adjusted_extrude_amount = adjust_extrude_amount(directions, extrude_direction, extrude_amount)
     
     return adjusted_extrude_amount
+
+
+
+#----------------------------------------------------------------------------------#
+def vis_stroke_cloud(node_features):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Plot all strokes in blue and compute limits
+    for stroke in node_features:
+        start = stroke[:3]
+        end = stroke[3:]
+
+        # Update the min and max limits for each axis
+        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+        # Plot the line segment for the stroke in blue
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], marker='o', color='blue')
+
+    # Compute the center of the shape
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+
+    # Compute the maximum difference across x, y, z directions
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    # Set the same limits for x, y, and z axes centered around the computed center
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    plt.show()

@@ -59,6 +59,9 @@ class Brep:
 
     def regular_sketch_op(self):
 
+        for face in self.Faces:
+            face.safe_check()
+
         faces_with_future_sketch = [face for face in self.Faces if face.future_sketch ]
         if not faces_with_future_sketch:
             return False

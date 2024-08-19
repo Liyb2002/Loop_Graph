@@ -9,13 +9,13 @@ import Encoders.gnn.basic
 class SemanticModule(nn.Module):
     def __init__(self, in_channels=32):
         super(SemanticModule, self).__init__()
-        self.local_head = Encoders.gnn.basic.GeneralHeteroConv(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_mean'], in_channels, 32)
+        self.local_head = Encoders.gnn.basic.GeneralHeteroConv(['strokeCoplanar_mean', 'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_max'], in_channels, 32)
 
         self.layers = nn.ModuleList([
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_mean'], 32, 32),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_mean'], 32, 32),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_mean'], 32, 32),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_mean'], 32, 32)
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_max'], 32, 32),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_max'], 32, 32),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_max'], 32, 32),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_max'], 32, 32)
         ])
 
 
@@ -83,6 +83,28 @@ class Sketch_brep_prediction(nn.Module):
         # combined_tensor = torch.cat((x_dict['stroke'], avg_tensor), dim=1)
 
         return torch.sigmoid(self.decoder(x_dict['stroke']))
+
+
+class Sketch_brep_prediction_timeEmbed(nn.Module):
+    def __init__(self, hidden_channels=64):
+        super(Sketch_brep_prediction_timeEmbed, self).__init__()
+
+        self.decoder = nn.Sequential(
+            nn.Linear(33, hidden_channels),
+            nn.ReLU(inplace=True),
+            nn.Linear(hidden_channels, 1),
+        )
+
+    def forward(self, x_dict, face_to_stroke):
+        num_faces = len(face_to_stroke)
+        avg_tensor = torch.zeros((num_faces, 1), dtype=torch.float32)
+    
+        for i, strokes in enumerate(face_to_stroke):
+            avg_tensor[i] = sum(strokes) / len(strokes)
+
+        combined_tensor = torch.cat((x_dict['stroke'], avg_tensor), dim=1)
+
+        return torch.sigmoid(self.decoder(combined_tensor))
 
 
 

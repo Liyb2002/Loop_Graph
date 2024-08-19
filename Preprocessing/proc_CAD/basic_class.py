@@ -17,6 +17,20 @@ class Face:
         self.radius = radius
         self.center = center
 
+    def safe_check(self):
+        verts = [vert.position for vert in self.vertices]
+        
+        # Extract x, y, and z coordinates separately
+        x_values = [v[0] for v in verts]
+        y_values = [v[1] for v in verts]
+        z_values = [v[2] for v in verts]
+        
+        if len(set(x_values)) == 1 or len(set(y_values)) == 1 or len(set(y_values)) == 1:
+            return
+        
+        self.future_sketch = False
+        return 
+
 
 
 class Edge:

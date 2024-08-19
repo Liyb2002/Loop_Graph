@@ -110,12 +110,10 @@ def create_vertex_node(vertex):
     return [pt.X(), pt.Y(), pt.Z()]
 
 
-def check_duplicate(new_feature, feature_list, edge = 0):
-    for idx, existing_feature in feature_list:
-
+def check_duplicate(new_feature, feature_list):
+    for existing_feature in feature_list:
         if existing_feature == new_feature:
-            return idx
-    
+            return 0
     return -1
 
 def build_face_to_face(edge_index_face_edge_list):
@@ -151,82 +149,37 @@ def count_type(index_to_type_dict):
 def create_graph_from_step_file(step_path):
     shape = read_step_file(step_path)
 
-    face_feature_gnn_list = []
-    face_features_list = []
+    # each sublist in edge_coplanar_list is a face that has multiple edges
+    # each sublist in edge_features_list is a edge with 6 values
+    edge_coplanar_list = []
     edge_features_list = []
-    vertex_features_list = []
-    
-    edge_index_face_edge_list = []
-    edge_index_edge_vertex_list = []
-
-    index_counter = 0
-    index_to_type = {}
 
     face_explorer = TopExp_Explorer(shape, TopAbs_FACE)
     while face_explorer.More():
         face = topods.Face(face_explorer.Current())
-        face_features = create_face_node(face)
         face_feature_gnn = create_face_node_gnn(face)
-        
-        face_feature_gnn_list.append(face_feature_gnn)
-        face_features_list.append((index_counter, face_features))
-        current_face_counter = index_counter
-        index_to_type[current_face_counter] = 'face'
-        index_counter += 1
-
+        edge_coplanar_list.append(face_feature_gnn)
 
         # Explore edges of the face
         edge_explorer = TopExp_Explorer(face, TopAbs_EDGE)
+
         while edge_explorer.More():
             edge = topods.Edge(edge_explorer.Current())
             edge_features = create_edge_node(edge)
 
-            edge_duplicate_id = check_duplicate(edge_features, edge_features_list, 1)
+            edge_duplicate_id = check_duplicate(edge_features, edge_features_list)
             if edge_duplicate_id != -1:
-                edge_index_face_edge_list.append([current_face_counter, edge_duplicate_id])
                 edge_explorer.Next()
                 continue
             
-            edge_features_list.append((index_counter, edge_features))
-            current_edge_counter = index_counter
-            edge_index_face_edge_list.append([current_face_counter, current_edge_counter])
-            index_to_type[current_edge_counter] = 'edge'
-            index_counter += 1
-
-
-            # Explore vertices of the edge
-            vertex_explorer = TopExp_Explorer(edge, TopAbs_VERTEX)
-            while vertex_explorer.More():
-                vertex = topods.Vertex(vertex_explorer.Current())
-                vertex_features = create_vertex_node(vertex)
-
-
-                vertex_duplicate_id = check_duplicate(vertex_features, vertex_features_list)
-                if vertex_duplicate_id != -1:
-                    edge_index_edge_vertex_list.append([current_edge_counter, vertex_duplicate_id])
-                    vertex_explorer.Next()
-                    continue
-                
-                vertex_features_list.append((index_counter, vertex_features))
-                edge_index_edge_vertex_list.append([current_edge_counter, index_counter])
-                index_to_type[index_counter] = 'vertex'
-                index_counter += 1
-                
-                vertex_explorer.Next()
+            edge_features_list.append(edge_features)
             
             edge_explorer.Next()
         
-        
         face_explorer.Next()
 
-    edge_index_face_face_list = build_face_to_face(edge_index_face_edge_list)
-
-    # index_id defines the index of the node to the index of the face/edge/vertex
-    # For instance index_id [0, 0, 0, 1, 1, 2, 2, 3, 3]
-    # means that the 4th element in the 2nd face
-    index_id = count_type(index_to_type)
     
-    return face_feature_gnn_list, face_features_list, edge_features_list, vertex_features_list, edge_index_face_edge_list, edge_index_edge_vertex_list, edge_index_face_face_list, index_id
+    return edge_features_list, edge_coplanar_list
 
 
 class BRep_Dataset(Dataset):
