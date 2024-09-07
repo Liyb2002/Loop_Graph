@@ -19,27 +19,31 @@ operations_dict = {     "terminate": 0,
                     } 
 
 class SketchHeteroData(HeteroData):
-    def __init__(self, stroke_loop, brep_loop, stroke_edges, brep_edges, stroke_brep_connect, stroke_cloud_coplanar, brep_coplanar):
+    def __init__(self, stroke_loop, stroke_edges, stroke_cloud_coplanar, stroke_brep_connect):
         super(SketchHeteroData, self).__init__()
 
         # Node features
         self['stroke'].x = torch.tensor(stroke_loop, dtype=torch.float)
-        self['brep'].x = torch.tensor(brep_loop, dtype=torch.float)
 
         # Converting adjacency matrices to edge indices
         stroke_edges_indices = torch.nonzero(torch.tensor(stroke_edges.clone().detach(), dtype=torch.long))
-        brep_edges_indices = torch.nonzero(torch.tensor(brep_edges.clone().detach(), dtype=torch.long))
-        stroke_brep_connect_indices = torch.nonzero(torch.tensor(stroke_brep_connect.clone().detach(), dtype=torch.long))
         stroke_cloud_coplanar_indices = torch.nonzero(torch.tensor(stroke_cloud_coplanar.clone().detach(), dtype=torch.long))
-        brep_coplanar_indices = torch.nonzero(torch.tensor(brep_coplanar.clone().detach(), dtype=torch.long))
 
         # Setting edge indices
         self['stroke', 'strokeIntersect', 'stroke'].edge_index = stroke_edges_indices.t().contiguous()
         self['stroke', 'strokeCoplanar', 'stroke'].edge_index = stroke_cloud_coplanar_indices.t().contiguous()
-        self['brep', 'brepIntersect', 'brep'].edge_index = brep_edges_indices.t().contiguous()
-        self['brep', 'brepCoplanar', 'brep'].edge_index = brep_coplanar_indices.t().contiguous()
-        self['stroke', 'represented_by', 'brep'].edge_index = stroke_brep_connect_indices.t().contiguous()
 
+        self.build_stroke_loop_representation(stroke_brep_connect)
+    
+    def build_stroke_loop_representation(self, stroke_brep_connect):
+
+        if stroke_brep_connect.shape[1] == 0:
+            num_strokes = self['stroke'].x.shape[0]
+            is_connected = torch.zeros((num_strokes, 1), device=self['stroke'].x.device)
+        else:
+            is_connected = (stroke_brep_connect.sum(dim=1) > 0).float().unsqueeze(1)
+
+        self['stroke'].x = torch.cat((self['stroke'].x, is_connected), dim=1)
 
 
 def build_graph(stroke_dict):

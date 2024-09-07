@@ -1,4 +1,7 @@
 
+import numpy as np
+
+
 class Face:
     def __init__(self, id, vertices, normal):
         # print(f"An Face is created with ID: {id}")
@@ -8,6 +11,8 @@ class Face:
 
         self.future_sketch = True
         self.is_cirlce = False
+
+        self.sketch_plane()
     
     def face_fixed(self):
         self.future_sketch = False
@@ -17,21 +22,27 @@ class Face:
         self.radius = radius
         self.center = center
 
-    def safe_check(self):
+    def sketch_plane(self):
+        # Ensure the sketch is on a plane
         verts = [vert.position for vert in self.vertices]
         
-        # Extract x, y, and z coordinates separately
         x_values = [v[0] for v in verts]
         y_values = [v[1] for v in verts]
         z_values = [v[2] for v in verts]
         
-        if len(set(x_values)) == 1 or len(set(y_values)) == 1 or len(set(y_values)) == 1:
+        if len(set(x_values)) == 1:
+            self.plane = ('x', round(x_values[0], 4))
+            return
+        elif len(set(y_values)) == 1:
+            self.plane = ('y', round(y_values[0], 4))
+            return
+        elif len(set(z_values)) == 1:
+            self.plane = ('z', round(z_values[0], 4))
             return
         
         self.future_sketch = False
-        return 
-
-
+        self.plane = ('None', 0)
+    
 
 class Edge:
     def __init__(self, id, vertices):
@@ -39,6 +50,8 @@ class Edge:
         self.id = id
         self.vertices = vertices
         self.round = False
+
+        self.edge_type = 'maybe_feature_line'
 
         self.Op = []
         self.Op_orders = []
@@ -57,6 +70,17 @@ class Edge:
 
     def connected_edges(self, edge_id):
         self.connected_edges.append(edge_id)
+    
+    def set_edge_type(self, new_edge_type):
+        self.edge_type = new_edge_type
+    
+    def set_alpha_value(self):
+        if self.edge_type == 'feature_line':
+            self.alpha_value = np.random.uniform(0.6, 0.9)
+        if self.edge_type == 'construction_line':
+            self.alpha_value = np.random.uniform(0.1, 0.2)
+
+
 
 
 class Vertex:

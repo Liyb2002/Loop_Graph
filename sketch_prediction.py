@@ -75,16 +75,13 @@ def train():
 
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} - Training"):
             program, node_features, operations_order_matrix, gnn_strokeCloud_edges, face_to_stroke, stroke_cloud_coplanar, brep_to_stroke, edge_features, gnn_brep_edges, brep_stroke_connection, brep_coplanar = Preprocessing.dataloader.process_batch(batch)
-            if edge_features.shape[1] ==0:
-                continue
             optimizer.zero_grad()
 
             # Loop embeddings
             sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
-            brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
 
             # Build graph
-            gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
+            gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, gnn_strokeCloud_edges, stroke_cloud_coplanar, brep_stroke_connection)
             x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
             # Predict
             prediction = graph_decoder(x_dict, face_to_stroke).squeeze(0)
@@ -95,8 +92,6 @@ def train():
             op_to_index_matrix = operations_order_matrix
             kth_operation = Encoders.helper.get_kth_operation(op_to_index_matrix, target_op_index).to(device)
             face_choice = Encoders.helper.stroke_to_face(kth_operation, face_to_stroke).float()
-
-            # print("clean face: ", Encoders.helper.clean_face_choice(brep_stroke_connection, face_choice))
 
             # Vis
             # Encoders.helper.vis_gt(face_choice, face_to_stroke, node_features)
@@ -123,19 +118,17 @@ def train():
         with torch.no_grad():
             for batch in tqdm(val_loader, desc=f"Epoch {epoch+1}/{epochs} - Validation"):
                 program, node_features, operations_order_matrix, gnn_strokeCloud_edges, face_to_stroke, stroke_cloud_coplanar, brep_to_stroke, edge_features, gnn_brep_edges, brep_stroke_connection, brep_coplanar = Preprocessing.dataloader.process_batch(batch)
-                if edge_features.shape[1] ==0:
-                    continue
+                optimizer.zero_grad()
 
                 # Loop embeddings
                 sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
-                brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
 
                 # Build graph
-                gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
+                gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, gnn_strokeCloud_edges, stroke_cloud_coplanar, brep_stroke_connection)
                 x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
-
                 # Predict
                 prediction = graph_decoder(x_dict, face_to_stroke).squeeze(0)
+
 
                 # Prepare Ground_truth
                 target_op_index = len(program[0]) - 1
@@ -181,19 +174,28 @@ def eval():
     with torch.no_grad():
         for batch in tqdm(eval_loader, desc="Evaluation"):
             program, node_features, operations_order_matrix, gnn_strokeCloud_edges, face_to_stroke, stroke_cloud_coplanar, brep_to_stroke, edge_features, gnn_brep_edges, brep_stroke_connection, brep_coplanar = Preprocessing.dataloader.process_batch(batch)
-            if edge_features.shape[1] == 0:
-                continue
+            optimizer.zero_grad()
 
             # Loop embeddings
             sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
-            brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
 
             # Build graph
-            gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
+            gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, gnn_strokeCloud_edges, stroke_cloud_coplanar, brep_stroke_connection)
             x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
-
             # Predict
             prediction = graph_decoder(x_dict, face_to_stroke).squeeze(0)
+
+            num_strokes = prediction.shape[0]
+
+            # Create a tensor filled with zeros of the same shape as prediction
+            random_tensor = torch.zeros(num_strokes, 1)
+
+            # Select a random index
+            random_index = torch.randint(0, num_strokes, (1,)).item()
+
+            # Set the value at the random index to 1
+            random_tensor[random_index] = 1
+
 
             # Prepare Ground_truth
             target_op_index = len(program[0]) - 1
@@ -201,41 +203,30 @@ def eval():
             kth_operation = Encoders.helper.get_kth_operation(op_to_index_matrix, target_op_index).to(device)
             face_choice = Encoders.helper.stroke_to_face(kth_operation, face_to_stroke).float()
 
-            # Calculate loss
-            eval_loss = criterion(prediction, face_choice)
-            total_eval_loss += eval_loss.item()
+            Encoders.helper.vis_brep_and_nextSketch(random_tensor, face_to_stroke, node_features, edge_features)
 
-            # Find the predicted face
-            predicted_face_index = torch.argmax(prediction).item()
-            ground_truth_face_index = torch.argmax(face_choice).item()
 
-            # Vis
-            Encoders.helper.vis_brep_and_nextSketch(face_choice, face_to_stroke, node_features, edge_features)
-            Encoders.helper.vis_brep_and_nextSketch(prediction, face_to_stroke, node_features, edge_features)
-            print("clean gt face: ", Encoders.helper.clean_face_choice(brep_stroke_connection, face_choice))  
-            print("clean prediction face: ", Encoders.helper.clean_face_choice(brep_stroke_connection, prediction))  
-            print("-----------")
-            # Encoders.helper.vis_stroke_cloud(node_features)
-            # Encoders.helper.vis_gt(face_choice, face_to_stroke, node_features)
+            if brep_stroke_connection.shape[1] != 0:
+                total_predictions += 1
 
-            # Encoders.helper.vis_stroke_cloud(edge_features)
-            # Encoders.helper.vis_gt(face_choice, face_to_stroke, node_features)
-            # Encoders.helper.vis_gt(prediction, face_to_stroke, node_features)
+                prediction_index = torch.argmax(prediction, dim=0)
+                gt_index = torch.argmax(face_choice, dim=0)
 
-            total_predictions += 1
-            # Check if the prediction is correct
-            if predicted_face_index == ground_truth_face_index:
-                correct_predictions += 1
-            # else:
-            #     Encoders.helper.vis_brep_and_nextSketch(face_choice, face_to_stroke, node_features, edge_features)
-            #     Encoders.helper.vis_brep_and_nextSketch(prediction, face_to_stroke, node_features, edge_features)
+                # Check if the prediction is correct
+                # if prediction_index == gt_index:
+                #     correct_predictions += 1
+                # # else:
+                # #     Encoders.helper.vis_brep_and_nextSketch(face_choice, face_to_stroke, node_features, edge_features)
+                # #     Encoders.helper.vis_brep_and_nextSketch(prediction, face_to_stroke, node_features, edge_features)
 
-            if Encoders.helper.predict_face_coplanar_with_brep(prediction, face_to_stroke, brep_to_stroke, node_features, edge_features) and Encoders.helper.clean_face_choice(brep_stroke_connection, prediction):
-                valid_predictions += 1
-            else:
-                pass
-                # Encoders.helper.vis_brep_and_nextSketch(face_choice, face_to_stroke, node_features, edge_features)
-                # Encoders.helper.vis_brep_and_nextSketch(prediction, face_to_stroke, node_features, edge_features)
+                # if Encoders.helper.predict_face_coplanar_with_brep(prediction_index, stroke_cloud_coplanar, gnn_graph.x_dict['stroke']):
+                #     # if Encoders.helper.clean_face_choice(prediction_index, gnn_graph.x_dict['stroke']):
+                #     valid_predictions += 1
+                # else:
+
+                # if prediction_index != gt_index:
+                #     Encoders.helper.vis_brep_and_nextSketch(face_choice, face_to_stroke, node_features, edge_features)
+                #     Encoders.helper.vis_brep_and_nextSketch(prediction, face_to_stroke, node_features, edge_features)
 
 
     avg_eval_loss = total_eval_loss / total_predictions

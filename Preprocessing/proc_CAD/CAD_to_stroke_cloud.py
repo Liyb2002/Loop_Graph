@@ -8,26 +8,46 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 class create_stroke_cloud():
-    def __init__(self, file_path, output = True):
-        self.file_path = file_path
+    def __init__(self, directory, output = True):
+
+        self.directory = directory
 
         self.order_count = 0
         self.faces = {}
         self.edges = {}
         self.vertices = {}
         self.id_to_count = {}
-        
-    def read_json_file(self):
-        with open(self.file_path, 'r') as file:
-            data = json.load(file)
-            for index, op in enumerate(data):
-                self.parse_op(op, index)
-            
-        
-        self.adj_edges()
-        self.map_id_to_count()
 
-        return
+        self.load_file()    
+        self.current_index = 0
+
+
+
+    def load_file(self):
+        program_path = os.path.join(self.directory, 'Program.json')
+        with open(program_path, 'r') as file:
+            self.data = json.load(file)
+
+
+    def read_next(self):
+        while self.current_index < len(self.data):
+            op = self.data[self.current_index]
+            self.parse_op(op, self.current_index)
+            self.current_index += 1
+            
+            if op['operation'][0] == 'extrude':
+                self.adj_edges()
+                self.map_id_to_count()
+                self.vis_stroke_cloud(self.directory, show = False, target_Op = 'sketch')
+                return True
+            elif op['operation'][0] == 'terminate':
+                self.adj_edges()
+                self.map_id_to_count()
+                self.vis_stroke_cloud(self.directory, show = False, target_Op = 'sketch')
+                return False  
+        
+        return False
+
 
 
     def output(self, onlyStrokes = True):
@@ -173,14 +193,17 @@ class create_stroke_cloud():
 
 # Example usage:
 
-def run(directory, vis = True):
-    file_path = os.path.join(directory, 'Program.json')
+def create_stroke_cloud_class(directory):
+    stroke_cloud_class = create_stroke_cloud(directory)
+    return stroke_cloud_class
 
-    stroke_cloud_class = create_stroke_cloud(file_path)
-    stroke_cloud_class.read_json_file()
-    # parsed_program_class.output()
 
-    if vis:
-        stroke_cloud_class.vis_stroke_cloud(directory, show = False, target_Op = 'sketch')
+# def run(directory, vis = True):
+#     file_path = os.path.join(directory, 'Program.json')
 
-    return stroke_cloud_class.edges, stroke_cloud_class.faces
+#     stroke_cloud_class = create_stroke_cloud(file_path)
+
+#     if vis:
+#         stroke_cloud_class.vis_stroke_cloud(directory, show = False, target_Op = 'sketch')
+
+#     return stroke_cloud_class.edges, stroke_cloud_class.faces

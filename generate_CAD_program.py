@@ -1,4 +1,5 @@
 import Preprocessing.dataloader
+import Preprocessing.generate_dataset
 import Preprocessing.gnn_graph
 import Preprocessing.gnn_graph_stroke
 
@@ -38,42 +39,26 @@ output_dir = os.path.join(current_dir, 'program_output')
 output_relative_dir = ('program_output/canvas')
 
 
-# --------------------- Directory --------------------- #
-def brep_info_to_graph_info():
-    edge_features = Preprocessing.proc_CAD.helper.preprocess_features(edge_features_list)
-
-    brep_to_stroke = Preprocessing.proc_CAD.helper.brep_to_stroke(face_feature_gnn_list, edge_features)
-    gnn_brep_edges = Preprocessing.proc_CAD.helper.gnn_edges(brep_to_stroke)
-
-    brep_stroke_connection = Preprocessing.proc_CAD.helper.stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, edge_features)
-    brep_coplanar = Preprocessing.proc_CAD.helper.coplanar_matrix(brep_to_stroke, edge_features)
-
-    return edge_features, brep_to_stroke, gnn_brep_edges, brep_stroke_connection, brep_coplanar
 
 # --------------------- Skecth Network --------------------- #
-def do_sketch(node_features, face_to_stroke, edge_features, brep_to_stroke, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar):
+def do_sketch(node_features, face_to_stroke, gnn_strokeCloud_edges, stroke_cloud_coplanar, cur_brep_stroke_connection):
     # Load models
     loop_embed_model = Models.loop_embeddings.LoopEmbeddingNetwork()
     graph_encoder = Encoders.gnn.gnn.SemanticModule()
-    graph_decoder = Encoders.gnn.gnn.Sketch_brep_prediction()
+    graph_decoder = Encoders.gnn.gnn.Sketch_brep_prediction_timeEmbed()
     loop_embed_model.to(device)
     graph_encoder.to(device)
     graph_decoder.to(device)
-    if edge_features.shape[1] == 0:
-        dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction_noBrep')
-    else:
-        dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
+    dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction_timeEmbed')
     loop_embed_model.load_state_dict(torch.load(os.path.join(dir, 'loop_embed_model.pth')))
     graph_encoder.load_state_dict(torch.load(os.path.join(dir, 'graph_encoder.pth')))
     graph_decoder.load_state_dict(torch.load(os.path.join(dir, 'graph_decoder.pth')))
 
     # Prepare the graph
     sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
-    brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
-    print("brep_loop_embeddings", brep_loop_embeddings.shape)
     
     # Build graph
-    gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
+    gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, gnn_strokeCloud_edges, stroke_cloud_coplanar, cur_brep_stroke_connection)
     x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
 
     # Predict
@@ -125,33 +110,37 @@ def do_extrude(node_features, face_to_stroke, edge_features, face_choice):
     return extrude_amount, direction
 
 
-# --------------------- Program Prediction Network --------------------- #
-def do_ProgramPredict(node_features, face_to_stroke, edge_features, brep_to_stroke, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar, cur_program):
-    # Load models
-    loop_embed_model = Models.loop_embeddings.LoopEmbeddingNetwork()
-    graph_encoder = Encoders.gnn.gnn.SemanticModule()
-    graph_decoder = Encoders.gnn.gnn.Program_prediction()
-    loop_embed_model.to(device)
-    graph_encoder.to(device)
-    graph_decoder.to(device)
-    dir = os.path.join(current_dir, 'checkpoints', 'program_prediction')
-    loop_embed_model.load_state_dict(torch.load(os.path.join(dir, 'loop_embed_model.pth')))
-    graph_encoder.load_state_dict(torch.load(os.path.join(dir, 'graph_encoder.pth')))
-    graph_decoder.load_state_dict(torch.load(os.path.join(dir, 'graph_decoder.pth')))
 
-    # Prepare the graph
-    sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
-    brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
 
-    # Build graph
-    gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
-    x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+# --------------------- Cascade Brep Features --------------------- #
 
-    # Predict
-    prediction = graph_decoder(x_dict, cur_program).squeeze(0)
-    predicted_token = torch.argmax(prediction)
-    return predicted_token
+def cascade_brep(brep_files, node_features):
+    final_brep_edges = []
+    prev_brep_edges = []
+    
+    for file_name in brep_files:
+        brep_directory = os.path.join(output_dir, 'canvas')
+        brep_file_path = os.path.join(brep_directory, file_name)
 
+        edge_features_list, edge_coplanar_list= Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
+        if len(prev_brep_edges) == 0:
+            final_brep_edges = edge_features_list
+            prev_brep_edges = edge_features_list
+        else:
+            # We already have brep
+            new_features= Preprocessing.generate_dataset.find_new_features(prev_brep_edges, edge_features_list) 
+            final_brep_edges += new_features
+            prev_brep_edges = edge_features_list
+
+    brep_to_stroke = Preprocessing.proc_CAD.helper.face_to_stroke(final_brep_edges)
+    node_features = node_features.numpy()
+    brep_stroke_connection = Preprocessing.proc_CAD.helper.stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, final_brep_edges)
+    # print("final_brep_edges", final_brep_edges)
+    # print("node_features", node_features)
+    # print('face_to_stroke', face_to_stroke)
+    # print("brep_to_stroke", brep_to_stroke)
+    # print("brep_stroke_connection", brep_stroke_connection)
+    return brep_stroke_connection
 
 # --------------------- Main Code --------------------- #
 for batch in tqdm(data_loader):
@@ -168,12 +157,7 @@ for batch in tqdm(data_loader):
     # Program State init
     cur__brep_class = Preprocessing.proc_CAD.generate_program.Brep()
     cur_program = torch.tensor([], dtype=torch.int64)
-
-    cur_brep_to_stroke = torch.zeros((1,0), dtype=torch.float32)
-    cur_edge_features = torch.zeros((1,0), dtype=torch.float32)
-    cur_gnn_brep_edges = torch.zeros((2, 0), dtype=torch.float32)
     cur_brep_stroke_connection = torch.zeros((2, 0), dtype=torch.float32)
-    cur_brep_coplanar = torch.zeros((2, 0), dtype=torch.float32)
 
     # Graph init
     next_op = 1
@@ -181,22 +165,22 @@ for batch in tqdm(data_loader):
     while next_op != 0:
         print("Op Executing", next_op)
 
+
         # Terminate
         if next_op == 0:
             break
             
         # Sketch
         if next_op == 1:
-            prev_sketch_matrix, sketch_points, normal = do_sketch(node_features, face_to_stroke, cur_edge_features, cur_brep_to_stroke, gnn_strokeCloud_edges, cur_gnn_brep_edges, cur_brep_stroke_connection, stroke_cloud_coplanar, cur_brep_coplanar)
+            prev_sketch_matrix, sketch_points, normal = do_sketch(node_features, face_to_stroke, gnn_strokeCloud_edges, stroke_cloud_coplanar, cur_brep_stroke_connection)
             cur__brep_class._sketch_op(sketch_points, normal, sketch_points.tolist())
-            Encoders.helper.vis_stroke_cloud(node_features)
-            Encoders.helper.vis_stroke_cloud(cur_edge_features)
             Encoders.helper.vis_gt(prev_sketch_matrix, face_to_stroke, node_features)
-
+            
 
         # Extrude
         if next_op == 2:
-            extrude_amount, direction = do_extrude(node_features, face_to_stroke, cur_edge_features, prev_sketch_matrix)
+            extrude_amount, direction = do_extrude(node_features, face_to_stroke, edge_features, prev_sketch_matrix)
+            print("direction", direction.tolist())
             cur__brep_class.extrude_op(extrude_amount, direction.tolist())
         
         # Write the Program
@@ -219,21 +203,18 @@ for batch in tqdm(data_loader):
         
 
         # Update brep data
-        face_feature_gnn_list, face_features_list, edge_features_list, vertex_features_list, edge_index_face_edge_list, edge_index_edge_vertex_list, edge_index_face_face_list, index_id= Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
-        cur_edge_features = Preprocessing.proc_CAD.helper.preprocess_features(edge_features_list)
-        cur_brep_to_stroke = Preprocessing.proc_CAD.helper.brep_to_stroke(face_feature_gnn_list, cur_edge_features)        
-        cur_gnn_brep_edges = Preprocessing.proc_CAD.helper.gnn_edges(cur_brep_to_stroke)
-        cur_brep_stroke_connection = Preprocessing.proc_CAD.helper.stroke_to_brep(face_to_stroke_transformed, cur_brep_to_stroke, node_features, cur_edge_features)
-        cur_brep_coplanar = Preprocessing.proc_CAD.helper.coplanar_matrix(cur_brep_to_stroke, cur_edge_features)
-
-        cur_edge_features = torch.tensor(cur_edge_features, dtype=torch.float32)
-        cur_brep_to_stroke = [[torch.tensor([value], dtype=torch.int) for value in sublist] for sublist in cur_brep_to_stroke]
-        cur_gnn_brep_edges = torch.tensor(cur_gnn_brep_edges, dtype=torch.float32)
-        cur_brep_stroke_connection = torch.tensor(cur_brep_stroke_connection, dtype=torch.float32)
-        cur_brep_coplanar = torch.tensor(cur_brep_coplanar, dtype=torch.float32)
+        print("brep_file_path", brep_file_path)
+        cur_brep_stroke_connection = cascade_brep(brep_files, node_features)
+        cur_brep_stroke_connection = torch.from_numpy(cur_brep_stroke_connection)
+        edge_features_list, edge_coplanar_list= Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path) 
+        edge_features = torch.tensor(edge_features_list)
+        print("edge_features", edge_features.shape)
+        Encoders.helper.vis_stroke_cloud(edge_features)
 
         # Predict next Operation
-        cur_program = torch.cat((cur_program, torch.tensor([next_op], dtype=torch.int64)))
-        next_op = do_ProgramPredict(node_features, face_to_stroke, cur_edge_features, cur_brep_to_stroke, gnn_strokeCloud_edges, cur_gnn_brep_edges, cur_brep_stroke_connection, stroke_cloud_coplanar, cur_brep_coplanar, cur_program)
-        print("------------")
-    
+        if next_op == 1:
+            next_op = 2
+        else:
+            next_op = 1
+
+    break

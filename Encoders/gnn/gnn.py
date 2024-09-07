@@ -7,15 +7,15 @@ from torch_geometric.data import HeteroData
 import Encoders.gnn.basic
 
 class SemanticModule(nn.Module):
-    def __init__(self, in_channels=32):
+    def __init__(self, in_channels=33):
         super(SemanticModule, self).__init__()
-        self.local_head = Encoders.gnn.basic.GeneralHeteroConv(['strokeCoplanar_mean', 'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_max'], in_channels, 32)
+        self.local_head = Encoders.gnn.basic.GeneralHeteroConv(['strokeCoplanar_mean', 'strokeIntersect_mean'], in_channels, 32)
 
         self.layers = nn.ModuleList([
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_max'], 32, 32),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_max'], 32, 32),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_max'], 32, 32),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeIntersect_mean',  'strokeCoplanar_max', 'brepIntersect_mean', 'brepCoplanar_max', 'represented_by_max'], 32, 32)
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeCoplanar_mean', 'strokeIntersect_mean'], 32, 32),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeCoplanar_mean', 'strokeIntersect_mean'], 32, 32),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeCoplanar_mean', 'strokeIntersect_mean'], 32, 32),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['strokeCoplanar_mean', 'strokeIntersect_mean'], 32, 32)
         ])
 
 

@@ -23,7 +23,7 @@ class Brep:
 
         axis = np.random.choice(['x', 'y', 'z'])
         points, normal = Preprocessing.proc_CAD.random_gen.generate_random_rectangle(axis)
-
+        
         if axis == 'x':
             boundary_points = ([1, 0, 0])
         elif axis == 'y':
@@ -51,6 +51,7 @@ class Brep:
 
         face_id = f"face_{self.idx}_{0}"
         face = Face(face_id, vertex_list, normal)
+        face.face_fixed()
         self.Faces.append(face)
         
         self.idx += 1
@@ -58,11 +59,9 @@ class Brep:
 
 
     def regular_sketch_op(self):
-
-        for face in self.Faces:
-            face.safe_check()
-
+        self.face_validation_check()
         faces_with_future_sketch = [face for face in self.Faces if face.future_sketch ]
+            
         if not faces_with_future_sketch:
             return False
         target_face = random.choice(faces_with_future_sketch)
@@ -72,7 +71,7 @@ class Brep:
         normal = [ 0 - normal for normal in target_face.normal]
 
         # cases = ['create_circle', 'find_rectangle', 'find_triangle', 'triangle_to_cut']
-        cases = ['find_rectangle', 'find_triangle', 'triangle_to_cut']
+        cases = ['triangle_to_cut']
         selected_case = random.choice(cases)
         if selected_case == 'create_circle':
             radius = Preprocessing.proc_CAD.random_gen.generate_random_cylinder_radius()
@@ -113,6 +112,11 @@ class Brep:
             
         if sketch_face_opposite_normal == [0,0,0]:
             sketch_face_opposite_normal = [-x for x in sketch_face.normal]
+            safe_amount = -self.safe_extrude_check()
+
+            if amount <0:
+                amount = max(amount, safe_amount)
+
         else:
             sketch_face.normal = [-x for x in sketch_face_opposite_normal]
 
@@ -316,3 +320,67 @@ class Brep:
         }
         data.append(operation)
         return data
+
+
+    def face_validation_check(self):
+        checked_faces = set()
+
+        for face in self.Faces:
+            current_plane = face.plane
+            
+            for other_face in self.Faces:
+                if other_face is face:
+                    continue
+                
+                if other_face.plane == current_plane and other_face not in checked_faces:
+                    face.face_fixed()
+                    other_face.face_fixed()
+            
+            checked_faces.add(face)
+
+
+    def safe_extrude_check(self):
+        sketch_face = self.Faces[-1]
+        sketch_plane = sketch_face.plane  # tuple, e.g., (x, 0) or (y, 0) or (z, 0)
+
+        extrude_directions = [x for x in sketch_face.normal]
+
+
+        extrude_direction = -1
+        if 1 in extrude_directions:
+            extrude_direction = 1
+        
+        base_value = sketch_plane[1]  # The value on the axis to compare against
+
+        closest_value = float('inf')
+        inf_big = float('inf')
+
+        for face in self.Faces:
+            if face is sketch_face:
+                continue
+            
+            other_plane = face.plane
+            distance = 0
+            # Check if the face is on the same axis (x, y, or z)
+            print("other_plane[0]", other_plane[0])
+            print("sketch_plane[0]", sketch_plane[0])
+            if other_plane[0] == sketch_plane[0]:
+                other_value = other_plane[1]
+
+                # Postive extrude
+                if extrude_direction > 0 and other_value > base_value:
+                    distance = abs(other_value - base_value)
+
+                # Negative extrude
+                if extrude_direction < 0 and other_value < base_value:
+                    distance = abs(other_value - base_value)
+
+                # We want the minimum distance
+                if distance > 0 and distance < closest_value:
+                    closest_value = distance
+
+        # Return the minimum distance or inf_big if no valid face was found
+        if closest_value == float('inf'):
+            return inf_big
+        else:
+            return closest_value

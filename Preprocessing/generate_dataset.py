@@ -22,7 +22,7 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 8000, start = 2990)
+        self.generate_dataset('dataset/test', number_data = 1, start = 0)
         self.generate_dataset('dataset/eval', number_data = 0, start = 0)
 
 
@@ -34,6 +34,7 @@ class dataset_generator():
                 successful_generations += 1
             else:
                 print("Retrying...")
+
 
     def generate_single_data(self, successful_generations, dir):
         data_directory = os.path.join(dir, f'data_{successful_generations}')
@@ -60,10 +61,31 @@ class dataset_generator():
             return False
         
         
+        Unfinished_shape = True
+        stroke_cloud_class = Preprocessing.proc_CAD.CAD_to_stroke_cloud.create_stroke_cloud_class(data_directory)
+
+        while Unfinished_shape:
+            Unfinished_shape = stroke_cloud_class.read_next()
+            stroke_cloud_edges = stroke_cloud_class.edges
+            stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_edges)
+
+
+
+
+
+
+
+
+
+# --------------------------------------------------------------------------------------------------------
+
+
         # 1) Save matrices for stroke_cloud_graph
         stroke_cloud_edges, stroke_cloud_faces= Preprocessing.proc_CAD.CAD_to_stroke_cloud.run(data_directory)
         node_features, operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_edges)
         stroke_cloud_save_path = os.path.join(data_directory, 'stroke_cloud_graph.pkl')
+        
+        
         face_to_stroke = Preprocessing.proc_CAD.helper.face_to_stroke(node_features)
         gnn_strokeCloud_edges = Preprocessing.proc_CAD.helper.gnn_edges(face_to_stroke)
         stroke_cloud_coplanar = Preprocessing.proc_CAD.helper.coplanar_matrix(face_to_stroke, node_features)
@@ -104,17 +126,13 @@ class dataset_generator():
             
             brep_to_stroke = Preprocessing.proc_CAD.helper.face_to_stroke(final_brep_edges)
             gnn_brep_edges = Preprocessing.proc_CAD.helper.gnn_edges(brep_to_stroke)
+
+            print("face_to_stroke", face_to_stroke)
+            print("brep_to_stroke", brep_to_stroke)
+            print("node_features", node_features.shape)
+            print("final_brep_edges", final_brep_edges)
             brep_stroke_connection = Preprocessing.proc_CAD.helper.stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, final_brep_edges)
             brep_coplanar = Preprocessing.proc_CAD.helper.coplanar_matrix(brep_to_stroke, final_brep_edges)
-            
-
-            # Now do validity check
-            if file_name == brep_files[-1]:
-                row_sums = brep_stroke_connection.sum(axis=1)
-                rows_not_valid = np.all(row_sums == 0)
-                if rows_not_valid:
-                    return False
-
         
        
             # extract index i

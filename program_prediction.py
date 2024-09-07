@@ -77,10 +77,8 @@ def train():
 
             # Loop embeddings
             sketch_loop_embeddings = loop_embed_model(node_features, face_to_stroke)
-            brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
-            print("gnn_brep_edges", gnn_brep_edges)
             # Build graph
-            gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
+            gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, gnn_strokeCloud_edges, stroke_cloud_coplanar, brep_stroke_connection)
             x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
 
             # Prepare Program
@@ -116,7 +114,7 @@ def train():
                 brep_loop_embeddings = loop_embed_model(edge_features, brep_to_stroke)
 
                 # Build graph
-                gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, brep_loop_embeddings, gnn_strokeCloud_edges, gnn_brep_edges, brep_stroke_connection, stroke_cloud_coplanar, brep_coplanar)
+                gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(sketch_loop_embeddings, gnn_strokeCloud_edges, stroke_cloud_coplanar, brep_stroke_connection)
                 x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
 
                 # Prepare Program

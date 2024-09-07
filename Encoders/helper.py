@@ -38,47 +38,15 @@ def face_is_not_in_brep(matrix, face_to_stroke, node_features, edge_features):
     return True
 
 
-def predict_face_coplanar_with_brep(matrix, face_to_stroke, brep_to_stroke, node_features, edge_features):
-    # Find the max index in the matrix
-    max_index = torch.argmax(matrix).item()
+def predict_face_coplanar_with_brep(predicted_index, coplanar_matrix, node_features):
+    # Step 1: Find all coplanar faces with the predicted_index using coplanar_matrix
+    coplanar_faces = torch.where(coplanar_matrix[predicted_index] == 1)[0]
     
-    # Get the strokes associated with the chosen face
-    chosen_face_strokes = face_to_stroke[max_index]
+    # Step 2: Check if any of the coplanar faces are used, using the last column of node_features
+    if torch.any(node_features[coplanar_faces, -1] == 1):
+        return True
     
-    # Gather all x, y, and z values from the chosen face strokes
-    x_values, y_values, z_values = set(), set(), set()
-    for stroke_index in chosen_face_strokes:
-        stroke = node_features[stroke_index][0]
-        x_values.update([stroke[0].item(), stroke[3].item()])
-        y_values.update([stroke[1].item(), stroke[4].item()])
-        z_values.update([stroke[2].item(), stroke[5].item()])
-    
-    # Determine the common axis and value
-    if len(x_values) == 1:
-        axis, value = 'x', next(iter(x_values))
-    elif len(y_values) == 1:
-        axis, value = 'y', next(iter(y_values))
-    elif len(z_values) == 1:
-        axis, value = 'z', next(iter(z_values))
-    else:
-        return False
-    
-    # Check if any of the brep faces are coplanar with the chosen face
-    for brep_face in brep_to_stroke:
-        brep_x_values, brep_y_values, brep_z_values = set(), set(), set()
-        for stroke_index in brep_face:
-            stroke = edge_features[stroke_index][0]
-            brep_x_values.update([stroke[0].item(), stroke[3].item()])
-            brep_y_values.update([stroke[1].item(), stroke[4].item()])
-            brep_z_values.update([stroke[2].item(), stroke[5].item()])
-        
-        if axis == 'x' and len(brep_x_values) == 1 and next(iter(brep_x_values)) == value:
-            return True
-        elif axis == 'y' and len(brep_y_values) == 1 and next(iter(brep_y_values)) == value:
-            return True
-        elif axis == 'z' and len(brep_z_values) == 1 and next(iter(brep_z_values)) == value:
-            return True
-    
+    # Step 3: If no coplanar face is used, return False
     return False
 
 #------------------------------------------------------------------------------------------------------#
@@ -184,6 +152,9 @@ def vis_gt(matrix, face_to_stroke, node_features):
 
 
 def vis_brep_and_nextSketch(matrix, face_to_stroke, node_features, edge_features):
+    if edge_features.shape[1] == 0:
+        return
+    
     # Initialize a list to keep track of stroke colors
     stroke_colors = ['blue'] * node_features.shape[0]
 
@@ -334,11 +305,9 @@ def build_intersection_matrix(node_features):
 #------------------------------------------------------------------------------------------------------#
 
 
-def clean_face_choice(brep_stroke_connection, face_choice):
-    chosen_face_idx = torch.argmax(face_choice).item()
-    
-    # Check if the chosen face is clean (no associated brep)
-    if torch.sum(brep_stroke_connection[chosen_face_idx]) == 0:
-        return True  # The face is clean
-   
-    return False
+def clean_face_choice(predicted_index, node_features):
+    # Check if the predicted_index itself is not being used
+    if node_features[predicted_index, -1] == 0:
+        return True
+    else:
+        return False
