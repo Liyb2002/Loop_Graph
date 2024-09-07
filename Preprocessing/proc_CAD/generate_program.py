@@ -362,8 +362,6 @@ class Brep:
             other_plane = face.plane
             distance = 0
             # Check if the face is on the same axis (x, y, or z)
-            print("other_plane[0]", other_plane[0])
-            print("sketch_plane[0]", sketch_plane[0])
             if other_plane[0] == sketch_plane[0]:
                 other_value = other_plane[1]
 

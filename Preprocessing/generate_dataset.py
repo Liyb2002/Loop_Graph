@@ -4,6 +4,7 @@ import Preprocessing.proc_CAD.render_images
 import Preprocessing.proc_CAD.Program_to_STL
 import Preprocessing.proc_CAD.helper
 import Preprocessing.proc_CAD.render_images
+import Preprocessing.proc_CAD.draw_all_lines
 
 import Preprocessing.gnn_graph
 import Preprocessing.SBGCN.run_SBGCN
@@ -61,16 +62,21 @@ class dataset_generator():
             return False
         
         
-        Unfinished_shape = True
-        stroke_cloud_class = Preprocessing.proc_CAD.CAD_to_stroke_cloud.create_stroke_cloud_class(data_directory)
+        stroke_cloud_class = Preprocessing.proc_CAD.draw_all_lines.create_stroke_cloud_class(data_directory)
 
-        while Unfinished_shape:
-            Unfinished_shape = stroke_cloud_class.read_next()
+        while True:
+            # 1) Produce the Stroke Cloud features
+            next_stop_idx = stroke_cloud_class.get_next_stop()
+            if next_stop_idx == -1:
+                break 
+            
+            stroke_cloud_class.read_next(next_stop_idx)
             stroke_cloud_edges = stroke_cloud_class.edges
             stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_edges)
+            print("stroke_node_features", stroke_node_features.shape)
 
 
-
+        print("--------cut off line------------")
 
 
 

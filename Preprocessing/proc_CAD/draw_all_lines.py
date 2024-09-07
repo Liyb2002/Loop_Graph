@@ -11,8 +11,8 @@ from scipy.interpolate import CubicSpline
 
 
 class create_stroke_cloud():
-    def __init__(self, file_path, brep_edges, output = True):
-        self.file_path = file_path
+    def __init__(self, directory, output = True):
+        self.directory = directory
 
         self.order_count = 0
         self.faces = {}
@@ -20,20 +20,56 @@ class create_stroke_cloud():
         self.vertices = {}
         self.id_to_count = {}
 
-        self.brep_edges = brep_edges
-        
-        
-    def read_json_file(self):
-        with open(self.file_path, 'r') as file:
-            data = json.load(file)
-            for index, op in enumerate(data):
-                self.parse_op(op, index)
+        self.load_file()    
+        self.current_index = 0
+
+
+        self.brep_directory = os.path.join(directory, 'canvas')
+        self.brep_files = [file_name for file_name in os.listdir(self.brep_directory) if file_name.startswith('brep_') and file_name.endswith('.step')]
+        self.brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+
+
+    def load_file(self):
+        program_path = os.path.join(self.directory, 'Program.json')
+        with open(program_path, 'r') as file:
+            self.data = json.load(file)
+
+    
+    def get_next_stop(self):
+        cur_idx = self.current_index
+
+        while cur_idx < len(self.data):
+            op = self.data[cur_idx]
+            if op['operation'][0] == 'extrude' :
+                return cur_idx
+
+            if op['operation'][0] == 'terminate': 
+                return -1 
             
+            cur_idx += 1
+
+        return -1
+
+
+    def read_next(self, stop_idx):
+
+        target_brep_file = self.brep_files[stop_idx]
+        brep_file_path = os.path.join(self.brep_directory, target_brep_file)
+        self.brep_edges, _ = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
+
+        while self.current_index < len(self.data):
+            op = self.data[self.current_index]
+            self.parse_op(op, self.current_index)
+            self.current_index += 1
+            
+            if op['operation'][0] == 'extrude':
+                self.finishing_production()
+                return True
+            elif op['operation'][0] == 'terminate':
+                self.finishing_production()
+                return False  
         
-        self.adj_edges()
-        self.map_id_to_count()
-        
-        return
+        return False
 
 
     def output(self, onlyStrokes = True):
@@ -191,21 +227,6 @@ class create_stroke_cloud():
         op = Op['operation'][0]
 
         if op == 'terminate':
-            construction_lines = Preprocessing.proc_CAD.line_utils.whole_bounding_box_lines(self.edges)
-            for line in construction_lines:
-                line.set_edge_type('construction_line')
-                line.set_order_count(self.order_count)
-                line.set_Op(op, index)
-                self.order_count += 1
-                self.edges[line.id] = line
-            
-            self.determine_edge_type()
-        
-            for edge_id, edge in self.edges.items():
-                edge.set_alpha_value()
-
-            # self.edges = proc_CAD.line_utils.remove_duplicate_lines(self.edges)
-            # self.edges = Preprocessing.proc_CAD.line_utils.perturbing_lines(self.edges)
             return
 
         for vertex_data in Op['vertices']:
@@ -509,27 +530,27 @@ class create_stroke_cloud():
                     edge.set_edge_type('construction_line')
 
 
+    def finishing_production(self):
+        construction_lines = Preprocessing.proc_CAD.line_utils.whole_bounding_box_lines(self.edges)
+        for line in construction_lines:
+            line.set_edge_type('construction_line')
+            line.set_order_count(self.order_count)
+            self.order_count += 1
+            self.edges[line.id] = line
+            
+        self.determine_edge_type()
+        
+        for edge_id, edge in self.edges.items():
+            edge.set_alpha_value()
 
-def run(directory):
-    file_path = os.path.join(directory, 'Program.json')
-    
-    # Get the final brep file
-    brep_directory = os.path.join(directory, 'canvas')
-    brep_files = [file_name for file_name in os.listdir(brep_directory)
-            if file_name.startswith('brep_') and file_name.endswith('.step')]
-    brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
-    brep_file_name = brep_files[-1]
-
-    # Read the brep edges
-    brep_file_path = os.path.join(brep_directory, brep_file_name)
-    brep_edges, _ = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
+        
+        self.adj_edges()
+        self.map_id_to_count()
+        self.vis_stroke_cloud(self.directory, show = True, target_Op = 'sketch')
 
 
+def create_stroke_cloud_class(directory):
+    stroke_cloud_class = create_stroke_cloud(directory)
+    return stroke_cloud_class
 
-    stroke_cloud_class = create_stroke_cloud(file_path, brep_edges)
-    stroke_cloud_class.read_json_file()
 
-    # stroke_cloud_class.vis_brep()
-    stroke_cloud_class.vis_stroke_cloud(directory, show = True)
-
-    return stroke_cloud_class.edges, stroke_cloud_class.faces

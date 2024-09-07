@@ -59,7 +59,7 @@ def build_graph(stroke_dict):
     # a map that maps stroke_id (e.g 'edge_0_0' to 0)
     stroke_id_to_index = {}
 
-    node_features = np.zeros((num_strokes, 6))
+    node_features = np.zeros((num_strokes, 7))
     operations_order_matrix = np.zeros((num_strokes, num_operation_counts+1))
 
 
@@ -69,8 +69,10 @@ def build_graph(stroke_dict):
         # node_features has shape num_strokes x 6, which is the starting and ending point
         start_point = stroke.vertices[0].position
         end_point = stroke.vertices[1].position
+        alpha_value = stroke.alpha_value
         node_features[i, :3] = start_point
-        node_features[i, 3:] = end_point
+        node_features[i, 3:6] = end_point
+        node_features[i, 6:] = alpha_value
 
         # build operation_order_matrix
         # operation_order_matrix has shape num_strokes x num_ops

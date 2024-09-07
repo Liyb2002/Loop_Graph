@@ -49,7 +49,6 @@ class create_stroke_cloud():
         return False
 
 
-
     def output(self, onlyStrokes = True):
         print("Outputting details of all components...")
 
@@ -197,13 +196,3 @@ def create_stroke_cloud_class(directory):
     stroke_cloud_class = create_stroke_cloud(directory)
     return stroke_cloud_class
 
-
-# def run(directory, vis = True):
-#     file_path = os.path.join(directory, 'Program.json')
-
-#     stroke_cloud_class = create_stroke_cloud(file_path)
-
-#     if vis:
-#         stroke_cloud_class.vis_stroke_cloud(directory, show = False, target_Op = 'sketch')
-
-#     return stroke_cloud_class.edges, stroke_cloud_class.faces
