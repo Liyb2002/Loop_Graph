@@ -9,6 +9,8 @@ import torch
 
 import matplotlib.pyplot as plt
 from itertools import permutations, combinations
+import networkx as nx
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def compute_normal(face_vertices, other_point):
@@ -458,3 +460,64 @@ def chosen_face_id(boundary_points, edge_features):
     print("boundary_points", len(boundary_points))
 
     
+
+#----------------------------------------------------------------------------------#
+def face_aggregate_networkx(stroke_matrix):
+    """
+    This function finds all connected groups of strokes with size 3 or 4 using NetworkX.
+    It checks if each point appears exactly twice within each group.
+
+    Parameters:
+    stroke_matrix (numpy.ndarray): A matrix of shape (num_strokes, 7) where each row represents a stroke
+                                   with start and end points in 3D space.
+
+    Returns:
+    list: A list of indices of valid connected groups of strokes, where each group contains either 3 or 4 strokes.
+    """
+    
+    # Ensure input is a numpy array and ignore the last column
+    stroke_matrix = np.array(stroke_matrix)[:, :6]
+    
+    # Initialize the graph
+    G = nx.Graph()
+    
+    # Add edges to the graph based on strokes and store the edge-to-stroke mapping
+    edge_to_stroke_id = {}
+    for idx, stroke in enumerate(stroke_matrix):
+        start_point = tuple(np.round(stroke[:3], 4))
+        end_point = tuple(np.round(stroke[3:], 4))
+        G.add_edge(start_point, end_point)
+        edge_to_stroke_id[(start_point, end_point)] = idx
+        edge_to_stroke_id[(end_point, start_point)] = idx  # Add both directions for undirected graph
+    
+    # List to store valid groups
+    valid_groups = []
+    
+    # Generate all possible combinations of nodes of size 3 or 4
+    nodes = list(G.nodes)
+
+    def check_group(group_nodes):
+        subgraph = G.subgraph(group_nodes)
+        if len(subgraph.edges) == len(group_nodes) and all(subgraph.degree(n) == 2 for n in subgraph.nodes):
+            return [edge_to_stroke_id[edge] for edge in subgraph.edges]
+        return None
+
+    # Use ThreadPoolExecutor to parallelize the checking of groups
+    with ThreadPoolExecutor() as executor:
+        futures = []
+        
+        # Submit tasks for combinations of 3 nodes
+        for group_nodes in combinations(nodes, 3):
+            futures.append(executor.submit(check_group, group_nodes))
+        
+        # Submit tasks for combinations of 4 nodes
+        for group_nodes in combinations(nodes, 4):
+            futures.append(executor.submit(check_group, group_nodes))
+        
+        # Collect results
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                valid_groups.append(result)
+    
+    return valid_groups

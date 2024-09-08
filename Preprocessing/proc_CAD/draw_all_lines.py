@@ -546,6 +546,7 @@ class create_stroke_cloud():
         
         self.adj_edges()
         self.map_id_to_count()
+        self.vis_brep()
         self.vis_stroke_cloud(self.directory, show = True, target_Op = 'sketch')
 
 
