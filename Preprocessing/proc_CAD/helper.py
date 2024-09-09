@@ -495,29 +495,67 @@ def face_aggregate_networkx(stroke_matrix):
     
     # Generate all possible combinations of nodes of size 3 or 4
     nodes = list(G.nodes)
-
-    def check_group(group_nodes):
+    
+    # Check for all combinations of 3 nodes
+    for group_nodes in combinations(nodes, 3):
         subgraph = G.subgraph(group_nodes)
-        if len(subgraph.edges) == len(group_nodes) and all(subgraph.degree(n) == 2 for n in subgraph.nodes):
-            return [edge_to_stroke_id[edge] for edge in subgraph.edges]
-        return None
+        if len(subgraph.edges) == 3 and all(subgraph.degree(n) == 2 for n in subgraph.nodes):
+            # Efficiently get stroke IDs for this subgraph
+            strokes_in_group = [edge_to_stroke_id[edge] for edge in subgraph.edges]
+            valid_groups.append(strokes_in_group)
+    
+    # Check for all combinations of 4 nodes
+    for group_nodes in combinations(nodes, 4):
+        subgraph = G.subgraph(group_nodes)
+        if len(subgraph.edges) == 4 and all(subgraph.degree(n) == 2 for n in subgraph.nodes):
+            # Efficiently get stroke IDs for this subgraph
+            strokes_in_group = [edge_to_stroke_id[edge] for edge in subgraph.edges]
+            valid_groups.append(strokes_in_group)
+    
+    return valid_groups
 
-    # Use ThreadPoolExecutor to parallelize the checking of groups
-    with ThreadPoolExecutor() as executor:
-        futures = []
-        
-        # Submit tasks for combinations of 3 nodes
-        for group_nodes in combinations(nodes, 3):
-            futures.append(executor.submit(check_group, group_nodes))
-        
-        # Submit tasks for combinations of 4 nodes
-        for group_nodes in combinations(nodes, 4):
-            futures.append(executor.submit(check_group, group_nodes))
-        
-        # Collect results
-        for future in as_completed(futures):
-            result = future.result()
-            if result:
-                valid_groups.append(result)
+
+def face_aggregate_direct(stroke_matrix):
+    """
+    This function finds all connected groups of strokes with size 3 or 4
+    by directly checking if each point appears exactly twice within each group.
+
+    Parameters:
+    stroke_matrix (numpy.ndarray): A matrix of shape (num_strokes, 7) where each row represents a stroke
+                                   with start and end points in 3D space.
+
+    Returns:
+    list: A list of indices of valid connected groups of strokes, where each group contains either 3 or 4 strokes.
+    """
+    
+    # Ensure input is a numpy array and ignore the last column
+    stroke_matrix = np.array(stroke_matrix)[:, :6]
+    
+    # Get the number of strokes
+    num_strokes = stroke_matrix.shape[0]
+    
+    # List to store valid groups
+    valid_groups = []
+    
+    # Function to check if all points appear exactly twice
+    def check_group(group_indices):
+        point_count = {}
+        for idx in group_indices:
+            start_point = tuple(np.round(stroke_matrix[idx, :3], 4))
+            end_point = tuple(np.round(stroke_matrix[idx, 3:], 4))
+            point_count[start_point] = point_count.get(start_point, 0) + 1
+            point_count[end_point] = point_count.get(end_point, 0) + 1
+        # Check if all points appear exactly twice
+        return all(count == 2 for count in point_count.values())
+    
+    # Check all combinations of 3 strokes
+    for group_indices in combinations(range(num_strokes), 3):
+        if check_group(group_indices):
+            valid_groups.append(list(group_indices))
+    
+    # Check all combinations of 4 strokes
+    for group_indices in combinations(range(num_strokes), 4):
+        if check_group(group_indices):
+            valid_groups.append(list(group_indices))
     
     return valid_groups

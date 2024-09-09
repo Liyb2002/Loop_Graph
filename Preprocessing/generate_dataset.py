@@ -63,7 +63,7 @@ class dataset_generator():
         
         
         stroke_cloud_class = Preprocessing.proc_CAD.draw_all_lines.create_stroke_cloud_class(data_directory)
-
+        prev_stroke_node_features = None
         while True:
             # 1) Produce the Stroke Cloud features
             next_stop_idx = stroke_cloud_class.get_next_stop()
@@ -71,13 +71,11 @@ class dataset_generator():
                 break 
             
             stroke_cloud_class.read_next(next_stop_idx)
-            stroke_cloud_edges = stroke_cloud_class.edges
-            stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_edges)
+            stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_class.edges)
 
             # 2) Get the loops
-            print("stroke_node_features", stroke_node_features.shape)
             loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features)
-            print("loops", loops)
+            print("networkx", loops)
 
 
         print("--------cut off line------------")

@@ -61,6 +61,8 @@ class create_stroke_cloud():
             op = self.data[self.current_index]
             self.parse_op(op, self.current_index)
             self.current_index += 1
+
+            
             
             if op['operation'][0] == 'extrude':
                 self.finishing_production()
@@ -247,7 +249,6 @@ class create_stroke_cloud():
             edge.set_order_count(self.order_count)
             new_edges.append(edge)
             self.order_count += 1
-            # self.edges[edge.id] = edge
 
 
         # Now add the new edges to self.edges
@@ -269,7 +270,7 @@ class create_stroke_cloud():
             line.set_order_count(self.order_count)
             line.set_Op(op, index)
             self.order_count += 1
-            self.edges[line.id] = line
+            self.edges[line.order_count] = line
         
 
         #find the edges that has the current operation 
@@ -454,14 +455,15 @@ class create_stroke_cloud():
 
             # Step 2: Add the new edge if not contained within any existing edge
             if not is_edge_contained:
-                self.edges[new_edge.id] = new_edge
+                self.edges[new_edge.order_count] = new_edge
             else:
                 # Remove the contained edge and add the new split edges
                 for edge_id in edges_to_remove:
-                    del self.edges[edge_id]
+                    pass
+                    # del self.edges[edge_id]
                 for edge in edges_to_add:
-                    self.edges[edge.id] = edge
-
+                    self.edges[edge.order_count] = edge
+        
 
     def determine_edge_type(self):
         """
@@ -536,8 +538,11 @@ class create_stroke_cloud():
             line.set_edge_type('construction_line')
             line.set_order_count(self.order_count)
             self.order_count += 1
-            self.edges[line.id] = line
-            
+            self.edges[line.order_count] = line
+        
+        self.edges = Preprocessing.proc_CAD.line_utils.remove_duplicate_lines(self.edges)
+        self.edges = Preprocessing.proc_CAD.line_utils.remove_single_point(self.edges)
+
         self.determine_edge_type()
         
         for edge_id, edge in self.edges.items():
@@ -546,7 +551,7 @@ class create_stroke_cloud():
         
         self.adj_edges()
         self.map_id_to_count()
-        self.vis_brep()
+        # self.vis_brep()
         self.vis_stroke_cloud(self.directory, show = True, target_Op = 'sketch')
 
 

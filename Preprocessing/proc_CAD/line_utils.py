@@ -497,69 +497,70 @@ def perturbing_lines(all_edges):
 
 def remove_duplicate_lines(all_edges):
     """
-    Removes duplicate edges from the set of edges `all_edges`. An edge A->B is considered
-    contained by another edge C->D if both points A and B lie on the line CD and have the
-    same direction.
+    Removes duplicate edges from all_edges.
+    An edge is considered a duplicate if it has the same start and end points as another edge 
+    (after rounding to 4 decimals) or if the points are in reversed order.
+    Decides which line to remove based on the edge type:
+    - Always remove 'construction_line' over 'maybe_feature_line'.
+    - If both are 'maybe_feature_line' or both are 'construction_line', remove one of them.
     """
-    def round_point(point, decimals=4):
-        """Round the coordinates of a point to a specified number of decimal places."""
-        return tuple(round(coord, decimals) for coord in point)
+    # Helper function to round a 3D point to 4 decimals
+    def round_point(point):
+        return tuple(round(coord, 4) for coord in point)
 
-    def direction_vector(p1, p2):
-        """Calculate the normalized direction vector from point p1 to point p2, rounded to 4 decimals."""
-        direction = tuple(p2[i] - p1[i] for i in range(3))
-        magnitude = math.sqrt(sum(d**2 for d in direction))
-        if magnitude == 0:
-            return (0, 0, 0)  # Degenerate line
-        return tuple(round(d / magnitude, 4) for d in direction)
+    # Dictionary to keep track of unique edges and their chosen representative
+    unique_edges = {}
 
-    def is_point_on_line(point, line_start, line_end):
-        """Check if a point lies on the line segment defined by line_start and line_end."""
-        if point == line_start or point == line_end:
-            return True  # The point coincides with one of the line's endpoints
+    # Iterate through each edge in all_edges
+    for edge_id, edge in list(all_edges.items()):
+        # Get the rounded positions of the vertices
+        p1 = round_point(edge.vertices[0].position)
+        p2 = round_point(edge.vertices[1].position)
 
-        # Direction vectors
-        line_direction = direction_vector(line_start, line_end)
-        to_point_direction = direction_vector(line_start, point)
+        # Create a normalized edge representation (smallest first to account for reversed order)
+        edge_key = tuple(sorted([p1, p2]))
 
-        # Check if direction vectors are collinear (same or opposite)
-        if all(abs(line_direction[i] - to_point_direction[i]) < 1e-4 for i in range(3)):
-            # Check if the point is between line_start and line_end
-            for i in range(3):
-                if not (min(line_start[i], line_end[i]) <= point[i] <= max(line_start[i], line_end[i])):
-                    return False
-            return True
-        return False
+        # If this normalized edge representation is not in unique_edges, add it
+        if edge_key not in unique_edges:
+            unique_edges[edge_key] = edge
+        else:
+            # If a duplicate is found, decide which edge to remove based on type
+            existing_edge = unique_edges[edge_key]
 
-    edges_to_remove = set()
-
-    for edge_id1, edge1 in all_edges.items():
-        pointA = round_point(edge1.vertices[0].position)
-        pointB = round_point(edge1.vertices[1].position)
-        dir1 = direction_vector(pointA, pointB)
-
-        for edge_id2, edge2 in all_edges.items():
-            if edge_id1 == edge_id2 or edge_id2 in edges_to_remove:
-                continue  # Skip comparing the same edge or already marked edges
-
-            pointC = round_point(edge2.vertices[0].position)
-            pointD = round_point(edge2.vertices[1].position)
-            dir2 = direction_vector(pointC, pointD)
-
-            # Check if directions are the same or opposite
-            if all(abs(dir1[i] - dir2[i]) < 1e-4 for i in range(3)):
-                # Check if both A and B are on the line CD
-                if is_point_on_line(pointA, pointC, pointD) and is_point_on_line(pointB, pointC, pointD):
-                    edges_to_remove.add(edge_id1)
-                    break
-
-    # Remove the contained edges
-    for edge_id in edges_to_remove:
-        del all_edges[edge_id]
+            # Logic to determine which edge to keep:
+            # Always prefer 'maybe_feature_line' over 'construction_line'
+            if existing_edge.edge_type == 'construction_line' and edge.edge_type == 'maybe_feature_line':
+                # Replace the existing 'construction_line' with 'maybe_feature_line'
+                unique_edges[edge_key] = edge
+                del all_edges[existing_edge.id]  # Remove the older 'construction_line'
+            elif existing_edge.edge_type == 'maybe_feature_line' and edge.edge_type == 'construction_line':
+                # Keep the existing 'maybe_feature_line' and remove the new 'construction_line'
+                del all_edges[edge_id]
+            else:
+                # Both edges are of the same type; you can remove either one
+                # For simplicity, we remove the current one
+                del all_edges[edge_id]
 
     return all_edges
 
 
-# -------------------- Go through self.edges, see if the new edge is comprised -------------------- #
+def remove_single_point(all_edges):
+    """
+    Removes edges from all_edges where both points of the edge are the same.
+    An edge is considered junk if its start and end points are identical.
+    """
+    # Helper function to round a 3D point to 4 decimals
+    def round_point(point):
+        return tuple(round(coord, 4) for coord in point)
 
-    
+    # Iterate through each edge in all_edges
+    for edge_id, edge in list(all_edges.items()):
+        # Get the rounded positions of the vertices
+        p1 = round_point(edge.vertices[0].position)
+        p2 = round_point(edge.vertices[1].position)
+
+        # If the start and end points are the same, remove the edge
+        if p1 == p2:
+            del all_edges[edge_id]
+
+    return all_edges
