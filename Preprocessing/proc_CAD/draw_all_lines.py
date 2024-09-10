@@ -61,8 +61,6 @@ class create_stroke_cloud():
             op = self.data[self.current_index]
             self.parse_op(op, self.current_index)
             self.current_index += 1
-
-            
             
             if op['operation'][0] == 'extrude':
                 self.finishing_production()
@@ -248,7 +246,8 @@ class create_stroke_cloud():
             edge.set_Op(op, index)
             edge.set_order_count(self.order_count)
             new_edges.append(edge)
-            self.order_count += 1
+
+            # self.edges[edge.order_count] = edge
 
 
         # Now add the new edges to self.edges
@@ -455,13 +454,16 @@ class create_stroke_cloud():
 
             # Step 2: Add the new edge if not contained within any existing edge
             if not is_edge_contained:
+                new_edge.set_order_count(self.order_count)
+                self.order_count += 1
                 self.edges[new_edge.order_count] = new_edge
             else:
                 # Remove the contained edge and add the new split edges
                 for edge_id in edges_to_remove:
-                    pass
-                    # del self.edges[edge_id]
+                    del self.edges[edge_id]
                 for edge in edges_to_add:
+                    edge.set_order_count(self.order_count)
+                    self.order_count += 1
                     self.edges[edge.order_count] = edge
         
 
