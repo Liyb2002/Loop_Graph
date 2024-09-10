@@ -559,3 +559,106 @@ def face_aggregate_direct(stroke_matrix):
             valid_groups.append(list(group_indices))
     
     return valid_groups
+
+
+
+#----------------------------------------------------------------------------------#
+def loop_neighboring_simple(loops):
+    """
+    Determine neighboring loops based on shared edges.
+    
+    Parameters:
+    loops (list of list of int): A list where each sublist contains indices representing edges of a loop.
+    
+    Returns:
+    np.ndarray: A matrix of shape (num_loops, num_loops) where [i, j] is 1 if loops i and j share an edge, otherwise 0.
+    """
+    num_loops = len(loops)
+    # Initialize the neighboring matrix with zeros with dtype float32
+    neighboring_matrix = np.zeros((num_loops, num_loops), dtype=np.float32)
+    
+    # Iterate over each pair of loops to check for shared edges
+    for i in range(num_loops):
+        for j in range(i + 1, num_loops):
+            # Check if loops i and j share any edge
+            if set(loops[i]).intersection(set(loops[j])):
+                neighboring_matrix[i, j] = 1.0
+                neighboring_matrix[j, i] = 1.0  # Since the matrix is symmetric
+    
+    return neighboring_matrix
+    
+
+
+def loop_neighboring_complex(loops, stroke_node_features):
+    """
+    Determine neighboring loops based on shared edges and different normals.
+    
+    Parameters:
+    loops (list of list of int): A list where each sublist contains indices representing edges of a loop.
+    stroke_node_features (np.ndarray): A (num_strokes, 7) matrix where the first 6 columns represent two 3D points forming a line.
+    
+    Returns:
+    np.ndarray: A matrix of shape (num_loops, num_loops) where [i, j] is 1 if loops i and j are connected, otherwise 0.
+    """
+    num_loops = len(loops)
+    # Initialize the neighboring matrix with zeros with dtype float32
+    neighboring_matrix = np.zeros((num_loops, num_loops), dtype=np.float32)
+    
+    # Function to compute the normal of a loop
+    def compute_normal(loop_indices):
+        points = []
+        # Gather all points of the loop
+        for idx in loop_indices:
+            start_point = stroke_node_features[idx, :3]
+            end_point = stroke_node_features[idx, 3:6]
+            points.append(start_point)
+            points.append(end_point)
+        
+        # Compute vectors from first point to the next two points
+        vec1 = points[1] - points[0]
+        vec2 = points[2] - points[0]
+        # Compute the cross product to get the normal
+        normal = np.cross(vec1, vec2)
+        # Normalize the normal vector
+        normal = normal / np.linalg.norm(normal)
+        # Ensure the normal is positive in direction
+        if normal[2] < 0:
+            normal = -normal
+        return normal
+
+    # Compute normals for each loop
+    loop_normals = [compute_normal(loop) for loop in loops]
+    print("loop_normals", loop_normals)
+
+    # Iterate over each pair of loops to check for shared edges and different normals
+    for i in range(num_loops):
+        for j in range(i + 1, num_loops):
+            # Check if loops i and j share any edge
+            if set(loops[i]).intersection(set(loops[j])):
+                # Check if the normals are different
+                if not np.allclose(loop_normals[i], loop_normals[j]):
+                    neighboring_matrix[i, j] = 1.0
+                    neighboring_matrix[j, i] = 1.0  # Since the matrix is symmetric
+
+    return neighboring_matrix
+
+
+def check_validacy(matrix1, matrix2):
+    """
+    Check the validity between two matrices.
+    
+    Parameters:
+    matrix1 (np.ndarray): The first matrix of shape (num_loops, num_loops).
+    matrix2 (np.ndarray): The second matrix of shape (num_loops, num_loops).
+    
+    Returns:
+    bool: True if for every entry [i, j] in matrix2 with value 1, the corresponding entry in matrix1 is also 1.
+    """
+    # Ensure matrices have the same shape
+    if matrix1.shape != matrix2.shape:
+        raise ValueError("Both matrices must have the same shape.")
+    
+    # Check validity
+    is_valid = np.all((matrix2 == 1) <= (matrix1 == 1))
+    
+    return is_valid

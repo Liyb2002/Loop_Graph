@@ -73,9 +73,21 @@ class dataset_generator():
             stroke_cloud_class.read_next(next_stop_idx)
             stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_class.edges)
 
+
             # 2) Get the loops
             loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features)
-            print("networkx", loops)
+
+
+            # 3) Compute Loop Information
+            loop_neighboring_simple = Preprocessing.proc_CAD.helper.loop_neighboring_simple(loops)
+            loop_neighboring_complex = Preprocessing.proc_CAD.helper.loop_neighboring_complex(loops, stroke_node_features)
+
+            valid_neighboring_loops = Preprocessing.proc_CAD.helper.check_validacy(loop_neighboring_simple, loop_neighboring_complex)
+            print("loop_neighboring_simple", loop_neighboring_simple)
+            print("loop_neighboring_complex", loop_neighboring_complex)
+            print("valid_neighboring_loops", valid_neighboring_loops)
+
+            
 
 
         print("--------cut off line------------")
