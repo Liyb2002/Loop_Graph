@@ -63,7 +63,8 @@ def build_graph(stroke_dict):
     operations_order_matrix = np.zeros((num_strokes, num_operation_counts+1))
 
 
-    for i, (_, stroke) in enumerate(stroke_dict.items()):
+    for i, key in enumerate(sorted(stroke_dict.keys())):
+        stroke = stroke_dict[key]
 
         # build node_features
         # node_features has shape num_strokes x 6, which is the starting and ending point

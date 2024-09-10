@@ -76,16 +76,16 @@ class dataset_generator():
 
             # 2) Get the loops
             loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features)
+            print("prev loops", loops)
+            loops = Preprocessing.proc_CAD.helper.reorder_loops(loops)
+            print("reorder loops", loops)
 
 
             # 3) Compute Loop Information
             loop_neighboring_simple = Preprocessing.proc_CAD.helper.loop_neighboring_simple(loops)
             loop_neighboring_complex = Preprocessing.proc_CAD.helper.loop_neighboring_complex(loops, stroke_node_features)
 
-            valid_neighboring_loops = Preprocessing.proc_CAD.helper.check_validacy(loop_neighboring_simple, loop_neighboring_complex)
-            print("loop_neighboring_simple", loop_neighboring_simple)
-            print("loop_neighboring_complex", loop_neighboring_complex)
-            print("valid_neighboring_loops", valid_neighboring_loops)
+            # valid_neighboring_loops = Preprocessing.proc_CAD.helper.check_validacy(loop_neighboring_simple, loop_neighboring_complex)
 
             
 

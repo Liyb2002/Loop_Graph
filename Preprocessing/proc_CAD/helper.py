@@ -563,6 +563,31 @@ def face_aggregate_direct(stroke_matrix):
 
 
 #----------------------------------------------------------------------------------#
+def reorder_loops(loops):
+    """
+    Reorder loops based on the average order of their strokes.
+    
+    Parameters:
+    loops (list of list of int): A list where each sublist contains indices representing strokes of a loop.
+    
+    Returns:
+    list of list of int: The reordered loops where the smallest loop order comes first.
+    """
+    # Calculate the order for each loop (average of stroke indices)
+    loop_orders = [(i, sum(loop) / len(loop)) for i, loop in enumerate(loops)]
+
+    # Sort loops by their calculated order
+    loop_orders.sort(key=lambda x: x[1])
+
+    # Reorder loops according to the sorted order
+    reordered_loops = [loops[i] for i, _ in loop_orders]
+
+    return reordered_loops
+
+
+
+
+#----------------------------------------------------------------------------------#
 def loop_neighboring_simple(loops):
     """
     Determine neighboring loops based on shared edges.
@@ -662,3 +687,6 @@ def check_validacy(matrix1, matrix2):
     is_valid = np.all((matrix2 == 1) <= (matrix1 == 1))
     
     return is_valid
+
+
+
