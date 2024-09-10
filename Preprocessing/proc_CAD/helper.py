@@ -653,7 +653,6 @@ def loop_neighboring_complex(loops, stroke_node_features):
 
     # Compute normals for each loop
     loop_normals = [compute_normal(loop) for loop in loops]
-    print("loop_normals", loop_normals)
 
     # Iterate over each pair of loops to check for shared edges and different normals
     for i in range(num_loops):
@@ -667,6 +666,27 @@ def loop_neighboring_complex(loops, stroke_node_features):
 
     return neighboring_matrix
 
+
+def coplanr_neighorbing_loop(matrix1, matrix2):
+    """
+    Compute a matrix indicating coplanar neighboring loops based on the differences between matrix1 and matrix2.
+    
+    Parameters:
+    matrix1 (np.ndarray): A matrix of shape (num_loops, num_loops) with more values of 1 than matrix2.
+    matrix2 (np.ndarray): A matrix of shape (num_loops, num_loops) with fewer values of 1 than matrix1.
+    
+    Returns:
+    np.ndarray: A matrix of the same shape where [i, j] is 1 if matrix1[i, j] is 1 and matrix2[i, j] is not 1.
+    """
+    # Ensure matrices have the same shape
+    if matrix1.shape != matrix2.shape:
+        raise ValueError("Both matrices must have the same shape.")
+    
+    # Compute the coplanar neighboring matrix
+    result_matrix = np.where((matrix1 == 1) & (matrix2 != 1), 1, 0)
+    
+    return result_matrix
+    
 
 def check_validacy(matrix1, matrix2):
     """
@@ -689,4 +709,6 @@ def check_validacy(matrix1, matrix2):
     return is_valid
 
 
+
+#----------------------------------------------------------------------------------#
 
