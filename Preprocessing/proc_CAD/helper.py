@@ -464,15 +464,15 @@ def chosen_face_id(boundary_points, edge_features):
 #----------------------------------------------------------------------------------#
 def face_aggregate_networkx(stroke_matrix):
     """
-    This function finds all connected groups of strokes with size 3 or 4 using NetworkX.
-    It checks if each point appears exactly twice within each group.
+    This function finds all valid loops of strokes with size 3 or 4 using NetworkX.
+    It generates all possible valid cycles by permuting over nodes and checking for a valid cycle.
 
     Parameters:
     stroke_matrix (numpy.ndarray): A matrix of shape (num_strokes, 7) where each row represents a stroke
                                    with start and end points in 3D space.
 
     Returns:
-    list: A list of indices of valid connected groups of strokes, where each group contains either 3 or 4 strokes.
+    list: A list of indices of valid loops of strokes, where each loop contains either 3 or 4 strokes.
     """
     
     # Ensure input is a numpy array and ignore the last column
@@ -487,32 +487,50 @@ def face_aggregate_networkx(stroke_matrix):
         start_point = tuple(np.round(stroke[:3], 4))
         end_point = tuple(np.round(stroke[3:], 4))
         G.add_edge(start_point, end_point)
+        # Store both directions in the dictionary to handle undirected edges
         edge_to_stroke_id[(start_point, end_point)] = idx
         edge_to_stroke_id[(end_point, start_point)] = idx  # Add both directions for undirected graph
-    
+
     # List to store valid groups
     valid_groups = []
-    
+
     # Generate all possible combinations of nodes of size 3 or 4
     nodes = list(G.nodes)
-    
-    # Check for all combinations of 3 nodes
+
+    # Helper function to check if a set of edges forms a valid cycle
+    def check_valid_edges(edges):
+        point_count = {}
+        for edge in edges:
+            point_count[edge[0]] = point_count.get(edge[0], 0) + 1
+            point_count[edge[1]] = point_count.get(edge[1], 0) + 1
+        # A valid cycle has each node exactly twice
+        return all(count == 2 for count in point_count.values())
+
+    # Check for valid loops of size 3 and 4
     for group_nodes in combinations(nodes, 3):
-        subgraph = G.subgraph(group_nodes)
-        if len(subgraph.edges) == 3 and all(subgraph.degree(n) == 2 for n in subgraph.nodes):
-            # Efficiently get stroke IDs for this subgraph
-            strokes_in_group = [edge_to_stroke_id[edge] for edge in subgraph.edges]
-            valid_groups.append(strokes_in_group)
-    
-    # Check for all combinations of 4 nodes
+        # Check if these nodes can form a valid subgraph
+        if nx.is_connected(G.subgraph(group_nodes)):
+            # Generate all permutations of the edges
+            for perm_edges in permutations(combinations(group_nodes, 2), 3):
+                if check_valid_edges(perm_edges):
+                    strokes_in_group = [edge_to_stroke_id.get(edge) or edge_to_stroke_id.get((edge[1], edge[0])) for edge in perm_edges]
+                    if None not in strokes_in_group:  # Ensure all edges are found in the mapping
+                        valid_groups.append(sorted(strokes_in_group))
+
     for group_nodes in combinations(nodes, 4):
-        subgraph = G.subgraph(group_nodes)
-        if len(subgraph.edges) == 4 and all(subgraph.degree(n) == 2 for n in subgraph.nodes):
-            # Efficiently get stroke IDs for this subgraph
-            strokes_in_group = [edge_to_stroke_id[edge] for edge in subgraph.edges]
-            valid_groups.append(strokes_in_group)
-    
-    return valid_groups
+        # Check if these nodes can form a valid subgraph
+        if nx.is_connected(G.subgraph(group_nodes)):
+            # Generate all permutations of the edges
+            for perm_edges in permutations(combinations(group_nodes, 2), 4):
+                if check_valid_edges(perm_edges):
+                    strokes_in_group = [edge_to_stroke_id.get(edge) or edge_to_stroke_id.get((edge[1], edge[0])) for edge in perm_edges]
+                    if None not in strokes_in_group:  # Ensure all edges are found in the mapping
+                        valid_groups.append(sorted(strokes_in_group))
+
+    # Remove duplicate loops by converting to a set of frozensets
+    unique_groups = list(set(frozenset(group) for group in valid_groups))
+
+    return unique_groups
 
 
 def face_aggregate_direct(stroke_matrix):
@@ -711,4 +729,79 @@ def check_validacy(matrix1, matrix2):
 
 
 #----------------------------------------------------------------------------------#
+def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges):
+    """
+    Find the correspondence between stroke loops and brep loops and visualize unrepresented stroke loops.
+    
+    Parameters:
+    stroke_cloud_loops (list of list of int): Each sublist contains indices of strokes in stroke_node_features.
+    brep_loops (list of list of int): Each sublist contains indices of edges in final_brep_edges.
+    stroke_node_features (np.ndarray): A matrix of shape (num_strokes, 7), where the first 6 columns represent two 3D points.
+    final_brep_edges (np.ndarray): A matrix of shape (num_brep_edges, 6) representing two 3D points for each edge.
+    
+    Returns:
+    np.ndarray: A matrix with shape (num_stroke_cloud_loops, num_brep_loops) where each entry is 1 if the loops match, otherwise 0.
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
 
+    # Initialize the correspondence matrix
+    num_stroke_cloud_loops = len(stroke_cloud_loops)
+    num_brep_loops = len(brep_loops)
+    correspondence_matrix = np.zeros((num_stroke_cloud_loops, num_brep_loops), dtype=np.float32)
+
+    # Step 1: Find matching between stroke_node_features and final_brep_edges
+    stroke_to_brep_map = {}
+    for stroke_idx, stroke in enumerate(stroke_node_features):
+        stroke_points = set(map(tuple, [stroke[:3], stroke[3:6]]))
+        for brep_idx, brep_edge in enumerate(final_brep_edges):
+            brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))
+            if stroke_points == brep_points:  # Matching found (considering reversed order)
+                stroke_to_brep_map[stroke_idx] = brep_idx
+                break
+
+    # Step 2: Find the corresponding loops based on matching edges
+    stroke_matched = [False] * num_stroke_cloud_loops  # Track matched stroke loops
+
+    for i, stroke_loop in enumerate(stroke_cloud_loops):
+        stroke_brep_indices = set(stroke_to_brep_map.get(stroke_idx) for stroke_idx in stroke_loop if stroke_idx in stroke_to_brep_map)
+        for j, brep_loop in enumerate(brep_loops):
+            if stroke_brep_indices == set(brep_loop):
+                correspondence_matrix[i, j] = 1.0
+                stroke_matched[i] = True
+
+
+    return correspondence_matrix
+
+
+def vis_specific_loop(loop, strokes):
+    """
+    Visualize specific loops and strokes.
+    
+    Parameters:
+    loop (list of int): A list containing indices of the strokes to be highlighted.
+    strokes (np.ndarray): A matrix of shape (num_strokes, 7), where the first 6 columns represent two 3D points.
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot all strokes in blue
+    for stroke in strokes:
+        start, end = stroke[:3], stroke[3:6]
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', alpha=0.5)
+
+    # Plot strokes in the loop in red
+    for idx in loop:
+        stroke = strokes[idx]
+        start, end = stroke[:3], stroke[3:6]
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='red', linewidth=2)
+
+    # Set labels and show plot
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    plt.show()
