@@ -23,7 +23,7 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 1, start = 0)
+        self.generate_dataset('dataset/test', number_data = 10, start = 0)
         self.generate_dataset('dataset/eval', number_data = 0, start = 0)
 
 
@@ -132,6 +132,7 @@ class dataset_generator():
 
 
             # 7) Write the data to file
+            os.makedirs(os.path.join(data_directory, 'shape_info'), exist_ok=True)
             output_file_path = os.path.join(data_directory, 'shape_info', f'shape_info_{file_count}.pkl')
             with open(output_file_path, 'wb') as f:
                 pickle.dump({
