@@ -530,7 +530,18 @@ def face_aggregate_networkx(stroke_matrix):
     # Remove duplicate loops by converting to a set of frozensets
     unique_groups = list(set(frozenset(group) for group in valid_groups))
 
-    return unique_groups
+    # Final check: Ensure each group has the same number of unique points as edges
+    final_groups = []
+    for group in unique_groups:
+        points = set()
+        for edge_id in group:
+            stroke = stroke_matrix[edge_id]
+            points.add(tuple(stroke[:3]))
+            points.add(tuple(stroke[3:]))
+        if len(points) == len(group):
+            final_groups.append(group)
+
+    return final_groups
 
 
 def face_aggregate_direct(stroke_matrix):
@@ -649,24 +660,49 @@ def loop_neighboring_complex(loops, stroke_node_features):
     
     # Function to compute the normal of a loop
     def compute_normal(loop_indices):
-        points = []
-        # Gather all points of the loop
-        for idx in loop_indices:
-            start_point = stroke_node_features[idx, :3]
-            end_point = stroke_node_features[idx, 3:6]
-            points.append(start_point)
-            points.append(end_point)
+        # List to store edges, each with 6 useful values
+        edges = []
         
-        # Compute vectors from first point to the next two points
-        vec1 = points[1] - points[0]
-        vec2 = points[2] - points[0]
+        # Extract edges from loop_indices and discard the last value
+        for idx in loop_indices:
+            edge = stroke_node_features[idx, :6]  # First 6 values represent two 3D points
+            edges.append(edge)
+        
+        # Find two edges that share a common point
+        shared_point_found = False
+        for i in range(len(edges)):
+            for j in range(i + 1, len(edges)):
+                # Extract points from edges
+                p1_start, p1_end = edges[i][:3], edges[i][3:6]
+                p2_start, p2_end = edges[j][:3], edges[j][3:6]
+
+                # Check if there is a common point between these two edges
+                if np.allclose(p1_start, p2_start) or np.allclose(p1_start, p2_end):
+                    common_point = p1_start
+                    vec1 = p1_end - p1_start
+                    vec2 = p2_end - p2_start if np.allclose(p1_start, p2_start) else p2_start - p2_end
+                    shared_point_found = True
+                    break
+                elif np.allclose(p1_end, p2_start) or np.allclose(p1_end, p2_end):
+                    common_point = p1_end
+                    vec1 = p1_start - p1_end
+                    vec2 = p2_end - p2_start if np.allclose(p1_end, p2_start) else p2_start - p2_end
+                    shared_point_found = True
+                    break
+            if shared_point_found:
+                break
+        
         # Compute the cross product to get the normal
         normal = np.cross(vec1, vec2)
-        # Normalize the normal vector
+        
+        if np.isnan(normal).any():
+            return np.array([0,0,0])
         normal = normal / np.linalg.norm(normal)
-        # Ensure the normal is positive in direction
+        
+        # Ensure the normal is positive in the z-direction
         if normal[2] < 0:
             normal = -normal
+
         return normal
 
     # Compute normals for each loop
@@ -683,6 +719,7 @@ def loop_neighboring_complex(loops, stroke_node_features):
                     neighboring_matrix[j, i] = 1.0  # Since the matrix is symmetric
 
     return neighboring_matrix
+
 
 
 def coplanr_neighorbing_loop(matrix1, matrix2):
@@ -705,6 +742,7 @@ def coplanr_neighorbing_loop(matrix1, matrix2):
     
     return result_matrix
     
+
 
 def check_validacy(matrix1, matrix2):
     """

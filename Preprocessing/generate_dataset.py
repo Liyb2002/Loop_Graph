@@ -68,6 +68,9 @@ class dataset_generator():
         brep_files = [file_name for file_name in os.listdir(brep_directory) if file_name.startswith('brep_') and file_name.endswith('.step')]
         brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
 
+        prev_stop_idx = 0
+        file_count = 0
+
         while True:
             # 1) Produce the Stroke Cloud features
             next_stop_idx = stroke_cloud_class.get_next_stop()
@@ -92,7 +95,11 @@ class dataset_generator():
             
             # 4) Load Brep
             # brep_edges = stroke_cloud_class.brep_edges
-            usable_brep_files = brep_files[:next_stop_idx+1]
+            if prev_stop_idx == 0:
+                prev_stop_idx = next_stop_idx+1
+                continue
+
+            usable_brep_files = brep_files[:prev_stop_idx]
             final_brep_edges_list = []
             prev_brep_edges = []
 
@@ -118,49 +125,35 @@ class dataset_generator():
 
             # 5) Stroke_Cloud - Brep Connection
             stroke_to_brep = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges)
-            print("stroke_to_brep", stroke_to_brep) 
-        print("--------cut off line------------")
 
 
+            # 6) Update the next brep file to read
+            prev_stop_idx = next_stop_idx+1
 
 
+            # 7) Write the data to file
+            output_file_path = os.path.join(data_directory, 'shape_info', f'shape_info_{file_count}.pkl')
+            with open(output_file_path, 'wb') as f:
+                pickle.dump({
+                    'stroke_cloud_loops': stroke_cloud_loops, 
+                    'brep_loops': brep_loops,
 
+                    'stroke_node_features': stroke_node_features,
+                    'final_brep_edges': final_brep_edges,
 
-# --------------------------------------------------------------------------------------------------------
+                    'loop_neighboring_vertical': loop_neighboring_vertical,
+                    'loop_neighboring_horizontal': loop_neighboring_horizontal,
 
+                    'brep_loop_neighboring': brep_loop_neighboring,
 
-
-
-
-
-
-            # print("face_to_stroke", face_to_stroke)
-            # print("brep_to_stroke", brep_to_stroke)
-            # print("node_features", node_features.shape)
-            # print("final_brep_edges", final_brep_edges)
-            # brep_stroke_connection = Preprocessing.proc_CAD.helper.stroke_to_brep(face_to_stroke, brep_to_stroke, node_features, final_brep_edges)
-            # brep_coplanar = Preprocessing.proc_CAD.helper.coplanar_matrix(brep_to_stroke, final_brep_edges)
-        
-       
-            # # extract index i
-            # index = file_name.split('_')[1].split('.')[0]
-            # os.makedirs(os.path.join(data_directory, 'brep_embedding'), exist_ok=True)
-            # embeddings_file_path = os.path.join(data_directory, 'brep_embedding', f'brep_info_{index}.pkl')
-            # with open(embeddings_file_path, 'wb') as f:
-            #     pickle.dump({
-            #         'brep_to_stroke': brep_to_stroke, 
-            #         'edge_features': final_brep_edges,
-            #         'gnn_brep_edges': gnn_brep_edges,
-            #         'brep_stroke_connection': brep_stroke_connection,
-            #         'brep_coplanar': brep_coplanar
-
-            #     }, f)
-
-        # 4) Save rendered 2D image
-        Preprocessing.proc_CAD.render_images.run_render_images(data_directory)
-
+                    'stroke_to_brep': stroke_to_brep
+                }, f)
+            
+            file_count += 1
 
         return True
+
+
 
 
 

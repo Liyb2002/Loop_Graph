@@ -76,9 +76,9 @@ class Edge:
     
     def set_alpha_value(self):
         if self.edge_type == 'feature_line':
-            self.alpha_value = np.random.uniform(0.6, 0.9)
+            self.alpha_value = np.random.uniform(0.5, 0.8)
         if self.edge_type == 'construction_line':
-            self.alpha_value = np.random.uniform(0.1, 0.2)
+            self.alpha_value = np.random.uniform(0.3, 0.6)
 
 
 
