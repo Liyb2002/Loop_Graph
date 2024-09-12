@@ -36,9 +36,6 @@ class LoopEmbeddingNetwork(nn.Module):
         for indices in stroke_to_loop:
             indices = [index.item() for index in indices]
             
-            print("node_features", node_features.shape)
-            print("indices", indices)
-
             strokes = node_features[indices]  # shape: (num_indices, 6)
             
             # Embed the strokes

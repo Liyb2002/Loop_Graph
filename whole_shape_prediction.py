@@ -19,7 +19,7 @@ import Models.loop_embeddings
 
 loop_embed_model = Models.loop_embeddings.LoopEmbeddingNetwork()
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
-graph_decoder = Encoders.gnn.gnn.Sketch_brep_prediction()
+graph_decoder = Encoders.gnn.gnn.Sketch_prediction()
 loop_embed_model.to(device)
 graph_encoder.to(device)
 graph_decoder.to(device)
@@ -72,10 +72,14 @@ def train():
             program, stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal, brep_loop_neighboring, stroke_to_brep = batch
 
             stroke_node_features = stroke_node_features.to(torch.float32).squeeze(0)
+            stroke_to_brep = stroke_to_brep.to(torch.float32).squeeze(0)
 
             # Loop embeddings
-            sketch_loop_embeddings = loop_embed_model(stroke_node_features, stroke_cloud_loops)
+            stroke_loop_embeddings = loop_embed_model(stroke_node_features, stroke_cloud_loops)
 
+            # Build Graph
+            gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(stroke_loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep)
+            print("gnn_graph", gnn_graph['stroke'].x.shape)
 
 #---------------------------------- Public Functions ----------------------------------#
 
