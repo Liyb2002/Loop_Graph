@@ -71,7 +71,11 @@ def train():
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} - Training"):
             program, stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal, brep_loop_neighboring, stroke_to_brep = batch
 
-            print("program", program)
+            stroke_node_features = stroke_node_features.to(torch.float32).squeeze(0)
+
+            # Loop embeddings
+            sketch_loop_embeddings = loop_embed_model(stroke_node_features, stroke_cloud_loops)
+
 
 #---------------------------------- Public Functions ----------------------------------#
 

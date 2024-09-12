@@ -80,6 +80,7 @@ class dataset_generator():
             stroke_cloud_class.read_next(next_stop_idx)
             stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_class.edges)
             stroke_node_features = np.round(stroke_node_features, 4)
+            stroke_node_features = stroke_node_features[:, :-1]
 
 
             # 2) Get the loops
