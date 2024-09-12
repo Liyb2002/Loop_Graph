@@ -532,14 +532,14 @@ def remove_duplicate_lines(all_edges):
             if existing_edge.edge_type == 'construction_line' and edge.edge_type == 'maybe_feature_line':
                 # Replace the existing 'construction_line' with 'maybe_feature_line'
                 unique_edges[edge_key] = edge
-                del all_edges[existing_edge.id]  # Remove the older 'construction_line'
+                del all_edges[existing_edge.order_count]  # Remove the older 'construction_line'
             elif existing_edge.edge_type == 'maybe_feature_line' and edge.edge_type == 'construction_line':
                 # Keep the existing 'maybe_feature_line' and remove the new 'construction_line'
-                del all_edges[edge_id]
+                del all_edges[edge.order_count]
             else:
                 # Both edges are of the same type; you can remove either one
                 # For simplicity, we remove the current one
-                del all_edges[edge_id]
+                del all_edges[edge.order_count]
 
     return all_edges
 

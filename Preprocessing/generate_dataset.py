@@ -96,36 +96,39 @@ class dataset_generator():
             # 4) Load Brep
             # brep_edges = stroke_cloud_class.brep_edges
             if prev_stop_idx == 0:
-                prev_stop_idx = next_stop_idx+1
-                continue
-
-            usable_brep_files = brep_files[:prev_stop_idx]
-            final_brep_edges_list = []
-            prev_brep_edges = []
-
-            for file_name in usable_brep_files:
-                brep_file_path = os.path.join(brep_directory, file_name)
-                edge_features_list, edge_coplanar_list= Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
-                if len(prev_brep_edges) == 0:
-                    final_brep_edges_list = edge_features_list
-                    prev_brep_edges = edge_features_list
-                    new_features = edge_features_list
-                else:
-                    # We already have brep
-                    new_features= find_new_features(prev_brep_edges, edge_features_list) 
-                    final_brep_edges_list += new_features
-                    prev_brep_edges = edge_features_list
+                final_brep_edges = np.zeros(0)
+                brep_loops = []
+                brep_loop_neighboring = np.zeros(0)
+                stroke_to_brep = np.zeros(0)
             
+            else:
+                usable_brep_files = brep_files[:prev_stop_idx]
+                final_brep_edges_list = []
+                prev_brep_edges = []
+
+                for file_name in usable_brep_files:
+                    brep_file_path = os.path.join(brep_directory, file_name)
+                    edge_features_list, edge_coplanar_list= Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
+                    if len(prev_brep_edges) == 0:
+                        final_brep_edges_list = edge_features_list
+                        prev_brep_edges = edge_features_list
+                        new_features = edge_features_list
+                    else:
+                        # We already have brep
+                        new_features= find_new_features(prev_brep_edges, edge_features_list) 
+                        final_brep_edges_list += new_features
+                        prev_brep_edges = edge_features_list
+                
+                
+                final_brep_edges = np.array(final_brep_edges_list)
+                final_brep_edges = np.round(final_brep_edges, 4)
+                brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(final_brep_edges)
+                brep_loop_neighboring = Preprocessing.proc_CAD.helper.loop_neighboring_simple(brep_loops)
+
+
+                # 5) Stroke_Cloud - Brep Connection
+                stroke_to_brep = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges)
             
-            final_brep_edges = np.array(final_brep_edges_list)
-            final_brep_edges = np.round(final_brep_edges, 4)
-            brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(final_brep_edges)
-            brep_loop_neighboring = Preprocessing.proc_CAD.helper.loop_neighboring_simple(brep_loops)
-
-
-            # 5) Stroke_Cloud - Brep Connection
-            stroke_to_brep = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges)
-
 
             # 6) Update the next brep file to read
             prev_stop_idx = next_stop_idx+1
@@ -141,6 +144,7 @@ class dataset_generator():
 
                     'stroke_node_features': stroke_node_features,
                     'final_brep_edges': final_brep_edges,
+                    'stroke_operations_order_matrix': stroke_operations_order_matrix, 
 
                     'loop_neighboring_vertical': loop_neighboring_vertical,
                     'loop_neighboring_horizontal': loop_neighboring_horizontal,
