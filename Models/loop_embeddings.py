@@ -62,3 +62,44 @@ class LoopEmbeddingNetwork(nn.Module):
 
         return face_embeddings
 
+
+
+
+class LoopConnectivityDecoder(nn.Module):
+    def __init__(self, embedding_dim=32, hidden_dim=64):
+        super(LoopConnectivityDecoder, self).__init__()
+        # A feed-forward network to predict connectivity
+        self.fc = nn.Sequential(
+            nn.Linear(embedding_dim * 2, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1),
+            nn.Sigmoid()
+        )
+
+    def forward(self, loop_embeddings):
+        """
+        Given loop embeddings, produce a connectivity matrix.
+        Args:
+            loop_embeddings (torch.Tensor): Tensor of shape (num_loops, embedding_dim)
+        Returns:
+            connectivity_matrix (torch.Tensor): Tensor of shape (num_loops, num_loops) with values in {0, 1}
+        """
+        num_loops = loop_embeddings.size(0)
+        
+        # Create empty matrix for storing connectivity predictions
+        connectivity_matrix = torch.zeros(num_loops, num_loops, device=loop_embeddings.device)
+        
+        # Compute pairwise connectivity
+        for i in range(num_loops):
+            for j in range(i + 1, num_loops):
+                # Concatenate embeddings for the pair (i, j)
+                pair_embedding = torch.cat([loop_embeddings[i], loop_embeddings[j]], dim=0)  # Shape: (embedding_dim * 2)
+                
+                # Predict if they share an edge
+                connectivity_score = self.fc(pair_embedding)  # Shape: (1,)
+                
+                # Store the result symmetrically
+                connectivity_matrix[i, j] = connectivity_score
+                connectivity_matrix[j, i] = connectivity_score
+        
+        return connectivity_matrix

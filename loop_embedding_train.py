@@ -18,8 +18,10 @@ import Models.loop_embeddings
 
 
 loop_embed_model = Models.loop_embeddings.LoopEmbeddingNetwork()
+loop_decoder_model = Models.loop_embeddings.LoopConnectivityDecoder()
 
 loop_embed_model.to(device)
+loop_decoder_model.to(device)
 
 criterion = nn.BCELoss()
 optimizer = optim.Adam(list(loop_embed_model.parameters()), lr=0.0004)
@@ -70,8 +72,11 @@ def train():
             # Loop embeddings
             stroke_loop_embeddings = loop_embed_model(stroke_node_features, stroke_cloud_loops)
 
-            print("stroke_loop_embeddings", stroke_loop_embeddings.shape)
+            # Loop decoding 
+            connectivity_matrix = loop_decoder_model(stroke_loop_embeddings)
 
+            print("stroke_loop_embeddings", stroke_loop_embeddings.shape)
+            print("connectivity_matrix", connectivity_matrix.shape)
 
 
 #---------------------------------- Public Functions ----------------------------------#
