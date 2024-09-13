@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm 
 import pickle
+import numpy as np
 
 from Preprocessing.config import device
 import Preprocessing.proc_CAD.helper
@@ -43,6 +44,17 @@ class Program_Graph_Dataset(Dataset):
         stroke_cloud_loops = [list(fset) for fset in shape_data['stroke_cloud_loops']]
         stroke_node_features = shape_data['stroke_node_features']
 
-        return stroke_cloud_loops, stroke_node_features
+        loop_neighboring_vertical = shape_data['loop_neighboring_vertical']
+        loop_neighboring_horizontal = shape_data['loop_neighboring_horizontal']
+        loop_neighboring_combined = np.logical_or(loop_neighboring_vertical, loop_neighboring_horizontal).astype(int)
+
+        return stroke_cloud_loops, stroke_node_features, loop_neighboring_combined
         
     
+
+
+def combine_matrix(loop_neighboring_vertical, loop_neighboring_horizontal):
+    
+    return np.logical_or(loop_neighboring_vertical, loop_neighboring_horizontal).astype(int)
+
+

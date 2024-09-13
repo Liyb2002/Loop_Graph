@@ -24,7 +24,7 @@ loop_embed_model.to(device)
 loop_decoder_model.to(device)
 
 criterion = nn.BCELoss()
-optimizer = optim.Adam(list(loop_embed_model.parameters()), lr=0.0004)
+optimizer = optim.Adam(list(loop_embed_model.parameters()) + list(loop_decoder_model.parameters()), lr=0.0004)
 
 # ------------------------------------------------------------------------------# 
 
@@ -34,10 +34,12 @@ os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
     loop_embed_model.load_state_dict(torch.load(os.path.join(save_dir, 'loop_embed_model.pth')))
+    loop_decoder_model.load_state_dict(torch.load(os.path.join(save_dir, 'loop_decoder_model.pth')))
 
 
 def save_models():
     torch.save(loop_embed_model.state_dict(), os.path.join(save_dir, 'loop_embed_model.pth'))
+    torch.save(loop_decoder_model.state_dict(), os.path.join(save_dir, 'loop_decoder_model.pth'))
 
 
 # ------------------------------------------------------------------------------# 
@@ -61,22 +63,70 @@ def train():
     best_val_loss = float('inf')
     epochs = 1
 
-
     for epoch in range(epochs):
+        loop_embed_model.train()
+        loop_decoder_model.train()
+        epoch_loss = 0
 
+        # Training Loop
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} - Training"):
-            stroke_cloud_loops, stroke_node_features = batch
+            stroke_cloud_loops, stroke_node_features, loop_neighboring_combined = batch
 
-            stroke_node_features = stroke_node_features.to(torch.float32).squeeze(0)
+            # Move data to device
+            stroke_node_features = stroke_node_features.to(torch.float32).to(device).squeeze(0)
+            loop_neighboring_combined = loop_neighboring_combined.to(torch.float32).to(device).squeeze(0)
 
-            # Loop embeddings
+            # Zero the gradients
+            optimizer.zero_grad()
+
+            # Compute Loop embeddings
             stroke_loop_embeddings = loop_embed_model(stroke_node_features, stroke_cloud_loops)
 
-            # Loop decoding 
+            # Decode to predict connectivity matrix
             connectivity_matrix = loop_decoder_model(stroke_loop_embeddings)
 
-            print("stroke_loop_embeddings", stroke_loop_embeddings.shape)
-            print("connectivity_matrix", connectivity_matrix.shape)
+            # Compute the loss
+            loss = criterion(connectivity_matrix, loop_neighboring_combined)
+
+            # Backpropagation and optimization
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
+
+        avg_epoch_loss = epoch_loss / len(train_loader)
+        print(f"Epoch [{epoch+1}/{epochs}], Training Loss: {avg_epoch_loss:.4f}")
+
+        # Validation Loop
+        loop_embed_model.eval()
+        loop_decoder_model.eval()
+        val_loss = 0
+
+        with torch.no_grad():
+            for batch in tqdm(val_loader, desc="Validation"):
+                stroke_cloud_loops, stroke_node_features, loop_neighboring_combined = batch
+
+                # Move data to device
+                stroke_node_features = stroke_node_features.to(torch.float32).to(device).squeeze(0)
+                loop_neighboring_combined = loop_neighboring_combined.to(torch.float32).to(device).squeeze(0)
+
+                # Compute Loop embeddings
+                stroke_loop_embeddings = loop_embed_model(stroke_node_features, stroke_cloud_loops)
+
+                # Decode to predict connectivity matrix
+                connectivity_matrix = loop_decoder_model(stroke_loop_embeddings)
+
+                # Compute the loss
+                loss = criterion(connectivity_matrix, loop_neighboring_combined)
+                val_loss += loss.item()
+
+        avg_val_loss = val_loss / len(val_loader)
+        print(f"Epoch [{epoch+1}/{epochs}], Validation Loss: {avg_val_loss:.4f}")
+
+        # Save model if it has the best validation performance
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            save_models()
 
 
 #---------------------------------- Public Functions ----------------------------------#
