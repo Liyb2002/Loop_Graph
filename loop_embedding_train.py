@@ -61,7 +61,7 @@ def train():
     val_loader = DataLoader(val_dataset, batch_size=4, shuffle=True, collate_fn=Preprocessing.dataloader_loop_embedding.custom_collate_fn)
     
     best_val_loss = float('inf')
-    epochs = 1
+    epochs = 10
 
     for epoch in range(epochs):
         loop_embed_model.train()
@@ -69,66 +69,31 @@ def train():
         epoch_loss = 0
 
         # Training Loop
-        for stroke_cloud_loops_list, padded_stroke_node_features, padded_loop_neighboring_combined, mask_stroke_node_features, mask_loop_neighboring_combined in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} - Training"):
-            # Move data to device
-            padded_stroke_node_features = padded_stroke_node_features.to(device)
-            padded_loop_neighboring_combined = padded_loop_neighboring_combined.to(device)
-            mask_stroke_node_features = mask_stroke_node_features.to(device)
-            mask_loop_neighboring_combined = mask_loop_neighboring_combined.to(device)
-
+        for loop_features, loop_neighboring_combined, mask_loop_features in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} - Training"):
 
             # Zero the gradients
             optimizer.zero_grad()
 
-            print("loop_neighboring_combined",padded_loop_neighboring_combined.device)
+            # Compute Loop embeddings
+            stroke_loop_embeddings = loop_embed_model(loop_features, mask_loop_features)
 
-            # # Compute Loop embeddings
-            # stroke_loop_embeddings = loop_embed_model(stroke_node_features, stroke_cloud_loops)
+            # Decode to predict connectivity matrix
+            connectivity_matrix = loop_decoder_model(stroke_loop_embeddings, mask_loop_features)
 
-            # # Decode to predict connectivity matrix
-            # connectivity_matrix = loop_decoder_model(stroke_loop_embeddings)
+            # Compute the loss
+            loss = criterion(connectivity_matrix, loop_neighboring_combined)
 
-            # # Compute the loss
-            # loss = criterion(connectivity_matrix, loop_neighboring_combined)
+            # Backpropagation and optimization
+            loss.backward()
+            optimizer.step()
 
-            # # Backpropagation and optimization
-            # loss.backward()
-            # optimizer.step()
-
-            # epoch_loss += loss.item()
+            epoch_loss += loss.item()
 
         avg_epoch_loss = epoch_loss / len(train_loader)
         print(f"Epoch [{epoch+1}/{epochs}], Training Loss: {avg_epoch_loss:.4f}")
-
-        # Validation Loop
-        loop_embed_model.eval()
-        loop_decoder_model.eval()
-        val_loss = 0
-
-        with torch.no_grad():
-            for batch in tqdm(val_loader, desc="Validation"):
-                stroke_cloud_loops, stroke_node_features, loop_neighboring_combined = batch
-
-                # Move data to device
-                stroke_node_features = stroke_node_features.to(torch.float32).to(device).squeeze(0)
-                loop_neighboring_combined = loop_neighboring_combined.to(torch.float32).to(device).squeeze(0)
-
-                # Compute Loop embeddings
-                stroke_loop_embeddings = loop_embed_model(stroke_node_features, stroke_cloud_loops)
-
-                # Decode to predict connectivity matrix
-                connectivity_matrix = loop_decoder_model(stroke_loop_embeddings)
-
-                # Compute the loss
-                loss = criterion(connectivity_matrix, loop_neighboring_combined)
-                val_loss += loss.item()
-
-        avg_val_loss = val_loss / len(val_loader)
-        print(f"Epoch [{epoch+1}/{epochs}], Validation Loss: {avg_val_loss:.4f}")
-
-        # Save model if it has the best validation performance
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
+        
+        if avg_epoch_loss < best_val_loss:
+            best_val_loss = avg_epoch_loss
             save_models()
 
 
