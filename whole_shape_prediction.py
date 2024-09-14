@@ -19,12 +19,10 @@ import Models.loop_embeddings
 
 loop_embed_model = Models.loop_embeddings.LoopEmbeddingNetwork()
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
-graph_decoder = Encoders.gnn.gnn.Sketch_prediction()
 loop_embed_model.to(device)
 graph_encoder.to(device)
-graph_decoder.to(device)
 criterion = nn.BCELoss()
-optimizer = optim.Adam(list(loop_embed_model.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
+optimizer = optim.Adam(list(loop_embed_model.parameters()) + list(graph_encoder.parameters()), lr=0.0004)
 
 # ------------------------------------------------------------------------------# 
 
@@ -33,15 +31,11 @@ save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
-    loop_embed_model.load_state_dict(torch.load(os.path.join(save_dir, 'loop_embed_model.pth')))
     graph_encoder.load_state_dict(torch.load(os.path.join(save_dir, 'graph_encoder.pth')))
-    graph_decoder.load_state_dict(torch.load(os.path.join(save_dir, 'graph_decoder.pth')))
 
 
 def save_models():
-    torch.save(loop_embed_model.state_dict(), os.path.join(save_dir, 'loop_embed_model.pth'))
     torch.save(graph_encoder.state_dict(), os.path.join(save_dir, 'graph_encoder.pth'))
-    torch.save(graph_decoder.state_dict(), os.path.join(save_dir, 'graph_decoder.pth'))
 
 
 # ------------------------------------------------------------------------------# 
@@ -69,17 +63,14 @@ def train():
     for epoch in range(epochs):
 
         for batch in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} - Training"):
-            program, stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal, brep_loop_neighboring, stroke_to_brep = batch
-
-            stroke_node_features = stroke_node_features.to(torch.float32).squeeze(0)
-            stroke_to_brep = stroke_to_brep.to(torch.float32).squeeze(0)
+            program, stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal, brep_loop_neighboring, stroke_to_brep, loop_embeddings= batch
 
             # Loop embeddings
-            stroke_loop_embeddings = loop_embed_model(stroke_node_features, stroke_cloud_loops)
+            # stroke_loop_embeddings = loop_embed_model(stroke_node_features, stroke_cloud_loops)
 
             # Build Graph
-            gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(stroke_loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep)
-            print("gnn_graph", gnn_graph['stroke'].x.shape)
+            # gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(stroke_loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep)
+            # print("gnn_graph", gnn_graph['stroke'].x.shape)
 
 #---------------------------------- Public Functions ----------------------------------#
 

@@ -4,10 +4,13 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm 
 import pickle
+import numpy as np
 
 from Preprocessing.config import device
 import Preprocessing.proc_CAD.helper
 import Preprocessing.SBGCN.run_SBGCN
+
+import Models.loop_embeddings
 
 class Program_Graph_Dataset(Dataset):
     def __init__(self, dataset):
@@ -17,6 +20,8 @@ class Program_Graph_Dataset(Dataset):
 
         print(f"Number of data directories: {len(self.data_dirs)}")
         print(f"Total number of brep_i.step files: {len(self.index_mapping)}")
+
+        self.load_loop_embed_model()
 
     def _create_index_mapping(self):
         index_mapping = []
@@ -32,6 +37,16 @@ class Program_Graph_Dataset(Dataset):
         return len(self.index_mapping)
 
 
+    def load_loop_embed_model(self):
+        current_dir = os.getcwd()
+        loop_embedding_dir = os.path.join(current_dir, 'checkpoints', 'loop_embedding_model')
+
+        self.loop_embed_model = Models.loop_embeddings.LoopEmbeddingNetwork()
+        self.loop_embed_model.load_state_dict(torch.load(os.path.join(loop_embedding_dir, 'loop_embed_model.pth')))
+        self.loop_embed_model.to(device)
+        self.loop_embed_model.eval()
+
+
     def __getitem__(self, idx):
         data_dir, shape_file_path_relative = self.index_mapping[idx]
         data_path = os.path.join(self.data_path, data_dir)
@@ -43,28 +58,64 @@ class Program_Graph_Dataset(Dataset):
         program_whole = Preprocessing.proc_CAD.helper.program_to_string(program_file_path)
         program = self.get_program(program_whole, idx)
 
-
-        # 1) Load shape data
+        # 2) Load shape data
         shape_file_path = os.path.join(self.data_path, data_dir, 'shape_info', shape_file_path_relative)
         with open(shape_file_path, 'rb') as f:
             shape_data = pickle.load(f)
         
         stroke_cloud_loops = [list(fset) for fset in shape_data['stroke_cloud_loops']]
-        brep_loops = [list(fset) for fset in shape_data['brep_loops']]
-
         stroke_node_features = shape_data['stroke_node_features']
+
+        # Prepare loop features for embedding
+        loop_features = []
+        for indices in stroke_cloud_loops:
+            strokes = stroke_node_features[indices]  # Extract strokes for current loop
+
+            # If there are only 3 strokes, pad to have 4 strokes
+            if strokes.shape[0] == 3:
+                padding = np.zeros((1, strokes.shape[1]))  # Create a zero padding
+                strokes = np.vstack([strokes, padding])  # Pad to shape (4, 6)
+
+            # Flatten the strokes to create a single feature vector for the loop
+            loop_feature = strokes.flatten()  # Shape: (1, 24)
+            loop_features.append(loop_feature)
+
+        # Convert to tensor
+        loop_features_tensor = torch.tensor(loop_features, dtype=torch.float32).to(device)  # Shape: (len(stroke_cloud_loops), 24)
+
+        # Create a dummy mask with all 1s since all loops are valid
+        mask_loop_features = torch.ones(loop_features_tensor.shape[0], dtype=torch.float32, device=device)
+
+        # Compute loop embeddings using the pretrained model
+        with torch.no_grad():
+            loop_embeddings = self.loop_embed_model(loop_features_tensor.unsqueeze(0), mask_loop_features.unsqueeze(0))  # Shape: (1, num_loops, 32)
+            loop_embeddings = loop_embeddings.squeeze(0)  # Remove the batch dimension
+
+        print("loop_embeddings", loop_embeddings.shape)
+
+
+        # Continue with other data loading
+        brep_loops = [list(fset) for fset in shape_data['brep_loops']]
         final_brep_edges = shape_data['final_brep_edges']
         stroke_operations_order_matrix = shape_data['stroke_operations_order_matrix']
-
         loop_neighboring_vertical = shape_data['loop_neighboring_vertical']
         loop_neighboring_horizontal = shape_data['loop_neighboring_horizontal']
-
         brep_loop_neighboring = shape_data['brep_loop_neighboring']
-
         stroke_to_brep = shape_data['stroke_to_brep']
-
-
-        return program, stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal, brep_loop_neighboring, stroke_to_brep 
+        
+        return (
+            program, 
+            stroke_cloud_loops, 
+            brep_loops, 
+            stroke_node_features, 
+            final_brep_edges, 
+            stroke_operations_order_matrix, 
+            loop_neighboring_vertical, 
+            loop_neighboring_horizontal, 
+            brep_loop_neighboring, 
+            stroke_to_brep,
+            loop_embeddings  # Include the computed loop embeddings
+        )
         
     
     def get_program(self, program, idx):
