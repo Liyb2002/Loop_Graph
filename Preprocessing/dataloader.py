@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm 
 import pickle
 import numpy as np
+from torch_geometric.data import Batch as PyGBatch
 
 from Preprocessing.config import device
 import Preprocessing.proc_CAD.helper
@@ -101,14 +102,10 @@ class Program_Graph_Dataset(Dataset):
         loop_neighboring_horizontal = torch.tensor(shape_data['loop_neighboring_horizontal'], dtype=torch.long, device=device)
         stroke_to_brep = torch.tensor(shape_data['stroke_to_brep'], dtype=torch.long, device=device)
 
-        # Create the SketchHeteroData graph
-        graph_data = Preprocessing.gnn_graph.SketchHeteroData(loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep)
-        graph_data = graph_data.to(device)
-
         # Load stroke_operations_order_matrix and convert to tensor
         stroke_operations_order_matrix = torch.tensor(shape_data['stroke_operations_order_matrix'], dtype=torch.float32)
 
-        return loop_embeddings,loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep
+        return loop_embeddings,loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix
 
 
 
@@ -128,4 +125,6 @@ class Program_Graph_Dataset(Dataset):
                 break
 
         return result
+
+
 

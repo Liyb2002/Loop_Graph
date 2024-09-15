@@ -3,7 +3,7 @@ import Preprocessing.gnn_graph
 import Encoders.gnn.gnn
 import Encoders.helper
 
-from torch_geometric.data import DataLoader
+from torch_geometric.loader import DataLoader
 
 from tqdm import tqdm
 from Preprocessing.config import device
@@ -52,16 +52,34 @@ def train():
     epochs = 1
 
 
+    graphs = []
+    for data in dataset:
+        # Extract the necessary elements from the dataset
+        loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix = data
+
+        # Squeeze the tensors if needed
+        loop_embeddings = loop_embeddings.squeeze(0)
+        loop_neighboring_vertical = loop_neighboring_vertical.squeeze(0)
+        loop_neighboring_horizontal = loop_neighboring_horizontal.squeeze(0)
+        stroke_to_brep = stroke_to_brep.squeeze(0)
+
+        # Build the graph
+        gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep)
+
+        # Move graph to GPU
+        gnn_graph = gnn_graph.to(device)
+        graphs.append(gnn_graph)
+
+    print(f"Total number of preprocessed graphs: {len(graphs)}")
+
+
+    best_val_loss = float('inf')
+    epochs = 1
+
     for epoch in range(epochs):
+        for gnn_graph in tqdm(graphs, desc=f"Epoch {epoch+1}/{epochs} - Training"):
 
-        for loop_embeddings,loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} - Training"):
-            print("hi")
-            # Loop embeddings
-            # stroke_loop_embeddings = loop_embed_model(stroke_node_features, stroke_cloud_loops)
-
-            # Build Graph
-            # gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep)
-            # print("gnn_graph", gnn_graph['stroke'].x.shape)
+            print("gnn_graph", gnn_graph['stroke'].x.shape)
 
 #---------------------------------- Public Functions ----------------------------------#
 
