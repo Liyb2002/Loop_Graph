@@ -23,27 +23,43 @@ class SketchHeteroData(HeteroData):
         super(SketchHeteroData, self).__init__()
 
         # Node features
-        self['stroke'].x = torch.tensor(stroke_loop_embeddings, dtype=torch.float)
+        self['stroke'].x = stroke_loop_embeddings
 
-        # Converting adjacency matrices to edge indices
-        loop_neighboring_vertical_indices = torch.nonzero(torch.tensor(loop_neighboring_vertical.clone().detach(), dtype=torch.long))
-        loop_neighboring_horizontal_indices = torch.nonzero(torch.tensor(loop_neighboring_horizontal.clone().detach(), dtype=torch.long))
+        # Convert adjacency matrix to edge indices
+        edge_index_vertical = self._adjacency_to_edge_index(loop_neighboring_vertical)
+        edge_index_horizontal = self._adjacency_to_edge_index(loop_neighboring_horizontal)
 
-        # Setting edge indices
-        self['stroke', 'verticalNeighboring', 'stroke'].edge_index = loop_neighboring_vertical_indices.t().contiguous()
-        self['stroke', 'horizontalNeighboring', 'stroke'].edge_index = loop_neighboring_horizontal_indices.t().contiguous()
+        # Set edge indices for vertical and horizontal connections
+        self['stroke', 'verticalNeighboring', 'stroke'].edge_index = edge_index_vertical
+        self['stroke', 'horizontalNeighboring', 'stroke'].edge_index = edge_index_horizontal
 
+        # Add additional edge information (e.g., stroke to brep)
         self.build_stroke_loop_representation(stroke_to_brep)
+
+    def _adjacency_to_edge_index(self, adjacency_matrix):
+        """
+        Converts an adjacency matrix to edge indices.
+        Args:
+            adjacency_matrix (torch.Tensor): A (num_nodes, num_nodes) adjacency matrix.
+        Returns:
+            edge_index (torch.Tensor): A (2, num_edges) tensor of edge indices.
+        """
+        edge_index = torch.nonzero(adjacency_matrix, as_tuple=False).t().contiguous()
+        return edge_index
     
     def build_stroke_loop_representation(self, stroke_to_brep):
-
+        """
+        Builds the stroke-to-brep representation and appends it to the node features.
+        Args:
+            stroke_to_brep (torch.Tensor): A tensor representing the stroke-to-brep relationships.
+        """
         if stroke_to_brep.shape[0] == 0:
             is_disconnected = torch.ones(self['stroke'].x.shape[0], 1, dtype=torch.int)
         else:
             is_disconnected = (stroke_to_brep.sum(dim=1) == 0).int().unsqueeze(1)
         
+        # Append the disconnected information to the node features
         self['stroke'].x = torch.cat((self['stroke'].x, is_disconnected), dim=1)
-
 
 
 

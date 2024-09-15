@@ -9,6 +9,7 @@ import numpy as np
 from Preprocessing.config import device
 import Preprocessing.proc_CAD.helper
 import Preprocessing.SBGCN.run_SBGCN
+import Preprocessing.gnn_graph
 
 import Models.loop_embeddings
 
@@ -88,36 +89,30 @@ class Program_Graph_Dataset(Dataset):
 
         # Compute loop embeddings using the pretrained model
         with torch.no_grad():
-            loop_embeddings = self.loop_embed_model(loop_features_tensor.unsqueeze(0), mask_loop_features.unsqueeze(0))  # Shape: (1, num_loops, 32)
-            loop_embeddings = loop_embeddings.squeeze(0)  # Remove the batch dimension
+            loop_embeddings = self.loop_embed_model(loop_features_tensor.unsqueeze(0), mask_loop_features.unsqueeze(0)).squeeze(0)  # Shape: (num_loops, embedding_dim)
 
-        print("loop_embeddings", loop_embeddings.shape)
+        # Ensure loop embeddings are not None
+        if loop_embeddings is None:
+            raise ValueError("Loop embeddings could not be computed; please check your model and data.")
 
-
-        # Continue with other data loading
-        brep_loops = [list(fset) for fset in shape_data['brep_loops']]
-        final_brep_edges = shape_data['final_brep_edges']
-        stroke_operations_order_matrix = shape_data['stroke_operations_order_matrix']
-        loop_neighboring_vertical = shape_data['loop_neighboring_vertical']
-        loop_neighboring_horizontal = shape_data['loop_neighboring_horizontal']
-        brep_loop_neighboring = shape_data['brep_loop_neighboring']
-        stroke_to_brep = shape_data['stroke_to_brep']
+        # Convert remaining numpy arrays to tensors
         
-        return (
-            program, 
-            stroke_cloud_loops, 
-            brep_loops, 
-            stroke_node_features, 
-            final_brep_edges, 
-            stroke_operations_order_matrix, 
-            loop_neighboring_vertical, 
-            loop_neighboring_horizontal, 
-            brep_loop_neighboring, 
-            stroke_to_brep,
-            loop_embeddings  # Include the computed loop embeddings
-        )
-        
-    
+        loop_neighboring_vertical = torch.tensor(shape_data['loop_neighboring_vertical'], dtype=torch.long, device=device)
+        loop_neighboring_horizontal = torch.tensor(shape_data['loop_neighboring_horizontal'], dtype=torch.long, device=device)
+        stroke_to_brep = torch.tensor(shape_data['stroke_to_brep'], dtype=torch.long, device=device)
+
+        # Create the SketchHeteroData graph
+        graph_data = Preprocessing.gnn_graph.SketchHeteroData(loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep)
+        graph_data = graph_data.to(device)
+
+        # Load stroke_operations_order_matrix and convert to tensor
+        stroke_operations_order_matrix = torch.tensor(shape_data['stroke_operations_order_matrix'], dtype=torch.float32)
+
+        return loop_embeddings,loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep
+
+
+
+
     def get_program(self, program, idx):
         sketch_count = 0
         result = []
