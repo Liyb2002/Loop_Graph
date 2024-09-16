@@ -23,8 +23,8 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 3, start = 0)
-        self.generate_dataset('dataset/eval', number_data = 0, start = 0)
+        self.generate_dataset('dataset/test', number_data = 0, start = 0)
+        self.generate_dataset('dataset/simple', number_data = 10, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -103,7 +103,6 @@ class dataset_generator():
                 stroke_to_brep = np.zeros(0)
             
             else:
-                print("prev_stop_idx", prev_stop_idx)
                 usable_brep_files = brep_files[:prev_stop_idx]
                 final_brep_edges_list = []
                 prev_brep_edges = []

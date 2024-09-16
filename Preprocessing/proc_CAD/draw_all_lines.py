@@ -255,21 +255,21 @@ class create_stroke_cloud():
 
         construction_lines = []
         # Now, we need to generate the construction lines
-        if op == 'sketch':
-            construction_lines = Preprocessing.proc_CAD.line_utils.midpoint_lines(new_edges)
-            construction_lines += Preprocessing.proc_CAD.line_utils.diagonal_lines(new_edges)                
+        # if op == 'sketch':
+        #     construction_lines = Preprocessing.proc_CAD.line_utils.midpoint_lines(new_edges)
+        #     construction_lines += Preprocessing.proc_CAD.line_utils.diagonal_lines(new_edges)                
 
-        if op == 'extrude':
-            construction_lines = Preprocessing.proc_CAD.line_utils.projection_lines(new_edges)
-            construction_lines += Preprocessing.proc_CAD.line_utils.bounding_box_lines(new_edges)
+        # if op == 'extrude':
+        #     construction_lines = Preprocessing.proc_CAD.line_utils.projection_lines(new_edges)
+        #     construction_lines += Preprocessing.proc_CAD.line_utils.bounding_box_lines(new_edges)
             # construction_lines = Preprocessing.proc_CAD.line_utils.grid_lines(self.edges, new_edges)
 
-        for line in construction_lines:
-            line.set_edge_type('construction_line')
-            line.set_order_count(self.order_count)
-            line.set_Op(op, index)
-            self.order_count += 1
-            self.edges[line.order_count] = line
+        # for line in construction_lines:
+        #     line.set_edge_type('construction_line')
+        #     line.set_order_count(self.order_count)
+        #     line.set_Op(op, index)
+        #     self.order_count += 1
+        #     self.edges[line.order_count] = line
         
 
         #find the edges that has the current operation 
