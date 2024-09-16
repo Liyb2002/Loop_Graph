@@ -843,3 +843,43 @@ def vis_specific_loop(loop, strokes):
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     plt.show()
+
+
+def vis_partial_graph(loops, strokes):
+    """
+    Visualize multiple loops and strokes in 3D space.
+
+    Parameters:
+    loops (list of lists of int): A list of loops, where each loop is a list containing indices of strokes to be highlighted.
+    strokes (np.ndarray): A matrix of shape (num_strokes, 7), where the first 6 columns represent two 3D points.
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    import numpy as np
+
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot all strokes in blue
+    for stroke in strokes:
+        start, end = stroke[:3], stroke[3:6]
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', alpha=0.5)
+
+    # Plot strokes in each loop with different colors
+    colors = plt.cm.jet(np.linspace(0, 1, len(loops)))  # Generate a color map for the loops
+
+    for i, loop in enumerate(loops):
+        for idx in loop:
+            stroke = strokes[idx]
+            start, end = stroke[:3], stroke[3:6]
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color=colors[i], linewidth=2)
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # Show plot
+    plt.show()
+    

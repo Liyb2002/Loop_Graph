@@ -51,182 +51,6 @@ def predict_face_coplanar_with_brep(predicted_index, coplanar_matrix, node_featu
 
 #------------------------------------------------------------------------------------------------------#
 
-def vis_stroke_cloud(node_features):
-    if node_features.shape[1] == 0:
-        return 
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    node_features = node_features.squeeze(0)
-
-    # Initialize min and max limits
-    x_min, x_max = float('inf'), float('-inf')
-    y_min, y_max = float('inf'), float('-inf')
-    z_min, z_max = float('inf'), float('-inf')
-
-    # Plot all strokes in blue and compute limits
-    for stroke in node_features:
-        start = stroke[:3].numpy()
-        end = stroke[3:].numpy()
-
-        # Update the min and max limits for each axis
-        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-
-        # Plot the line segment for the stroke in blue
-        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], marker='o', color='blue')
-
-    # Compute the center of the shape
-    x_center = (x_min + x_max) / 2
-    y_center = (y_min + y_max) / 2
-    z_center = (z_min + z_max) / 2
-
-    # Compute the maximum difference across x, y, z directions
-    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
-
-    # Set the same limits for x, y, and z axes centered around the computed center
-    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
-    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
-    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    plt.show()
-
-    
-def vis_gt(matrix, face_to_stroke, node_features):
-    # Initialize a list to keep track of stroke colors
-    stroke_colors = ['blue'] * node_features.shape[0]
-
-    # Find the index of the item with the highest value in the matrix
-    max_index = torch.argmax(matrix).item()
-
-    # Set the strokes in the face with the highest value to red
-    for stroke in face_to_stroke[max_index]:
-        stroke_colors[stroke] = 'red'
-    
-    # Initialize min and max limits
-    x_min, x_max = float('inf'), float('-inf')
-    y_min, y_max = float('inf'), float('-inf')
-    z_min, z_max = float('inf'), float('-inf')
-    
-    # Create the plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    
-    # Plot each stroke and compute limits
-    for i, stroke in enumerate(node_features):
-        x = [stroke[0], stroke[3]]
-        y = [stroke[1], stroke[4]]
-        z = [stroke[2], stroke[5]]
-        
-        # Update the min and max limits for each axis
-        x_min, x_max = min(x_min, x[0], x[1]), max(x_max, x[0], x[1])
-        y_min, y_max = min(y_min, y[0], y[1]), max(y_max, y[0], y[1])
-        z_min, z_max = min(z_min, z[0], z[1]), max(z_max, z[0], z[1])
-        
-        ax.plot(x, y, z, color=stroke_colors[i])
-    
-    # Compute the center of the shape
-    x_center = (x_min + x_max) / 2
-    y_center = (y_min + y_max) / 2
-    z_center = (z_min + z_max) / 2
-
-    # Compute the maximum difference across x, y, z directions
-    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
-
-    # Set the same limits for x, y, and z axes centered around the computed center
-    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
-    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
-    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    plt.show()
-
-
-def vis_brep_and_nextSketch(matrix, face_to_stroke, node_features, edge_features):
-    if edge_features.shape[1] == 0:
-        return
-    
-    # Initialize a list to keep track of stroke colors
-    stroke_colors = ['blue'] * node_features.shape[0]
-
-    # Find the index of the item with the highest value in the matrix
-    max_index = torch.argmax(matrix).item()
-
-    # Set the strokes in the face with the highest value to red
-    for stroke in face_to_stroke[max_index]:
-        stroke_colors[stroke] = 'red'
-    
-    # Initialize min and max limits
-    x_min, x_max = float('inf'), float('-inf')
-    y_min, y_max = float('inf'), float('-inf')
-    z_min, z_max = float('inf'), float('-inf')
-    
-    # Create the plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Plot node_features in blue (or red if in max_index face) and compute limits
-    for i, stroke in enumerate(node_features):
-        x = [stroke[0], stroke[3]]
-        y = [stroke[1], stroke[4]]
-        z = [stroke[2], stroke[5]]
-
-        # Update the min and max limits for each axis
-        x_min, x_max = min(x_min, x[0], x[1]), max(x_max, x[0], x[1])
-        y_min, y_max = min(y_min, y[0], y[1]), max(y_max, y[0], y[1])
-        z_min, z_max = min(z_min, z[0], z[1]), max(z_max, z[0], z[1])
-
-        ax.plot(x, y, z, color=stroke_colors[i])
-    
-    # Plot edge_features in green and compute limits
-    for stroke in edge_features:
-        x = [stroke[0], stroke[3]]
-        y = [stroke[1], stroke[4]]
-        z = [stroke[2], stroke[5]]
-
-        # Update the min and max limits for each axis
-        x_min, x_max = min(x_min, x[0], x[1]), max(x_max, x[0], x[1])
-        y_min, y_max = min(y_min, y[0], y[1]), max(y_max, y[0], y[1])
-        z_min, z_max = min(z_min, z[0], z[1]), max(z_max, z[0], z[1])
-
-        ax.plot(x, y, z, color='green')
-
-    # Compute the center of the shape
-    x_center = (x_min + x_max) / 2
-    y_center = (y_min + y_max) / 2
-    z_center = (z_min + z_max) / 2
-
-    # Compute the maximum difference across x, y, z directions
-    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
-
-    # Set the same limits for x, y, and z axes centered around the computed center
-    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
-    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
-    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
-
-    # Plot the strokes in red (again for visibility after scaling)
-    for i, stroke in enumerate(node_features):
-        if stroke_colors[i] == 'red':
-            x = [stroke[0], stroke[3]]
-            y = [stroke[1], stroke[4]]
-            z = [stroke[2], stroke[5]]
-            ax.plot(x, y, z, color=stroke_colors[i])
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    plt.show()
-
 
 
 def vis_clean_strokes(node_features, edge_features):
@@ -311,3 +135,219 @@ def clean_face_choice(predicted_index, node_features):
         return True
     else:
         return False
+
+
+def vis_specific_loop(loop, strokes):
+    """
+    Visualize specific loops and strokes.
+    
+    Parameters:
+    loop (list of int): A list containing indices of the strokes to be highlighted.
+    strokes (np.ndarray): A matrix of shape (num_strokes, 7), where the first 6 columns represent two 3D points.
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot all strokes in blue
+    for stroke in strokes:
+        start, end = stroke[:3], stroke[3:6]
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', alpha=0.5)
+
+    # Plot strokes in the loop in red
+    for idx in loop:
+        stroke = strokes[idx]
+        start, end = stroke[:3], stroke[3:6]
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='red', linewidth=2)
+
+    # Set labels and show plot
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    plt.show()
+
+
+#------------------------------------------------------------------------------------------------------#
+def vis_partial_graph(loops, strokes, stroke_to_brep):
+    """
+    Visualize multiple loops and strokes in 3D space, with all strokes in blue and rescaled axes.
+    Only visualize strokes that are part of a loop and exclude loops based on the stroke_to_brep matrix.
+
+    Parameters:
+    loops (list of lists of int): A list of loops, where each loop is a list containing indices of strokes to be highlighted.
+    strokes (np.ndarray): A matrix of shape (num_strokes, 7), where the first 6 columns represent two 3D points.
+    stroke_to_brep (torch.Tensor): A tensor that either has shape (num_loops, num_brep) or [0].
+                                   If its shape is (num_loops, num_brep), a loop is excluded if it has a column value of 1.
+    """
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Determine which loops to visualize based on stroke_to_brep
+    if stroke_to_brep.shape[0] > 0:
+        # Identify loops to exclude (any loop with a column value of 1)
+        exclude_loops = [i for i in range(stroke_to_brep.shape[0]) if torch.any(stroke_to_brep[i] == 1)]
+    else:
+        exclude_loops = []
+
+    # Plot strokes in each loop with a line width of 0.5
+    for i, loop in enumerate(loops):
+        if i not in exclude_loops:
+            for idx in loop:
+                stroke = strokes[idx]
+                start, end = stroke[:3], stroke[3:6]
+
+                # Update the min and max limits for each axis
+                x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+                y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+                z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+                
+                ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+
+    # Compute the center of the shape
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+
+    # Compute the maximum difference across x, y, z directions
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    # Set the same limits for x, y, and z axes centered around the computed center
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # Show plot
+    plt.show()
+
+
+def vis_whole_graph(loops, strokes):
+    """
+    Visualize multiple loops and strokes in 3D space, with all strokes in blue and rescaled axes.
+
+    Parameters:
+    loops (list of lists of int): A list of loops, where each loop is a list containing indices of strokes to be highlighted.
+    strokes (np.ndarray): A matrix of shape (num_strokes, 7), where the first 6 columns represent two 3D points.
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    import numpy as np
+
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Plot all strokes in blue
+    for stroke in strokes:
+        start, end = stroke[:3], stroke[3:6]
+        
+        # Update the min and max limits for each axis
+        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+        
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', alpha=0.5)
+
+    # Plot strokes in each loop in blue but with a thicker line
+    for loop in loops:
+        for idx in loop:
+            stroke = strokes[idx]
+            start, end = stroke[:3], stroke[3:6]
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+
+    # Compute the center of the shape
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+
+    # Compute the maximum difference across x, y, z directions
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    # Set the same limits for x, y, and z axes centered around the computed center
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # Show plot
+    plt.show()
+
+
+def vis_brep(brep):
+    """
+    Visualize the brep strokes in 3D space if brep is not empty.
+    
+    Parameters:
+    brep (np.ndarray): A matrix with shape (num_strokes, 6) representing strokes.
+                       Each row contains two 3D points representing the start and end of a stroke.
+                       If brep.shape[0] == 0, the function returns without plotting.
+    """
+    # Check if brep is empty
+    if brep.shape[0] == 0:
+        return
+
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Plot all brep strokes in blue with line width 1
+    for stroke in brep:
+        start, end = stroke[:3], stroke[3:6]
+        
+        # Update the min and max limits for each axis
+        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+        
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+
+    # Compute the center of the shape
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+
+    # Compute the maximum difference across x, y, z directions
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    # Set the same limits for x, y, and z axes centered around the computed center
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # Show plot
+    plt.show()

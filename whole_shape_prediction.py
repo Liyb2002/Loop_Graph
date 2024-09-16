@@ -1,5 +1,6 @@
 import Preprocessing.dataloader
 import Preprocessing.gnn_graph
+
 import Encoders.gnn.gnn
 import Encoders.helper
 
@@ -46,7 +47,7 @@ def train():
     dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
     print(f"Total number of shape data: {len(dataset)}")
 
-    train_loader = DataLoader(dataset, batch_size=1, shuffle=True)
+    train_loader = DataLoader(dataset, batch_size=1, shuffle=False)
     
     best_val_loss = float('inf')
     epochs = 1
@@ -55,7 +56,7 @@ def train():
     graphs = []
     for data in dataset:
         # Extract the necessary elements from the dataset
-        loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix = data
+        stroke_cloud_loops, stroke_node_features, loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges= data
 
         # Squeeze the tensors if needed
         loop_embeddings = loop_embeddings.squeeze(0)
@@ -69,6 +70,11 @@ def train():
         # Move graph to GPU
         gnn_graph = gnn_graph.to(device)
         graphs.append(gnn_graph)
+
+        Encoders.helper.vis_partial_graph(stroke_cloud_loops, stroke_node_features, stroke_to_brep)
+        Encoders.helper.vis_whole_graph(stroke_cloud_loops, stroke_node_features)
+        Encoders.helper.vis_brep(final_brep_edges)
+
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
 

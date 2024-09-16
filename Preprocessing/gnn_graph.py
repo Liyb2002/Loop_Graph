@@ -99,3 +99,7 @@ def build_graph(stroke_dict):
 
 
     return node_features, operations_order_matrix
+
+
+def vis_graph(graph):
+    pass

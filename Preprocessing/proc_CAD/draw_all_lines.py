@@ -535,12 +535,12 @@ class create_stroke_cloud():
 
 
     def finishing_production(self):
-        construction_lines = Preprocessing.proc_CAD.line_utils.whole_bounding_box_lines(self.edges)
-        for line in construction_lines:
-            line.set_edge_type('construction_line')
-            line.set_order_count(self.order_count)
-            self.order_count += 1
-            self.edges[line.order_count] = line
+        # construction_lines = Preprocessing.proc_CAD.line_utils.whole_bounding_box_lines(self.edges)
+        # for line in construction_lines:
+        #     line.set_edge_type('construction_line')
+        #     line.set_order_count(self.order_count)
+        #     self.order_count += 1
+        #     self.edges[line.order_count] = line
         
         self.edges = Preprocessing.proc_CAD.line_utils.remove_duplicate_lines(self.edges)
         self.edges = Preprocessing.proc_CAD.line_utils.remove_single_point(self.edges)
