@@ -63,6 +63,85 @@ class SketchHeteroData(HeteroData):
 
 
 
+
+class SketchLoopGraph(HeteroData):
+    def __init__(self, stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep):
+        super(SketchLoopGraph, self).__init__()
+
+        # Stroke node features
+        self['stroke'].x = torch.tensor(stroke_node_features, dtype=torch.float)
+
+        # Loop node features based on stroke_to_brep
+        self['loop'].x = self._compute_loop_features(stroke_cloud_loops, stroke_to_brep)
+
+        # Create edges between loops and strokes
+        loop_indices, stroke_indices = self._create_loop_stroke_edges(stroke_cloud_loops)
+        print("loop_indices", loop_indices, "stroke_indices", stroke_indices)
+        self['loop', 'representedBy', 'stroke'].edge_index = torch.tensor([loop_indices, stroke_indices], dtype=torch.long)
+        
+        # Combine loop neighboring matrices and create edges between loops
+        loop_edge_indices = self._create_loop_neighbor_edges(loop_neighboring_vertical, loop_neighboring_horizontal)
+        self['loop', 'neighboring', 'loop'].edge_index = torch.tensor(loop_edge_indices, dtype=torch.long)
+
+        # Create directed edges between loops based on their order
+        ordered_loop_edges = self._create_ordered_loop_edges(stroke_cloud_loops)
+        self['loop', 'order', 'loop'].edge_index = torch.tensor(ordered_loop_edges, dtype=torch.long)
+
+    def _compute_loop_features(self, stroke_cloud_loops, stroke_to_brep):
+        num_loops = len(stroke_cloud_loops)
+        
+        if stroke_to_brep.shape[0] == 0:
+            # Case 1: If stroke_to_brep has shape (0,), all loop features should be 0
+            return torch.zeros((num_loops, 1), dtype=torch.float)
+
+        # Case 2: stroke_to_brep has shape (num_loops, k)
+        # Compute a feature matrix where each row is 1 if there is any 1 in the corresponding row of stroke_to_brep, otherwise 0
+        loop_features = (stroke_to_brep.sum(dim=1, keepdim=True) > 0).float()
+        return loop_features
+
+    def _create_loop_stroke_edges(self, stroke_cloud_loops):
+        loop_indices = []
+        stroke_indices = []
+        
+        # Create edges between each loop node and its corresponding stroke nodes
+        for loop_idx, loop in enumerate(stroke_cloud_loops):
+            for stroke_idx in loop:
+                loop_indices.append(loop_idx)  # Connect the current loop node
+                stroke_indices.append(stroke_idx)  # To each stroke node in the sublist
+        
+        return loop_indices, stroke_indices
+
+    def _create_loop_neighbor_edges(self, loop_neighboring_vertical, loop_neighboring_horizontal):
+        # Combine neighboring tensors
+        combined_neighboring = (loop_neighboring_vertical | loop_neighboring_horizontal)
+        loop_edge_indices = ([], [])
+        
+        # Create edges based on the combined neighboring matrix
+        num_loops = combined_neighboring.shape[0]
+        for i in range(num_loops):
+            for j in range(num_loops):
+                if combined_neighboring[i, j] == 1:
+                    loop_edge_indices[0].append(i)
+                    loop_edge_indices[1].append(j)
+        
+        return loop_edge_indices
+
+    def _create_ordered_loop_edges(self, stroke_cloud_loops):
+        # Compute the average stroke index for each loop
+        loop_order = [(idx, sum(loop) / len(loop) if len(loop) > 0 else float('inf')) for idx, loop in enumerate(stroke_cloud_loops)]
+        # Sort loops by average stroke index (ascending order)
+        loop_order.sort(key=lambda x: x[1])
+
+        # Create directed edges from the first loop to the last one
+        ordered_loop_edges = ([], [])
+        for i in range(len(loop_order) - 1):
+            ordered_loop_edges[0].append(loop_order[i][0])
+            ordered_loop_edges[1].append(loop_order[i + 1][0])
+        
+        return ordered_loop_edges
+
+
+
 def build_graph(stroke_dict):
     num_strokes = len(stroke_dict)
     num_operation_counts = 0

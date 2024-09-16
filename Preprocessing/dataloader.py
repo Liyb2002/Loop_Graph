@@ -68,34 +68,6 @@ class Program_Graph_Dataset(Dataset):
         stroke_cloud_loops = [list(fset) for fset in shape_data['stroke_cloud_loops']]
         stroke_node_features = shape_data['stroke_node_features']
 
-        # Prepare loop features for embedding
-        loop_features = []
-        for indices in stroke_cloud_loops:
-            strokes = stroke_node_features[indices]  # Extract strokes for current loop
-
-            # If there are only 3 strokes, pad to have 4 strokes
-            if strokes.shape[0] == 3:
-                padding = np.zeros((1, strokes.shape[1]))  # Create a zero padding
-                strokes = np.vstack([strokes, padding])  # Pad to shape (4, 6)
-
-            # Flatten the strokes to create a single feature vector for the loop
-            loop_feature = strokes.flatten()  # Shape: (1, 24)
-            loop_features.append(loop_feature)
-
-        # Convert to tensor
-        loop_features_tensor = torch.tensor(loop_features, dtype=torch.float32).to(device)  # Shape: (len(stroke_cloud_loops), 24)
-
-        # Create a dummy mask with all 1s since all loops are valid
-        mask_loop_features = torch.ones(loop_features_tensor.shape[0], dtype=torch.float32, device=device)
-
-        # Compute loop embeddings using the pretrained model
-        with torch.no_grad():
-            loop_embeddings = self.loop_embed_model(loop_features_tensor.unsqueeze(0), mask_loop_features.unsqueeze(0)).squeeze(0)  # Shape: (num_loops, embedding_dim)
-
-        # Ensure loop embeddings are not None
-        if loop_embeddings is None:
-            raise ValueError("Loop embeddings could not be computed; please check your model and data.")
-
         # Convert remaining numpy arrays to tensors
         
         loop_neighboring_vertical = torch.tensor(shape_data['loop_neighboring_vertical'], dtype=torch.long, device=device)
@@ -106,7 +78,7 @@ class Program_Graph_Dataset(Dataset):
         # Load stroke_operations_order_matrix and convert to tensor
         stroke_operations_order_matrix = torch.tensor(shape_data['stroke_operations_order_matrix'], dtype=torch.float32)
 
-        return stroke_cloud_loops, stroke_node_features, loop_embeddings,loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges
+        return stroke_cloud_loops, stroke_node_features,loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges
 
 
 

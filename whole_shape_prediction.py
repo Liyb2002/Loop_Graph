@@ -44,7 +44,7 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
     print(f"Total number of shape data: {len(dataset)}")
 
     train_loader = DataLoader(dataset, batch_size=1, shuffle=False)
@@ -56,24 +56,14 @@ def train():
     graphs = []
     for data in dataset:
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges= data
+        stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges= data
 
-        # Squeeze the tensors if needed
-        loop_embeddings = loop_embeddings.squeeze(0)
-        loop_neighboring_vertical = loop_neighboring_vertical.squeeze(0)
-        loop_neighboring_horizontal = loop_neighboring_horizontal.squeeze(0)
-        stroke_to_brep = stroke_to_brep.squeeze(0)
-
+        print('--------')
         # Build the graph
-        gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep)
-
-        # Move graph to GPU
-        gnn_graph = gnn_graph.to(device)
+        gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep)
         graphs.append(gnn_graph)
 
-        Encoders.helper.vis_partial_graph(stroke_cloud_loops, stroke_node_features, stroke_to_brep)
-        Encoders.helper.vis_whole_graph(stroke_cloud_loops, stroke_node_features)
-        Encoders.helper.vis_brep(final_brep_edges)
+        
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -85,8 +75,7 @@ def train():
     for epoch in range(epochs):
         for gnn_graph in tqdm(graphs, desc=f"Epoch {epoch+1}/{epochs} - Training"):
 
-            print("gnn_graph", gnn_graph['stroke'].x.shape)
-
+            pass
 #---------------------------------- Public Functions ----------------------------------#
 
 train()
