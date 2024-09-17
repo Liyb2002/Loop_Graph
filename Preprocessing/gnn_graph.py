@@ -76,7 +76,6 @@ class SketchLoopGraph(HeteroData):
 
         # Create edges between loops and strokes
         loop_indices, stroke_indices = self._create_loop_stroke_edges(stroke_cloud_loops)
-        print("loop_indices", loop_indices, "stroke_indices", stroke_indices)
         self['loop', 'representedBy', 'stroke'].edge_index = torch.tensor([loop_indices, stroke_indices], dtype=torch.long)
         
         # Combine loop neighboring matrices and create edges between loops

@@ -77,6 +77,7 @@ class dataset_generator():
             if next_stop_idx == -1:
                 break 
             
+            
             stroke_cloud_class.read_next(next_stop_idx)
             stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_class.edges)
             stroke_node_features = np.round(stroke_node_features, 4)

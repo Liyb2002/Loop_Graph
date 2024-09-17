@@ -52,30 +52,56 @@ def train():
     best_val_loss = float('inf')
     epochs = 1
 
-
     graphs = []
+    loop_selection_masks = []
+
+    # Preprocess and build the graphs
     for data in dataset:
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges= data
+        stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
 
-        print('--------')
-        # Build the graph
-        gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep)
-        graphs.append(gnn_graph)
-
+        second_last_column = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
+        chosen_strokes = (second_last_column == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        loop_chosen_mask = []
+        for loop in stroke_cloud_loops:
+            if all(stroke in chosen_strokes for stroke in loop):
+                loop_chosen_mask.append(1)  # Loop is chosen
+            else:
+                loop_chosen_mask.append(0)  # Loop is not chosen
         
+        loop_chosen_mask_tensor = torch.tensor(loop_chosen_mask).reshape(-1, 1)
+        if not (loop_chosen_mask_tensor == 1).any():
+            continue
 
+
+
+        # Build the graph
+        gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
+            stroke_cloud_loops, 
+            stroke_node_features, 
+            loop_neighboring_vertical, 
+            loop_neighboring_horizontal, 
+            stroke_to_brep
+        )
+
+        # Prepare the pair
+        graphs.append(gnn_graph)
+        loop_selection_masks.append(loop_chosen_mask_tensor)
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
 
 
-    best_val_loss = float('inf')
-    epochs = 1
 
+    # Training loop
     for epoch in range(epochs):
-        for gnn_graph in tqdm(graphs, desc=f"Epoch {epoch+1}/{epochs} - Training"):
-
+        total_loss = 0.0
+        for gnn_graph, loop_selection_mask in zip(graphs, loop_selection_masks):
             pass
+            print("-----------")
+            print("gnn_graph", gnn_graph['loop'].x.shape)
+            print("loop_selection_mask", loop_selection_mask.shape)
+
+
 #---------------------------------- Public Functions ----------------------------------#
 
 train()
