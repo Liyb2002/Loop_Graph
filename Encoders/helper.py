@@ -235,67 +235,6 @@ def vis_partial_graph(loops, strokes, stroke_to_brep):
     plt.show()
 
 
-def vis_whole_graph(loops, strokes):
-    """
-    Visualize multiple loops and strokes in 3D space, with all strokes in blue and rescaled axes.
-
-    Parameters:
-    loops (list of lists of int): A list of loops, where each loop is a list containing indices of strokes to be highlighted.
-    strokes (np.ndarray): A matrix of shape (num_strokes, 7), where the first 6 columns represent two 3D points.
-    """
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-    import numpy as np
-
-    # Initialize the 3D plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.grid(False)
-
-    # Initialize min and max limits
-    x_min, x_max = float('inf'), float('-inf')
-    y_min, y_max = float('inf'), float('-inf')
-    z_min, z_max = float('inf'), float('-inf')
-
-    # Plot all strokes in blue
-    for stroke in strokes:
-        start, end = stroke[:3], stroke[3:6]
-        
-        # Update the min and max limits for each axis
-        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-        
-        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', alpha=0.5)
-
-    # Plot strokes in each loop in blue but with a thicker line
-    for loop in loops:
-        for idx in loop:
-            stroke = strokes[idx]
-            start, end = stroke[:3], stroke[3:6]
-            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
-
-    # Compute the center of the shape
-    x_center = (x_min + x_max) / 2
-    y_center = (y_min + y_max) / 2
-    z_center = (z_min + z_max) / 2
-
-    # Compute the maximum difference across x, y, z directions
-    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
-
-    # Set the same limits for x, y, and z axes centered around the computed center
-    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
-    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
-    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
-
-    # Set axis labels
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    # Show plot
-    plt.show()
-
 
 def vis_brep(brep):
     """
@@ -330,6 +269,82 @@ def vis_brep(brep):
         z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
         
         ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+
+    # Compute the center of the shape
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+
+    # Compute the maximum difference across x, y, z directions
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    # Set the same limits for x, y, and z axes centered around the computed center
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # Show plot
+    plt.show()
+
+
+def vis_whole_graph(graph, loop_selection_masks):
+    """
+    Visualize the graph with loops and strokes in 3D space.
+    
+    Parameters:
+    graph (SketchLoopGraph): A single graph object containing loops and strokes.
+    loop_selection_masks (np.ndarray or torch.Tensor): A binary mask of shape (num_loops, 1), where 1 indicates a chosen loop.
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    import numpy as np
+
+    # Extract loop-stroke connection edges and stroke features
+    loops_to_strokes = graph['loop', 'representedBy', 'stroke'].edge_index
+    stroke_node_features = graph['stroke'].x.numpy()
+
+    # Convert edge indices to a more accessible format
+    loop_to_strokes = {}
+    for loop_idx, stroke_idx in zip(loops_to_strokes[0], loops_to_strokes[1]):
+        if loop_idx.item() not in loop_to_strokes:
+            loop_to_strokes[loop_idx.item()] = []
+        loop_to_strokes[loop_idx.item()].append(stroke_idx.item())
+
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Plot all loops in blue
+    for loop_idx, stroke_indices in loop_to_strokes.items():
+        for idx in stroke_indices:
+            stroke = stroke_node_features[idx]
+            start, end = stroke[:3], stroke[3:6]
+            
+            # Update the min and max limits for each axis
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+            
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1, alpha=0.5)
+
+    # Plot chosen loops in red
+    for loop_idx, stroke_indices in loop_to_strokes.items():
+        if loop_selection_masks[loop_idx].item() == 1:  # Only plot if the loop is chosen
+            for idx in stroke_indices:
+                stroke = stroke_node_features[idx]
+                start, end = stroke[:3], stroke[3:6]
+                ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='red', linewidth=1)
 
     # Compute the center of the shape
     x_center = (x_min + x_max) / 2

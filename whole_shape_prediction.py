@@ -73,8 +73,6 @@ def train():
         if not (loop_chosen_mask_tensor == 1).any():
             continue
 
-
-
         # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
@@ -96,10 +94,10 @@ def train():
     for epoch in range(epochs):
         total_loss = 0.0
         for gnn_graph, loop_selection_mask in zip(graphs, loop_selection_masks):
-            pass
-            print("-----------")
-            print("gnn_graph", gnn_graph['loop'].x.shape)
-            print("loop_selection_mask", loop_selection_mask.shape)
+
+            Encoders.helper.vis_whole_graph(gnn_graph, loop_selection_mask)
+
+
 
 
 #---------------------------------- Public Functions ----------------------------------#
