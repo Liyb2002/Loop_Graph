@@ -80,8 +80,9 @@ class GeneralHeteroConv(torch.nn.Module):
     
     def create_HeteroConv_dict(self):
         heteroConv_dict = {}
-        edges_types = [('stroke', 'strokeCoplanar', 'stroke'),
-                       ('stroke', 'strokeIntersect', 'stroke')]
+        edges_types = [('loop', 'representedBy', 'stroke'),
+                       ('loop', 'neighboring', 'loop'),
+                       ('loop', 'order', 'loop')]
         
         aggr_fns = self.find_aggr_fun()
         for i in range(len(edges_types)):
@@ -111,9 +112,9 @@ class GeneralHeteroConv(torch.nn.Module):
         if edge_attr_dict is None:
             edge_attr_dict = {}
 
-        if 'brep' in x_dict and x_dict['brep'].size(0) == 0:
-            x_dict_no_brep = {key: value for key, value in x_dict.items() if key != 'brep'}
-            edge_index_dict_no_brep = {key: value for key, value in edge_index_dict.items() if 'brep' not in key}
+        if 'stroke' in x_dict and x_dict['stroke'].size(0) == 0:
+            x_dict_no_brep = {key: value for key, value in x_dict.items() if key != 'stroke'}
+            edge_index_dict_no_brep = {key: value for key, value in edge_index_dict.items() if 'stroke' not in key}
 
             # Perform convolution without brep nodes and edges
             res = self.gconv(x_dict_no_brep, edge_index_dict_no_brep, edge_attr_dict)
@@ -133,25 +134,25 @@ class ResidualGeneralHeteroConvBlock(torch.nn.Module):
 
     def forward(self, x_dict, edge_index_dict, edge_attr_dict=None, data=None):
 
-        residual_stroke = x_dict['stroke']
-        if 'brep' in x_dict:
-            residual_brep = x_dict['brep']
+        residual_stroke = x_dict['loop']
+        if 'stroke' in x_dict:
+            residual_brep = x_dict['stroke']
             out = self.mlp_edge_conv(x_dict, edge_index_dict, edge_attr_dict, data)
         else:
-            x_dict_no_brep = {key: value for key, value in x_dict.items() if key != 'brep'}
-            edge_index_dict_no_brep = {key: value for key, value in edge_index_dict.items() if 'brep' not in key}
+            x_dict_no_brep = {key: value for key, value in x_dict.items() if key != 'stroke'}
+            edge_index_dict_no_brep = {key: value for key, value in edge_index_dict.items() if 'loop' not in key}
             out = self.mlp_edge_conv(x_dict_no_brep, edge_index_dict_no_brep, edge_attr_dict, data)
 
 
         if self.residual:
-            out['stroke'] += residual_stroke
-            if 'brep' in x_dict:
-                out['brep'] += residual_brep
+            out['loop'] += residual_stroke
+            if 'stroke' in x_dict:
+                out['stroke'] += residual_brep
 
         else:
-            out['stroke'] += self.projection(residual_stroke)
-            if 'brep' in x_dict:
-                out['brep'] += self.projection(residual_brep)
+            out['loop'] += self.projection(residual_stroke)
+            if 'stroke' in x_dict:
+                out['stroke'] += self.projection(residual_brep)
 
         return out
     

@@ -91,11 +91,12 @@ class SketchLoopGraph(HeteroData):
         
         if stroke_to_brep.shape[0] == 0:
             # Case 1: If stroke_to_brep has shape (0,), all loop features should be 0
-            return torch.zeros((num_loops, 1), dtype=torch.float)
+            return torch.zeros((num_loops, 6), dtype=torch.float)
 
         # Case 2: stroke_to_brep has shape (num_loops, k)
         # Compute a feature matrix where each row is 1 if there is any 1 in the corresponding row of stroke_to_brep, otherwise 0
         loop_features = (stroke_to_brep.sum(dim=1, keepdim=True) > 0).float()
+        loop_features = loop_features.repeat(1, 6)  # Repeat the value 6 times to create a (num_loops, 6) matrix
         return loop_features
 
     def _create_loop_stroke_edges(self, stroke_cloud_loops):
