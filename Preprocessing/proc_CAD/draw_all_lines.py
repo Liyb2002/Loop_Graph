@@ -51,6 +51,22 @@ class create_stroke_cloud():
         return -1
 
 
+    def read_whole(self):
+        target_brep_file = self.brep_files[-1]
+        brep_file_path = os.path.join(self.brep_directory, target_brep_file)
+        self.brep_edges, _ = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
+
+        while self.current_index < len(self.data):
+            op = self.data[self.current_index]
+            self.parse_op(op, self.current_index)
+            self.current_index += 1
+
+        self.adj_edges()
+        self.map_id_to_count()
+
+        return True
+    
+
     def read_next(self, stop_idx):
 
         target_brep_file = self.brep_files[stop_idx]
@@ -245,13 +261,14 @@ class create_stroke_cloud():
             edge = Edge(id=edge_data['id'], vertices=vertices)
             edge.set_Op(op, index)
             edge.set_order_count(self.order_count)
-            new_edges.append(edge)
 
-            # self.edges[edge.order_count] = edge
+            edge.set_edge_type('feature_line')
+            edge.set_alpha_value()
+            self.edges[edge.order_count] = edge
 
 
         # Now add the new edges to self.edges
-        self.add_new_edges(new_edges)
+        # self.add_new_edges(new_edges)
 
         construction_lines = []
         # Now, we need to generate the construction lines
@@ -542,12 +559,13 @@ class create_stroke_cloud():
         #     self.order_count += 1
         #     self.edges[line.order_count] = line
         
-        self.edges = Preprocessing.proc_CAD.line_utils.remove_duplicate_lines(self.edges)
-        self.edges = Preprocessing.proc_CAD.line_utils.remove_single_point(self.edges)
+        # self.edges = Preprocessing.proc_CAD.line_utils.remove_duplicate_lines(self.edges)
+        # self.edges = Preprocessing.proc_CAD.line_utils.remove_single_point(self.edges)
 
-        self.determine_edge_type()
+        # self.determine_edge_type()
         
         for edge_id, edge in self.edges.items():
+            edge.set_edge_type('feature_line')
             edge.set_alpha_value()
 
         

@@ -58,10 +58,10 @@ def train():
     # Preprocess and build the graphs
     for data in dataset:
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
+        stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges, prev_stop_idx = data
 
-        second_last_column = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
-        chosen_strokes = (second_last_column == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        chosen_column = stroke_operations_order_matrix[:, prev_stop_idx].reshape(-1, 1)
+        chosen_strokes = (chosen_column == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
         loop_chosen_mask = []
         for loop in stroke_cloud_loops:
             if all(stroke in chosen_strokes for stroke in loop):
@@ -70,6 +70,7 @@ def train():
                 loop_chosen_mask.append(0)  # Loop is not chosen
         
         loop_chosen_mask_tensor = torch.tensor(loop_chosen_mask).reshape(-1, 1)
+
         if not (loop_chosen_mask_tensor == 1).any():
             continue
 

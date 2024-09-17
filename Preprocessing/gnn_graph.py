@@ -165,7 +165,7 @@ def build_graph(stroke_dict):
         # node_features has shape num_strokes x 6, which is the starting and ending point
         start_point = stroke.vertices[0].position
         end_point = stroke.vertices[1].position
-        alpha_value = stroke.alpha_value
+        alpha_value = 1
         node_features[i, :3] = start_point
         node_features[i, 3:6] = end_point
         node_features[i, 6:] = alpha_value
