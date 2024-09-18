@@ -295,7 +295,7 @@ def vis_brep(brep):
     plt.show()
 
 
-def vis_whole_graph(graph, loop_selection_masks):
+def vis_whole_graph(graph, selected_loop):
     """
     Visualize the graph with loops and strokes in 3D space.
     
@@ -343,7 +343,7 @@ def vis_whole_graph(graph, loop_selection_masks):
 
     # Plot chosen loops in red
     for loop_idx, stroke_indices in loop_to_strokes.items():
-        if loop_selection_masks[loop_idx].item() >= 0.5:  # Only plot if the loop is chosen
+        if loop_idx == selected_loop:  # Plot only the selected loop
             for idx in stroke_indices:
                 stroke = stroke_node_features[idx]
                 start, end = stroke[:3], stroke[3:6]

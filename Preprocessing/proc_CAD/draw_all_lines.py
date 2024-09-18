@@ -51,22 +51,6 @@ class create_stroke_cloud():
         return -1
 
 
-    def read_whole(self):
-        target_brep_file = self.brep_files[-1]
-        brep_file_path = os.path.join(self.brep_directory, target_brep_file)
-        self.brep_edges, _ = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
-
-        while self.current_index < len(self.data):
-            op = self.data[self.current_index]
-            self.parse_op(op, self.current_index)
-            self.current_index += 1
-
-        self.adj_edges()
-        self.map_id_to_count()
-
-        return True
-    
-
     def read_next(self, stop_idx):
 
         target_brep_file = self.brep_files[stop_idx]
@@ -261,32 +245,31 @@ class create_stroke_cloud():
             edge = Edge(id=edge_data['id'], vertices=vertices)
             edge.set_Op(op, index)
             edge.set_order_count(self.order_count)
+            new_edges.append(edge)
 
-            edge.set_edge_type('feature_line')
-            edge.set_alpha_value()
-            self.edges[edge.order_count] = edge
+            # self.edges[edge.order_count] = edge
 
 
         # Now add the new edges to self.edges
-        # self.add_new_edges(new_edges)
+        self.add_new_edges(new_edges)
 
         construction_lines = []
         # Now, we need to generate the construction lines
-        # if op == 'sketch':
-        #     construction_lines = Preprocessing.proc_CAD.line_utils.midpoint_lines(new_edges)
-        #     construction_lines += Preprocessing.proc_CAD.line_utils.diagonal_lines(new_edges)                
+        if op == 'sketch':
+            construction_lines = Preprocessing.proc_CAD.line_utils.midpoint_lines(new_edges)
+            construction_lines += Preprocessing.proc_CAD.line_utils.diagonal_lines(new_edges)                
 
-        # if op == 'extrude':
-        #     construction_lines = Preprocessing.proc_CAD.line_utils.projection_lines(new_edges)
-        #     construction_lines += Preprocessing.proc_CAD.line_utils.bounding_box_lines(new_edges)
+        if op == 'extrude':
+            construction_lines = Preprocessing.proc_CAD.line_utils.projection_lines(new_edges)
+            construction_lines += Preprocessing.proc_CAD.line_utils.bounding_box_lines(new_edges)
             # construction_lines = Preprocessing.proc_CAD.line_utils.grid_lines(self.edges, new_edges)
 
-        # for line in construction_lines:
-        #     line.set_edge_type('construction_line')
-        #     line.set_order_count(self.order_count)
-        #     line.set_Op(op, index)
-        #     self.order_count += 1
-        #     self.edges[line.order_count] = line
+        for line in construction_lines:
+            line.set_edge_type('construction_line')
+            line.set_order_count(self.order_count)
+            line.set_Op(op, index)
+            self.order_count += 1
+            self.edges[line.order_count] = line
         
 
         #find the edges that has the current operation 
@@ -436,7 +419,7 @@ class create_stroke_cloud():
             edges_to_add = []
 
             # Check if the new edge is contained within any existing edge
-            for prev_edge_id, prev_edge in list(self.edges.items()):
+            for _, prev_edge in list(self.edges.items()):
                 if is_contained(prev_edge, new_edge):
                     # The new edge is contained within the previous edge
                     is_edge_contained = True
@@ -466,7 +449,7 @@ class create_stroke_cloud():
                         new_edge = Edge(id=edge_id, vertices=(start, end))
                         edges_to_add.append(new_edge)
 
-                    edges_to_remove.append(prev_edge_id)
+                    edges_to_remove.append(prev_edge.order_count)
                     break  # No need to check other previous edges since it is already contained
 
             # Step 2: Add the new edge if not contained within any existing edge
@@ -552,20 +535,19 @@ class create_stroke_cloud():
 
 
     def finishing_production(self):
-        # construction_lines = Preprocessing.proc_CAD.line_utils.whole_bounding_box_lines(self.edges)
-        # for line in construction_lines:
-        #     line.set_edge_type('construction_line')
-        #     line.set_order_count(self.order_count)
-        #     self.order_count += 1
-        #     self.edges[line.order_count] = line
+        construction_lines = Preprocessing.proc_CAD.line_utils.whole_bounding_box_lines(self.edges)
+        for line in construction_lines:
+            line.set_edge_type('construction_line')
+            line.set_order_count(self.order_count)
+            self.order_count += 1
+            self.edges[line.order_count] = line
         
-        # self.edges = Preprocessing.proc_CAD.line_utils.remove_duplicate_lines(self.edges)
-        # self.edges = Preprocessing.proc_CAD.line_utils.remove_single_point(self.edges)
+        self.edges = Preprocessing.proc_CAD.line_utils.remove_duplicate_lines(self.edges)
+        self.edges = Preprocessing.proc_CAD.line_utils.remove_single_point(self.edges)
 
-        # self.determine_edge_type()
+        self.determine_edge_type()
         
         for edge_id, edge in self.edges.items():
-            edge.set_edge_type('feature_line')
             edge.set_alpha_value()
 
         
@@ -578,5 +560,4 @@ class create_stroke_cloud():
 def create_stroke_cloud_class(directory):
     stroke_cloud_class = create_stroke_cloud(directory)
     return stroke_cloud_class
-
 
