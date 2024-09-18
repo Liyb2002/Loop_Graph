@@ -1,7 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-
+import numpy as np
 
 def get_kth_operation(op_to_index_matrix, k):    
     squeezed_matrix = op_to_index_matrix.squeeze(0)
@@ -246,13 +246,16 @@ def vis_brep(brep):
                        If brep.shape[0] == 0, the function returns without plotting.
     """
     # Check if brep is empty
-    if brep.shape[0] == 0:
-        return
-
-    # Initialize the 3D plot
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.grid(False)
+
+    # Check if brep is empty
+    if brep.shape[0] == 0:
+        plt.title('Empty Plot')
+        plt.show()
+        return
+    
 
     # Initialize min and max limits
     x_min, x_max = float('inf'), float('-inf')
@@ -340,7 +343,7 @@ def vis_whole_graph(graph, loop_selection_masks):
 
     # Plot chosen loops in red
     for loop_idx, stroke_indices in loop_to_strokes.items():
-        if loop_selection_masks[loop_idx].item() == 1:  # Only plot if the loop is chosen
+        if loop_selection_masks[loop_idx].item() >= 0.5:  # Only plot if the loop is chosen
             for idx in stroke_indices:
                 stroke = stroke_node_features[idx]
                 start, end = stroke[:3], stroke[3:6]
@@ -358,6 +361,79 @@ def vis_whole_graph(graph, loop_selection_masks):
     ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
     ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
     ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # Show plot
+    plt.show()
+
+
+def vis_used_graph(graph):
+    """
+    Visualize the graph with loops and strokes in 3D space.
+    Only visualize the loops with feature 0 (blue loops).
+    
+    Parameters:
+    graph (SketchLoopGraph): A single graph object containing loops and strokes.
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    import numpy as np
+
+    # Extract loop-stroke connection edges and stroke features
+    loops_to_strokes = graph['loop', 'representedBy', 'stroke'].edge_index
+    stroke_node_features = graph['stroke'].x.numpy()
+    loop_features = graph['loop'].x.numpy()  # Assuming graph['loop'].x contains the features for each loop
+
+    # Convert edge indices to a more accessible format
+    loop_to_strokes = {}
+    for loop_idx, stroke_idx in zip(loops_to_strokes[0], loops_to_strokes[1]):
+        if loop_idx.item() not in loop_to_strokes:
+            loop_to_strokes[loop_idx.item()] = []
+        loop_to_strokes[loop_idx.item()].append(stroke_idx.item())
+
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Plot only the unused loops (with feature 0)
+    for loop_idx, stroke_indices in loop_to_strokes.items():
+        # Check if the current loop has a feature of 0
+        if loop_features[loop_idx][0] == 0:  # Only visualize if the first feature is 0
+            for idx in stroke_indices:
+                stroke = stroke_node_features[idx]
+                start, end = stroke[:3], stroke[3:6]
+
+                # Update the min and max limits for each axis
+                x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+                y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+                z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+                # Plot the stroke in blue
+                ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1, alpha=0.5)
+
+    # Compute the center of the shape
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+
+    # Compute the maximum difference across x, y, z directions
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    # Set the same limits for x, y, and z axes centered around the computed center
+    if max_diff > 0:  # Only set limits if max_diff is positive
+        ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+        ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+        ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
 
     # Set axis labels
     ax.set_xlabel('X')

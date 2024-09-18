@@ -24,7 +24,8 @@ class dataset_generator():
         os.makedirs('dataset', exist_ok=True)
 
         self.generate_dataset('dataset/test', number_data = 0, start = 0)
-        self.generate_dataset('dataset/simple', number_data = 5, start = 0)
+        self.generate_dataset('dataset/simple', number_data = 0, start = 0)
+        self.generate_dataset('dataset/simple_eval', number_data = 500, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -102,15 +103,12 @@ class dataset_generator():
                 for file_name in usable_brep_files:
                     brep_file_path = os.path.join(brep_directory, file_name)
                     edge_features_list, edge_coplanar_list= Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
-                    if len(prev_brep_edges) == 0:
+                    if len(final_brep_edges_list) == 0:
                         final_brep_edges_list = edge_features_list
-                        prev_brep_edges = edge_features_list
-                        new_features = edge_features_list
                     else:
                         # We already have brep
-                        new_features= find_new_features(prev_brep_edges, edge_features_list) 
+                        new_features= find_new_features(final_brep_edges_list, edge_features_list) 
                         final_brep_edges_list += new_features
-                        prev_brep_edges = edge_features_list
                 
 
 

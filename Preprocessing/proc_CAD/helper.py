@@ -780,6 +780,7 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
     Returns:
     np.ndarray: A matrix with shape (num_stroke_cloud_loops, num_brep_loops) where each entry is 1 if the loops match, otherwise 0.
     """
+    import numpy as np
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
 
@@ -794,20 +795,26 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
         stroke_points = set(map(tuple, [stroke[:3], stroke[3:6]]))
         for brep_idx, brep_edge in enumerate(final_brep_edges):
             brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))
-            if stroke_points == brep_points:  # Matching found (considering reversed order)
-                stroke_to_brep_map[stroke_idx] = brep_idx
-                break
+            
+            # Check if stroke is contained in brep or brep is contained in stroke
+            if stroke_points.issubset(brep_points) or brep_points.issubset(stroke_points):
+                if stroke_idx not in stroke_to_brep_map:
+                    stroke_to_brep_map[stroke_idx] = set()
+                stroke_to_brep_map[stroke_idx].add(brep_idx)  # Allow multiple matches
 
     # Step 2: Find the corresponding loops based on matching edges
     stroke_matched = [False] * num_stroke_cloud_loops  # Track matched stroke loops
 
     for i, stroke_loop in enumerate(stroke_cloud_loops):
-        stroke_brep_indices = set(stroke_to_brep_map.get(stroke_idx) for stroke_idx in stroke_loop if stroke_idx in stroke_to_brep_map)
+        stroke_brep_indices = set()
+        for stroke_idx in stroke_loop:
+            if stroke_idx in stroke_to_brep_map:
+                stroke_brep_indices.update(stroke_to_brep_map[stroke_idx])
+        
         for j, brep_loop in enumerate(brep_loops):
-            if stroke_brep_indices == set(brep_loop):
+            if stroke_brep_indices and stroke_brep_indices.issubset(set(brep_loop)):
                 correspondence_matrix[i, j] = 1.0
                 stroke_matched[i] = True
-
 
     return correspondence_matrix
 
@@ -883,3 +890,59 @@ def vis_partial_graph(loops, strokes):
     # Show plot
     plt.show()
     
+
+
+def vis_brep(brep):
+    """
+    Visualize the brep strokes in 3D space if brep is not empty.
+    
+    Parameters:
+    brep (np.ndarray): A matrix with shape (num_strokes, 6) representing strokes.
+                       Each row contains two 3D points representing the start and end of a stroke.
+                       If brep.shape[0] == 0, the function returns without plotting.
+    """
+    # Check if brep is empty
+    if brep.shape[0] == 0:
+        return
+
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Plot all brep strokes in blue with line width 1
+    for stroke in brep:
+        start, end = stroke[:3], stroke[3:6]
+        
+        # Update the min and max limits for each axis
+        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+        
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+
+    # Compute the center of the shape
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+
+    # Compute the maximum difference across x, y, z directions
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    # Set the same limits for x, y, and z axes centered around the computed center
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # Show plot
+    plt.show()
