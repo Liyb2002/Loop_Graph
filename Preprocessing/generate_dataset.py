@@ -81,7 +81,7 @@ class dataset_generator():
             stroke_cloud_class.read_next(next_stop_idx)
             stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_class.edges)
             stroke_node_features = np.round(stroke_node_features, 4)
-            stroke_node_features = stroke_node_features[:, :-1]
+            # stroke_node_features = stroke_node_features[:, :-1]
 
 
             # 2) Get the loops
@@ -93,7 +93,7 @@ class dataset_generator():
             loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(stroke_cloud_loops)
             loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(stroke_cloud_loops, stroke_node_features)
             loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(loop_neighboring_all, loop_neighboring_vertical)
-
+            loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(stroke_cloud_loops, stroke_node_features)
             
             # 4) Load Brep
             # brep_edges = stroke_cloud_class.brep_edges

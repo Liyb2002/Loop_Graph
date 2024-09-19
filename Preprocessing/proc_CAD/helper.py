@@ -744,6 +744,61 @@ def coplanr_neighorbing_loop(matrix1, matrix2):
     
 
 
+def loop_contained(loops, stroke_node_features):
+    """
+    Determine if a loop is contained within another loop based on bounding boxes in 3D space.
+    
+    Parameters:
+    loops (list of list of int): A list where each sublist contains indices representing strokes of a loop.
+    stroke_node_features (dict): A dictionary where the key is the stroke index, and the value is a list of two 3D points [(x1, y1, z1), (x2, y2, z2)] representing the stroke.
+    
+    Returns:
+    np.ndarray: A matrix of shape (num_loops, num_loops) where [i, j] is 1 if loop i contains loop j, otherwise 0.
+    """
+    num_loops = len(loops)
+    
+    # Initialize the contained matrix with zeros
+    contained_matrix = np.zeros((num_loops, num_loops), dtype=np.float32)
+    
+    # Step 1: Calculate the bounding box (min_x, max_x, min_y, max_y, min_z, max_z) for each loop
+    bounding_boxes = []
+    
+    for loop in loops:
+        # Initialize min/max values with extreme values
+        min_x, max_x = float('inf'), float('-inf')
+        min_y, max_y = float('inf'), float('-inf')
+        min_z, max_z = float('inf'), float('-inf')
+        
+        # Process each stroke in the loop
+        for stroke in loop:
+            stroke_coords = stroke_node_features[stroke]  # Each stroke has exactly 6 values: [x1, y1, z1, x2, y2, z2]
+            x1, y1, z1, x2, y2, z2, _ = stroke_coords
+            
+            # Update bounding box for the loop
+            min_x, max_x = min(min_x, x1, x2), max(max_x, x1, x2)
+            min_y, max_y = min(min_y, y1, y2), max(max_y, y1, y2)
+            min_z, max_z = min(min_z, z1, z2), max(max_z, z1, z2)
+        
+        # Store the bounding box as a tuple (min_x, max_x, min_y, max_y, min_z, max_z)
+        bounding_boxes.append((min_x, max_x, min_y, max_y, min_z, max_z))
+    
+    # Step 2: Check if one loop is contained in another in 3D space
+    for i in range(num_loops):
+        for j in range(num_loops):
+            if i != j:  # Avoid comparing the same loop
+                min_x_i, max_x_i, min_y_i, max_y_i, min_z_i, max_z_i = bounding_boxes[i]
+                min_x_j, max_x_j, min_y_j, max_y_j, min_z_j, max_z_j = bounding_boxes[j]
+                
+                # Check containment conditions in 3D space
+                if (min_x_i <= min_x_j <= max_x_j <= max_x_i) and \
+                   (min_y_i <= min_y_j <= max_y_j <= max_y_i) and \
+                   (min_z_i <= min_z_j <= max_z_j <= max_z_i):
+                    contained_matrix[i, j] = 1.0  # Loop i contains loop j
+    
+    return contained_matrix
+
+
+
 def check_validacy(matrix1, matrix2):
     """
     Check the validity between two matrices.
