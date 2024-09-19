@@ -79,6 +79,10 @@ class SketchLoopGraph(HeteroData):
         loop_edge_indices = self._create_loop_neighbor_edges(loop_neighboring_vertical, loop_neighboring_horizontal)
         self['loop', 'neighboring', 'loop'].edge_index = torch.tensor(loop_edge_indices, dtype=torch.long)
 
+        # Create directed edges for contained loops
+        contained_loop_edges = self._create_contained_edges(loop_neighboring_contained)
+        self['loop', 'contains', 'loop'].edge_index = torch.tensor(contained_loop_edges, dtype=torch.long)
+
         # Create directed edges between loops based on their order
         ordered_loop_edges = self._create_ordered_loop_edges(stroke_cloud_loops)
         self['loop', 'order', 'loop'].edge_index = torch.tensor(ordered_loop_edges, dtype=torch.long)
@@ -135,6 +139,19 @@ class SketchLoopGraph(HeteroData):
                 if combined_neighboring[i, j] == 1:
                     loop_edge_indices[0].append(i)
                     loop_edge_indices[1].append(j)
+        
+        return loop_edge_indices
+
+    def _create_contained_edges(self, loop_neighboring_contained):
+        """ Create directed edges based on loop containment relationships """
+        loop_edge_indices = ([], [])
+
+        num_loops = loop_neighboring_contained.shape[0]
+        for i in range(num_loops):
+            for j in range(num_loops):
+                if loop_neighboring_contained[i, j] == 1:  # If loop_i contains loop_j
+                    loop_edge_indices[0].append(i)  # Directed edge from i (containing loop)
+                    loop_edge_indices[1].append(j)  # To j (contained loop)
         
         return loop_edge_indices
 

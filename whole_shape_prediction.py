@@ -16,9 +16,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-import Models.loop_embeddings
-
-
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
 graph_encoder.to(device)
 criterion = nn.BCELoss()
