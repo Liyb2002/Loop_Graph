@@ -24,7 +24,8 @@ class dataset_generator():
         # os.makedirs('dataset', exist_ok=True)
 
         self.generate_dataset('dataset/test', number_data = 5, start = 0)
-        self.generate_dataset('dataset/simple', number_data = 0, start = 0)
+        self.generate_dataset('dataset/simple', number_data = 0, start = 1245)
+        self.generate_dataset('dataset/eval', number_data = 0, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -68,13 +69,14 @@ class dataset_generator():
         brep_files = [file_name for file_name in os.listdir(brep_directory) if file_name.startswith('brep_') and file_name.endswith('.step')]
         brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
 
+
         prev_stop_idx = 0
         file_count = 0
 
         while True:
             # 1) Produce the Stroke Cloud features
             next_stop_idx = stroke_cloud_class.get_next_stop()
-            if next_stop_idx == -1:
+            if next_stop_idx == -1 or next_stop_idx > len(brep_files):
                 break 
             
             

@@ -23,7 +23,7 @@ graph_encoder.to(device)
 graph_decoder.to(device)
 
 criterion = nn.BCELoss()
-optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.001)
+optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
 
 # ------------------------------------------------------------------------------# 
 
@@ -47,20 +47,17 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
     print(f"Total number of shape data: {len(dataset)}")
-
-    train_loader = DataLoader(dataset, batch_size=1, shuffle=False)
     
     best_val_loss = float('inf')
     epochs = 30
     
-
     graphs = []
     loop_selection_masks = []
 
     # Preprocess and build the graphs
-    for data in dataset:
+    for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
         stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
 
@@ -147,7 +144,78 @@ def train():
 
 
 
+def eval():
+    load_models()
+    # Load the dataset
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/eval')
+    print(f"Total number of shape data: {len(dataset)}")
+
+
+    graphs = []
+    loop_selection_masks = []
+
+    # Preprocess and build the graphs
+    for data in tqdm(dataset, desc=f"Building Graphs"):
+        # Extract the necessary elements from the dataset
+        stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
+
+        second_last_column = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
+        chosen_strokes = (second_last_column == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        loop_chosen_mask = []
+        for loop in stroke_cloud_loops:
+            if all(stroke in chosen_strokes for stroke in loop):
+                loop_chosen_mask.append(1)  # Loop is chosen
+            else:
+                loop_chosen_mask.append(0)  # Loop is not chosen
+        
+        loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1).to(device)
+        if not (loop_selection_mask == 1).any():
+            continue
+
+        # Build the graph
+        gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
+            stroke_cloud_loops, 
+            stroke_node_features, 
+            loop_neighboring_vertical, 
+            loop_neighboring_horizontal, 
+            loop_neighboring_contained,
+            stroke_to_brep
+        )
+
+        # Encoders.helper.vis_brep(final_brep_edges)
+        # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+
+        # Prepare the pair
+        graphs.append(gnn_graph)
+        loop_selection_masks.append(loop_selection_mask)
+
+
+    # Eval
+    graph_encoder.eval()
+    graph_decoder.eval()
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for gnn_graph, loop_selection_mask in tqdm(zip(graphs, loop_selection_masks), desc=f"Evaluation"):
+            x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+            output = graph_decoder(x_dict)
+
+            output_selected_idx = torch.argmax(output)  # Index of selected loop in output
+            mask_selected_idx = torch.argmax(loop_selection_mask)  # Index of selected loop in ground truth
+            
+            # Check if the selected loop is correct
+            if output_selected_idx == mask_selected_idx:
+                correct += 1
+            # else:
+            #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
+            #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+            total += 1
+
+    accuracy = correct / total if total > 0 else 0
+    print(f"Validation Accuracy: {accuracy:.4f}")
 
 #---------------------------------- Public Functions ----------------------------------#
 
-train()
+
+eval()
