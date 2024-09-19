@@ -58,9 +58,8 @@ def train():
     # Preprocess and build the graphs
     for data in dataset:
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
+        stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
 
-        print("stroke_node_features", stroke_node_features.shape)
         second_last_column = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
         chosen_strokes = (second_last_column == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
         loop_chosen_mask = []
@@ -80,6 +79,7 @@ def train():
             stroke_node_features, 
             loop_neighboring_vertical, 
             loop_neighboring_horizontal, 
+            loop_neighboring_contained,
             stroke_to_brep
         )
 
@@ -95,7 +95,10 @@ def train():
     for epoch in range(epochs):
         total_loss = 0.0
         for gnn_graph, loop_selection_mask in zip(graphs, loop_selection_masks):
-            
+
+            print("strokes", gnn_graph['stroke'].x)
+            print("loop", gnn_graph['loop'].x)
+
             Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
 
 

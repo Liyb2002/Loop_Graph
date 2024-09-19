@@ -61,18 +61,15 @@ class SketchHeteroData(HeteroData):
         # Append the disconnected information to the node features
         self['stroke'].x = torch.cat((self['stroke'].x, is_disconnected), dim=1)
 
-
-
-
 class SketchLoopGraph(HeteroData):
-    def __init__(self, stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep):
+    def __init__(self, stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_to_brep):
         super(SketchLoopGraph, self).__init__()
 
-        # Stroke node features
-        self['stroke'].x = torch.tensor(stroke_node_features, dtype=torch.float)
+        # Use only the first 6 values of stroke_node_features
+        self['stroke'].x = torch.tensor(stroke_node_features[:, :6], dtype=torch.float)
 
-        # Loop node features based on stroke_to_brep
-        self['loop'].x = self._compute_loop_features(stroke_cloud_loops, stroke_to_brep)
+        # Loop node features based on the strokes and loop_to_brep
+        self['loop'].x = self._compute_loop_features(stroke_cloud_loops, stroke_node_features, loop_to_brep)
 
         # Create edges between loops and strokes
         loop_indices, stroke_indices = self._create_loop_stroke_edges(stroke_cloud_loops)
@@ -86,18 +83,33 @@ class SketchLoopGraph(HeteroData):
         ordered_loop_edges = self._create_ordered_loop_edges(stroke_cloud_loops)
         self['loop', 'order', 'loop'].edge_index = torch.tensor(ordered_loop_edges, dtype=torch.long)
 
-    def _compute_loop_features(self, stroke_cloud_loops, stroke_to_brep):
+    def _compute_loop_features(self, stroke_cloud_loops, stroke_node_features, loop_to_brep):
         num_loops = len(stroke_cloud_loops)
-        
-        if stroke_to_brep.shape[0] == 0:
-            # Case 1: If stroke_to_brep has shape (0,), all loop features should be 0
-            return torch.zeros((num_loops, 6), dtype=torch.float)
+        loop_features = []
 
-        # Case 2: stroke_to_brep has shape (num_loops, k)
-        # Compute a feature matrix where each row is 1 if there is any 1 in the corresponding row of stroke_to_brep, otherwise 0
-        loop_features = (stroke_to_brep.sum(dim=1, keepdim=True) > 0).float()
-        loop_features = loop_features.repeat(1, 6)  # Repeat the value 6 times to create a (num_loops, 6) matrix
-        return loop_features
+        # Process each loop
+        for loop_idx, loop in enumerate(stroke_cloud_loops):
+            # The first 5 values: average of the 7th value from connected strokes
+            stroke_seventh_values = [stroke_node_features[stroke_idx, 6] for stroke_idx in loop]
+            if len(stroke_seventh_values) > 0:
+                avg_value = sum(stroke_seventh_values) / len(stroke_seventh_values)
+            else:
+                avg_value = 0  # In case of an empty loop
+            
+            loop_feature = [avg_value] * 5  # Repeat the average for the first 5 values
+
+            # The last value: check the sum of the loop's corresponding row in loop_to_brep
+            if loop_to_brep.shape[0] == 0:
+                last_value = 0  # If loop_to_brep is empty, set to 0
+            else:
+                # Compute the last value: 1 if any value in the row is 1, otherwise 0
+                last_value = float(loop_to_brep[loop_idx, :].sum() > 0)
+
+            loop_feature.append(last_value)  # Add the last value
+
+            loop_features.append(loop_feature)
+
+        return torch.tensor(loop_features, dtype=torch.float)
 
     def _create_loop_stroke_edges(self, stroke_cloud_loops):
         loop_indices = []
@@ -166,7 +178,7 @@ def build_graph(stroke_dict):
         # node_features has shape num_strokes x 6, which is the starting and ending point
         start_point = stroke.vertices[0].position
         end_point = stroke.vertices[1].position
-        alpha_value = 1
+        alpha_value = stroke.alpha_value
         node_features[i, :3] = start_point
         node_features[i, 3:6] = end_point
         node_features[i, 6:] = alpha_value

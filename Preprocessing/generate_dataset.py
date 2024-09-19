@@ -24,7 +24,7 @@ class dataset_generator():
         os.makedirs('dataset', exist_ok=True)
 
         self.generate_dataset('dataset/test', number_data = 0, start = 0)
-        self.generate_dataset('dataset/simple', number_data = 10, start = 0)
+        self.generate_dataset('dataset/simple', number_data = 5, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -134,7 +134,7 @@ class dataset_generator():
 
                 # 5) Stroke_Cloud - Brep Connection
                 stroke_to_brep = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges)
-            
+
 
             # 6) Update the next brep file to read
             prev_stop_idx = next_stop_idx+1
@@ -154,6 +154,7 @@ class dataset_generator():
 
                     'loop_neighboring_vertical': loop_neighboring_vertical,
                     'loop_neighboring_horizontal': loop_neighboring_horizontal,
+                    'loop_neighboring_contained': loop_neighboring_contained,
 
                     'brep_loop_neighboring': brep_loop_neighboring,
 
