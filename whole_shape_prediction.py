@@ -22,7 +22,7 @@ graph_decoder = Encoders.gnn.gnn.Sketch_prediction()
 graph_encoder.to(device)
 graph_decoder.to(device)
 
-criterion = nn.BCELoss()
+criterion = Encoders.gnn.gnn.FocalLoss(alpha=0.75, gamma=2.0)
 optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
 
 # ------------------------------------------------------------------------------# 
@@ -106,7 +106,7 @@ def train():
         graph_encoder.train()
         graph_decoder.train()
 
-        for gnn_graph, loop_selection_mask in tqdm(zip(train_graphs, train_masks), desc=f"Epoch {epoch+1}/{epochs} - Training"):
+        for gnn_graph, loop_selection_mask in tqdm(zip(train_graphs, train_masks), desc=f"Epoch {epoch+1}/{epochs} - Training", dynamic_ncols=True):
 
             optimizer.zero_grad()
 

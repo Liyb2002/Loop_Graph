@@ -49,3 +49,23 @@ class Sketch_prediction(nn.Module):
 
     def forward(self, x_dict):
         return torch.sigmoid(self.decoder(x_dict['loop']))
+
+
+
+#---------------------------------- Loss Function ----------------------------------#
+
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=1.0, gamma=2.0):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha  # Balances the importance of positive and negative examples
+        self.gamma = gamma  # Focuses on hard examples
+
+    def forward(self, probs, targets):        
+        # Compute binary cross-entropy loss but do not reduce it
+        BCE_loss = F.binary_cross_entropy(probs, targets, reduction='none')
+
+        # Apply the focal loss scaling factor (1 - pt)^gamma
+        pt = torch.exp(-BCE_loss)  # Probability of the true class
+        focal_loss = self.alpha * ((1 - pt) ** self.gamma) * BCE_loss
+
+        return focal_loss.mean()
