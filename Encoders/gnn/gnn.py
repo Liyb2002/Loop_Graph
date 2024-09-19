@@ -9,13 +9,13 @@ import Encoders.gnn.basic
 class SemanticModule(nn.Module):
     def __init__(self, in_channels=6):
         super(SemanticModule, self).__init__()
-        self.local_head = Encoders.gnn.basic.GeneralHeteroConv(['representedBy_sum', 'neighboring_mean', 'order_add'], in_channels, 32)
+        self.local_head = Encoders.gnn.basic.GeneralHeteroConv(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'order_add'], in_channels, 32)
 
         self.layers = nn.ModuleList([
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_mean', 'order_add'], 32, 32),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_mean', 'order_add'], 32, 32),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_mean', 'order_add'], 32, 32),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_mean', 'order_add'], 32, 32)
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'order_add'], 32, 32),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'order_add'], 32, 32),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'order_add'], 32, 32),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'order_add'], 32, 32)
         ])
 
 

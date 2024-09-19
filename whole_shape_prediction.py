@@ -17,9 +17,13 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
+graph_decoder = Encoders.gnn.gnn.Sketch_prediction()
+
 graph_encoder.to(device)
+graph_decoder.to(device)
+
 criterion = nn.BCELoss()
-optimizer = optim.Adam(list(graph_encoder.parameters()), lr=0.0004)
+optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.001)
 
 # ------------------------------------------------------------------------------# 
 
@@ -29,10 +33,12 @@ os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
     graph_encoder.load_state_dict(torch.load(os.path.join(save_dir, 'graph_encoder.pth')))
+    graph_decoder.load_state_dict(torch.load(os.path.join(save_dir, 'graph_decoder.pth')))
 
 
 def save_models():
     torch.save(graph_encoder.state_dict(), os.path.join(save_dir, 'graph_encoder.pth'))
+    torch.save(graph_decoder.state_dict(), os.path.join(save_dir, 'graph_decoder.pth'))
 
 
 # ------------------------------------------------------------------------------# 
@@ -41,13 +47,14 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
     print(f"Total number of shape data: {len(dataset)}")
 
     train_loader = DataLoader(dataset, batch_size=1, shuffle=False)
     
     best_val_loss = float('inf')
-    epochs = 1
+    epochs = 30
+    
 
     graphs = []
     loop_selection_masks = []
@@ -66,8 +73,8 @@ def train():
             else:
                 loop_chosen_mask.append(0)  # Loop is not chosen
         
-        loop_chosen_mask_tensor = torch.tensor(loop_chosen_mask).reshape(-1, 1)
-        if not (loop_chosen_mask_tensor == 1).any():
+        loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1).to(device)
+        if not (loop_selection_mask == 1).any():
             continue
 
         # Build the graph
@@ -80,23 +87,63 @@ def train():
             stroke_to_brep
         )
 
+        # Encoders.helper.vis_brep(final_brep_edges)
+        # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+
         # Prepare the pair
         graphs.append(gnn_graph)
-        loop_selection_masks.append(loop_chosen_mask_tensor)
+        loop_selection_masks.append(loop_selection_mask)
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
+    # Split the dataset into training and validation sets (80-20 split)
+    split_index = int(0.8 * len(graphs))
+    train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
+    train_masks, val_masks = loop_selection_masks[:split_index], loop_selection_masks[split_index:]
+
 
 
 
     # Training loop
     for epoch in range(epochs):
-        total_loss = 0.0
-        for gnn_graph, loop_selection_mask in zip(graphs, loop_selection_masks):
+        train_loss = 0.0
+        graph_encoder.train()
+        graph_decoder.train()
 
-            print("strokes", gnn_graph['stroke'].x)
-            print("loop", gnn_graph['loop'].x)
+        for gnn_graph, loop_selection_mask in tqdm(zip(train_graphs, train_masks), desc=f"Epoch {epoch+1}/{epochs} - Training"):
 
-            Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+            optimizer.zero_grad()
+
+            x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+            output = graph_decoder(x_dict)
+
+            loss = criterion(output, loop_selection_mask)
+
+            loss.backward()
+            optimizer.step()
+
+            train_loss += loss.item()
+
+        train_loss /= len(train_graphs)
+        val_loss = 0.0
+        min_val_loss = float('inf')
+        graph_encoder.eval()
+        graph_decoder.eval()
+        with torch.no_grad():
+            for gnn_graph, loop_selection_mask in tqdm(zip(val_graphs, val_masks), desc=f"Epoch {epoch+1}/{epochs} - Validation"):
+                x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+                output = graph_decoder(x_dict)
+
+                loss = criterion(output, loop_selection_mask)
+                val_loss += loss.item()
+        
+        val_loss /= len(val_graphs)
+
+        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.4f} - Validation Loss: {val_loss:.4f}")
+
+        if val_loss < min_val_loss:
+            min_val_loss = val_loss
+            save_models()
+            print(f"Models saved at epoch {epoch+1} with validation loss: {val_loss:.4f}")
 
 
 

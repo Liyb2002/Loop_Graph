@@ -75,9 +75,13 @@ class SketchLoopGraph(HeteroData):
         loop_indices, stroke_indices = self._create_loop_stroke_edges(stroke_cloud_loops)
         self['loop', 'representedBy', 'stroke'].edge_index = torch.tensor([loop_indices, stroke_indices], dtype=torch.long)
         
-        # Combine loop neighboring matrices and create edges between loops
-        loop_edge_indices = self._create_loop_neighbor_edges(loop_neighboring_vertical, loop_neighboring_horizontal)
-        self['loop', 'neighboring', 'loop'].edge_index = torch.tensor(loop_edge_indices, dtype=torch.long)
+        # Create neighboring_vertical edges
+        vertical_edge_indices = self._create_loop_neighbor_edges(loop_neighboring_vertical)
+        self['loop', 'neighboring_vertical', 'loop'].edge_index = torch.tensor(vertical_edge_indices, dtype=torch.long)
+
+        # Create neighboring_horizontal edges
+        horizontal_edge_indices = self._create_loop_neighbor_edges(loop_neighboring_horizontal)
+        self['loop', 'neighboring_horizontal', 'loop'].edge_index = torch.tensor(horizontal_edge_indices, dtype=torch.long)
 
         # Create directed edges for contained loops
         contained_loop_edges = self._create_contained_edges(loop_neighboring_contained)
@@ -127,16 +131,14 @@ class SketchLoopGraph(HeteroData):
         
         return loop_indices, stroke_indices
 
-    def _create_loop_neighbor_edges(self, loop_neighboring_vertical, loop_neighboring_horizontal):
-        # Combine neighboring tensors
-        combined_neighboring = (loop_neighboring_vertical | loop_neighboring_horizontal)
+    def _create_loop_neighbor_edges(self, loop_neighboring):
+        """ Create non-directed edges for neighboring loops """
         loop_edge_indices = ([], [])
         
-        # Create edges based on the combined neighboring matrix
-        num_loops = combined_neighboring.shape[0]
+        num_loops = loop_neighboring.shape[0]
         for i in range(num_loops):
             for j in range(num_loops):
-                if combined_neighboring[i, j] == 1:
+                if loop_neighboring[i, j] == 1:
                     loop_edge_indices[0].append(i)
                     loop_edge_indices[1].append(j)
         
@@ -168,6 +170,9 @@ class SketchLoopGraph(HeteroData):
             ordered_loop_edges[1].append(loop_order[i + 1][0])
         
         return ordered_loop_edges
+
+
+
 
 
 
