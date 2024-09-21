@@ -61,6 +61,8 @@ class SketchHeteroData(HeteroData):
         # Append the disconnected information to the node features
         self['stroke'].x = torch.cat((self['stroke'].x, is_disconnected), dim=1)
 
+
+
 class SketchLoopGraph(HeteroData):
     def __init__(self, stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_to_brep):
         super(SketchLoopGraph, self).__init__()

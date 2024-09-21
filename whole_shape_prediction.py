@@ -22,7 +22,7 @@ graph_decoder = Encoders.gnn.gnn.Sketch_prediction()
 graph_encoder.to(device)
 graph_decoder.to(device)
 
-criterion = Encoders.gnn.gnn.FocalLoss(alpha=0.75, gamma=2.0)
+criterion = Encoders.gnn.gnn.FocalLoss(alpha=0.9, gamma=3.0)
 optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
 
 # ------------------------------------------------------------------------------# 
@@ -50,7 +50,7 @@ def train():
     dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
     print(f"Total number of shape data: {len(dataset)}")
     
-    best_val_loss = float('inf')
+    best_val_accuracy = 0
     epochs = 30
     
     graphs = []
@@ -122,7 +122,9 @@ def train():
 
         train_loss /= len(train_graphs)
         val_loss = 0.0
-        min_val_loss = float('inf')
+        correct = 0
+        total = 0
+
         graph_encoder.eval()
         graph_decoder.eval()
         with torch.no_grad():
@@ -132,15 +134,22 @@ def train():
 
                 loss = criterion(output, loop_selection_mask)
                 val_loss += loss.item()
+
+                if torch.argmax(output) == torch.argmax(loop_selection_mask):
+                    correct += 1
+                total += 1
+
         
         val_loss /= len(val_graphs)
+        
 
-        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.4f} - Validation Loss: {val_loss:.4f}")
+        accuracy = correct / total if total > 0 else 0
+        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.5f} - Validation Loss: {val_loss:.5f} - Validation Accuracy: {accuracy:.5f}")
 
-        if val_loss < min_val_loss:
-            min_val_loss = val_loss
+        if accuracy > best_val_accuracy:
+            best_val_accuracy = accuracy
             save_models()
-            print(f"Models saved at epoch {epoch+1} with validation loss: {val_loss:.4f}")
+            print(f"Models saved at epoch {epoch+1} with validation loss: {accuracy:.5f}")
 
 
 
@@ -183,7 +192,6 @@ def eval():
         )
 
         # Encoders.helper.vis_brep(final_brep_edges)
-        # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
 
         # Prepare the pair
         graphs.append(gnn_graph)
@@ -196,24 +204,32 @@ def eval():
     correct = 0
     total = 0
 
+    eval_loss = 0.0
+
     with torch.no_grad():
         for gnn_graph, loop_selection_mask in tqdm(zip(graphs, loop_selection_masks), desc=f"Evaluation"):
             x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
             output = graph_decoder(x_dict)
-
-            output_selected_idx = torch.argmax(output)  # Index of selected loop in output
-            mask_selected_idx = torch.argmax(loop_selection_mask)  # Index of selected loop in ground truth
             
+
             # Check if the selected loop is correct
-            if output_selected_idx == mask_selected_idx:
+            if torch.argmax(output) == torch.argmax(loop_selection_mask):
                 correct += 1
             # else:
             #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
             #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+
             total += 1
 
+            loss = criterion(output, loop_selection_mask)
+            eval_loss += loss.item()
+        
+        eval_loss /= len(graphs)
+
+    
+    print(f"Eval Loss: {eval_loss:.4f}")
     accuracy = correct / total if total > 0 else 0
-    print(f"Validation Accuracy: {accuracy:.4f}")
+    print(f"Validation Accuracy: {accuracy:.5f}")
 
 #---------------------------------- Public Functions ----------------------------------#
 
