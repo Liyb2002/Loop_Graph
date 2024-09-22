@@ -75,7 +75,7 @@ class Program_Graph_Dataset(Dataset):
         loop_neighboring_contained = torch.tensor(shape_data['loop_neighboring_contained'], dtype=torch.long, device=device)
 
         stroke_to_brep = torch.tensor(shape_data['stroke_to_brep'], dtype=torch.long, device=device)
-        final_brep_edges = torch.tensor(shape_data['final_brep_edges'], dtype=torch.long, device=device)
+        final_brep_edges = torch.tensor(shape_data['final_brep_edges'], dtype=torch.float32, device=device)
 
         # Load stroke_operations_order_matrix and convert to tensor
         stroke_operations_order_matrix = torch.tensor(shape_data['stroke_operations_order_matrix'], dtype=torch.float32)

@@ -442,3 +442,64 @@ def vis_used_graph(graph):
 
     # Show plot
     plt.show()
+
+
+def vis_stroke_graph(graph, stroke_selection_mask):
+    """
+    Visualize all strokes in the graph in 3D space. Strokes are colored based on stroke_selection_mask.
+    
+    Parameters:
+    graph (SketchHeteroData): A single graph object containing strokes.
+    stroke_selection_mask (np.ndarray or torch.Tensor): A binary mask of shape (num_strokes, 1), where 1 indicates a chosen stroke (red), and 0 indicates an unchosen stroke (blue).
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    import numpy as np
+
+    # Extract stroke features from the graph
+    stroke_node_features = graph['stroke'].x.numpy()
+    stroke_selection_mask = stroke_selection_mask.numpy()
+
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Plot all strokes, using red for selected strokes and blue for unchosen ones
+    for idx, stroke in enumerate(stroke_node_features):
+        start, end = stroke[:3], stroke[3:6]
+        color = 'red' if stroke_selection_mask[idx] == 1 else 'blue'
+        
+        # Update the min and max limits for each axis
+        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+        
+        # Plot the stroke
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color=color, linewidth=1, alpha=0.8 if color == 'red' else 0.5)
+
+    # Compute the center of the shape
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+
+    # Compute the maximum difference across x, y, z directions
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    # Set the same limits for x, y, and z axes centered around the computed center
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # Show plot
+    plt.show()

@@ -1,5 +1,6 @@
 import Preprocessing.dataloader
 import Preprocessing.gnn_graph
+import Preprocessing.gnn_graph_stroke
 
 import Encoders.gnn.gnn
 import Encoders.helper
@@ -105,6 +106,9 @@ def train():
         train_loss = 0.0
         graph_encoder.train()
         graph_decoder.train()
+        train_correct = 0
+        train_total = 0
+
 
         for gnn_graph, loop_selection_mask in tqdm(zip(train_graphs, train_masks), desc=f"Epoch {epoch+1}/{epochs} - Training", dynamic_ncols=True):
 
@@ -115,11 +119,17 @@ def train():
 
             loss = criterion(output, loop_selection_mask)
 
+            if torch.argmax(output) == torch.argmax(loop_selection_mask):
+                train_correct += 1
+            train_total += 1
+
+
             loss.backward()
             optimizer.step()
 
             train_loss += loss.item()
 
+        train_accuracy = train_correct / train_total if train_total > 0 else 0
         train_loss /= len(train_graphs)
         val_loss = 0.0
         correct = 0
@@ -144,19 +154,19 @@ def train():
         
 
         accuracy = correct / total if total > 0 else 0
-        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.5f} - Validation Loss: {val_loss:.5f} - Validation Accuracy: {accuracy:.5f}")
+        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.5f} - Validation Loss: {val_loss:.5f} - Train Accuracy: {train_accuracy:.5f} - Validation Accuracy: {accuracy:.5f}")
 
         if accuracy > best_val_accuracy:
             best_val_accuracy = accuracy
             save_models()
-            print(f"Models saved at epoch {epoch+1} with validation loss: {accuracy:.5f}")
+            print(f"Models saved at epoch {epoch+1} with validation accuracy: {accuracy:.5f}")
 
 
 
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -215,9 +225,9 @@ def eval():
             # Check if the selected loop is correct
             if torch.argmax(output) == torch.argmax(loop_selection_mask):
                 correct += 1
-            # else:
-            #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
-            #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+            else:
+                Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
+                Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
 
             total += 1
 
@@ -231,7 +241,45 @@ def eval():
     accuracy = correct / total if total > 0 else 0
     print(f"Validation Accuracy: {accuracy:.5f}")
 
+
+
+def train_extrude_prediction_baseline():
+    load_models()
+    # Load the dataset
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+    print(f"Total number of shape data: {len(dataset)}")
+
+
+    graphs = []
+    stroke_selection_masks = []
+
+    # Preprocess and build the graphs
+    for data in tqdm(dataset, desc=f"Building Graphs"):
+        # Extract the necessary elements from the dataset
+        stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
+
+        stroke_selection_mask = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
+        if not (stroke_selection_mask == 1).any():
+            continue
+        
+        
+        stroke_node_features = torch.tensor(stroke_node_features, dtype=torch.float32)
+        final_brep_edges = torch.tensor(final_brep_edges, dtype=torch.float32)
+
+        # Build the graph
+        gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(
+            stroke_node_features, 
+            final_brep_edges
+        )
+
+        # Encoders.helper.vis_brep(final_brep_edges)
+        Encoders.helper.vis_stroke_graph(gnn_graph, stroke_selection_mask)
+
+        # # Prepare the pair
+        graphs.append(gnn_graph)
+        stroke_selection_masks.append(stroke_selection_mask)
+
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

@@ -54,16 +54,14 @@ class Edge:
         self.edge_type = 'maybe_feature_line'
 
         self.Op = []
-        self.Op_orders = []
         self.order_count = 0
         self.connected_edges = []
     
     def fillet_edge(self):
         self.round = True
     
-    def set_Op(self, Op, order_count):
-        self.Op.append(Op)
-        self.Op_orders.append(order_count)
+    def set_Op(self, Op, index):
+        self.Op.append(index)
     
     def set_order_count(self, order_count):
         self.order_count = order_count

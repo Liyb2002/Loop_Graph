@@ -24,8 +24,8 @@ class dataset_generator():
         # os.makedirs('dataset', exist_ok=True)
 
         self.generate_dataset('dataset/test', number_data = 5, start = 0)
-        self.generate_dataset('dataset/simple', number_data = 0, start = 5660)
-        self.generate_dataset('dataset/eval', number_data = 0, start = 195)
+        self.generate_dataset('dataset/simple', number_data = 0, start = 1302)
+        self.generate_dataset('dataset/eval', number_data = 0, start = 299)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -76,7 +76,7 @@ class dataset_generator():
         while True:
             # 1) Produce the Stroke Cloud features
             next_stop_idx = stroke_cloud_class.get_next_stop()
-            if next_stop_idx == -1 or next_stop_idx > len(brep_files):
+            if next_stop_idx == -1 or next_stop_idx >= len(brep_files):
                 break 
             
             

@@ -267,14 +267,13 @@ class create_stroke_cloud():
         for line in construction_lines:
             line.set_edge_type('construction_line')
             line.set_order_count(self.order_count)
-            line.set_Op(op, index)
             self.order_count += 1
             self.edges[line.order_count] = line
         
 
         #find the edges that has the current operation 
-        #but not created by the current operation
-        self.find_unwritten_edges(cur_op_vertex_ids, op, index)
+        # but not created by the current operation
+        # self.find_unwritten_edges(cur_op_vertex_ids, op, index)
 
         for face_data in Op['faces']:
             vertices = [self.vertices[v_id] for v_id in face_data['vertices']]
@@ -460,7 +459,8 @@ class create_stroke_cloud():
             else:
                 # Remove the contained edge and add the new split edges
                 for edge_id in edges_to_remove:
-                    del self.edges[edge_id]
+                    self.edges[edge_id].set_edge_type('construction_line')
+                    # del self.edges[edge_id]
                 for edge in edges_to_add:
                     edge.set_order_count(self.order_count)
                     self.order_count += 1
@@ -554,7 +554,7 @@ class create_stroke_cloud():
         self.adj_edges()
         self.map_id_to_count()
         # self.vis_brep()
-        self.vis_stroke_cloud(self.directory, show = True, target_Op = 'sketch')
+
 
 
 def create_stroke_cloud_class(directory):

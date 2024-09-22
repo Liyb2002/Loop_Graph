@@ -17,49 +17,118 @@ operations_dict = {     "terminate": 0,
                         "extrude": 2,
                         "fillet": 3
                     } 
-
 class SketchHeteroData(HeteroData):
-    def __init__(self, stroke_loop_embeddings, loop_neighboring_vertical, loop_neighboring_horizontal, stroke_to_brep):
+    def __init__(self, stroke_node_features, final_brep_edges):
         super(SketchHeteroData, self).__init__()
-
-        # Node features
-        self['stroke'].x = stroke_loop_embeddings
-
-        # Convert adjacency matrix to edge indices
-        edge_index_vertical = self._adjacency_to_edge_index(loop_neighboring_vertical)
-        edge_index_horizontal = self._adjacency_to_edge_index(loop_neighboring_horizontal)
-
-        # Set edge indices for vertical and horizontal connections
-        self['stroke', 'verticalNeighboring', 'stroke'].edge_index = edge_index_vertical
-        self['stroke', 'horizontalNeighboring', 'stroke'].edge_index = edge_index_horizontal
-
-        # Add additional edge information (e.g., stroke to brep)
-        self.build_stroke_loop_representation(stroke_to_brep)
-
-    def _adjacency_to_edge_index(self, adjacency_matrix):
-        """
-        Converts an adjacency matrix to edge indices.
-        Args:
-            adjacency_matrix (torch.Tensor): A (num_nodes, num_nodes) adjacency matrix.
-        Returns:
-            edge_index (torch.Tensor): A (2, num_edges) tensor of edge indices.
-        """
-        edge_index = torch.nonzero(adjacency_matrix, as_tuple=False).t().contiguous()
-        return edge_index
-    
-    def build_stroke_loop_representation(self, stroke_to_brep):
-        """
-        Builds the stroke-to-brep representation and appends it to the node features.
-        Args:
-            stroke_to_brep (torch.Tensor): A tensor representing the stroke-to-brep relationships.
-        """
-        if stroke_to_brep.shape[0] == 0:
-            is_disconnected = torch.ones(self['stroke'].x.shape[0], 1, dtype=torch.int)
-        else:
-            is_disconnected = (stroke_to_brep.sum(dim=1) == 0).int().unsqueeze(1)
         
-        # Append the disconnected information to the node features
-        self['stroke'].x = torch.cat((self['stroke'].x, is_disconnected), dim=1)
+        # Compute stroke usage
+        stroke_used = self._compute_stroke_usage(stroke_node_features, final_brep_edges)
+        
+        # Build stroke node features with the shape (num_strokes, 7)
+        self['stroke'].x = self._build_stroke_features(stroke_node_features, stroke_used)
+
+        # Build connected strokes matrix and connect edges
+        connected_strokes = self._build_connected_strokes(stroke_node_features)
+        self._add_connect_edges(connected_strokes)
+
+        # Build order edges
+        self._add_order_edges(stroke_node_features)
+
+    def _compute_stroke_usage(self, stroke_node_features, final_brep_edges):
+        """ 
+        Compute a (num_strokes, 1) matrix telling if a stroke is represented in final_brep_edges.
+        """
+
+        num_strokes = stroke_node_features.shape[0]
+        stroke_used = torch.zeros((num_strokes, 1), dtype=torch.float)  # Initialize as not used
+
+        if final_brep_edges.shape[0] == 0:
+            return stroke_used
+
+        # Iterate through each stroke
+        for stroke_idx in range(num_strokes):
+            stroke_start = stroke_node_features[stroke_idx, :3]  # First 3D point
+            stroke_end = stroke_node_features[stroke_idx, 3:6]   # Second 3D point
+            
+            # Check if this stroke is represented in final_brep_edges
+            for brep_edge in final_brep_edges:
+                brep_start = brep_edge[:3]  # First 3D point of brep
+                brep_end = brep_edge[3:6]   # Second 3D point of brep
+                
+                # Check if points match (either in the same order or reversed)
+                if (torch.allclose(stroke_start, brep_start) and torch.allclose(stroke_end, brep_end)) or \
+                   (torch.allclose(stroke_start, brep_end) and torch.allclose(stroke_end, brep_start)):
+                    stroke_used[stroke_idx] = 1  # Mark this stroke as used
+                    break  # No need to check further once a match is found
+
+        return stroke_used
+
+    def _build_stroke_features(self, stroke_node_features, stroke_used):
+        """
+        Build the stroke node features for the graph. The shape will be (num_strokes, 7).
+        First 6 columns are from stroke_node_features, and the last column is stroke_used.
+        """
+        # Concatenate the first 6 columns from stroke_node_features with stroke_used (the last column)
+        stroke_features = torch.cat([stroke_node_features[:, :6], stroke_used], dim=1)
+        return stroke_features
+
+    def _build_connected_strokes(self, stroke_node_features):
+        """
+        Build the connected strokes matrix. If two strokes share a common point, mark them as connected.
+        """
+        num_strokes = stroke_node_features.shape[0]
+        connected_strokes = torch.zeros((num_strokes, num_strokes), dtype=torch.float)
+
+        # Iterate over pairs of strokes and check if they share a common point
+        for i in range(num_strokes):
+            stroke_i_start = stroke_node_features[i, :3]
+            stroke_i_end = stroke_node_features[i, 3:6]
+
+            for j in range(i + 1, num_strokes):
+                stroke_j_start = stroke_node_features[j, :3]
+                stroke_j_end = stroke_node_features[j, 3:6]
+
+                # Check if any of the two points match (in either order)
+                if (torch.allclose(stroke_i_start, stroke_j_start) or torch.allclose(stroke_i_start, stroke_j_end) or
+                    torch.allclose(stroke_i_end, stroke_j_start) or torch.allclose(stroke_i_end, stroke_j_end)):
+                    connected_strokes[i, j] = 1
+                    connected_strokes[j, i] = 1  # Symmetric for undirected edges
+
+        return connected_strokes
+
+    def _add_connect_edges(self, connected_strokes):
+        """
+        Add edges to the graph based on the connected_strokes matrix.
+        """
+        num_strokes = connected_strokes.shape[0]
+        edge_index = [[], []]
+
+        # Iterate over the connected_strokes matrix and add edges
+        for i in range(num_strokes):
+            for j in range(i + 1, num_strokes):  # Only upper triangle to avoid duplicates
+                if connected_strokes[i, j] == 1:
+                    edge_index[0].append(i)
+                    edge_index[1].append(j)
+                    edge_index[0].append(j)
+                    edge_index[1].append(i)  # Add the reverse edge for undirected graph
+
+        # Convert to tensor and add to the graph
+        self['stroke', 'connect', 'stroke'].edge_index = torch.tensor(edge_index, dtype=torch.long)
+
+    def _add_order_edges(self, stroke_node_features):
+        """
+        Add order edges to the graph based on the order of strokes in stroke_node_features.
+        """
+        num_strokes = stroke_node_features.shape[0]
+        edge_index = [[], []]
+
+        # Iterate over strokes and connect them sequentially
+        for i in range(num_strokes - 1):
+            edge_index[0].append(i)
+            edge_index[1].append(i + 1)
+
+        # Convert to tensor and add to the graph
+        self['stroke', 'order', 'stroke'].edge_index = torch.tensor(edge_index, dtype=torch.long)
 
 
 
@@ -180,19 +249,24 @@ class SketchLoopGraph(HeteroData):
 
 def build_graph(stroke_dict):
     num_strokes = len(stroke_dict)
-    num_operation_counts = 0
+    num_operations = 0
 
-    # find the total number of operations
-    for i, (_, stroke) in enumerate(stroke_dict.items()):
-        for index in stroke.Op_orders:
-            if index > num_operation_counts:
-                num_operation_counts = index
+    # # find the total number of operations
+    # for i, (_, stroke) in enumerate(stroke_dict.items()):
+    #     for index in stroke.Op_orders:
+    #         if index > num_operation_counts:
+    #             num_operation_counts = index
 
-    # a map that maps stroke_id (e.g 'edge_0_0' to 0)
-    stroke_id_to_index = {}
+    # # a map that maps stroke_id (e.g 'edge_0_0' to 0)
+    # stroke_id_to_index = {}
+
+    for i, key in enumerate(sorted(stroke_dict.keys())):
+        stroke = stroke_dict[key]
+        if len(stroke.Op) > 0 and num_operations < stroke.Op[0]:
+            num_operations = stroke.Op[0]
 
     node_features = np.zeros((num_strokes, 7))
-    operations_order_matrix = np.zeros((num_strokes, num_operation_counts+1))
+    operations_order_matrix = np.zeros((num_strokes, num_operations+1))
 
 
     for i, key in enumerate(sorted(stroke_dict.keys())):
@@ -209,7 +283,7 @@ def build_graph(stroke_dict):
 
         # build operation_order_matrix
         # operation_order_matrix has shape num_strokes x num_ops
-        for stroke_op_count in stroke.Op_orders:
+        for stroke_op_count in stroke.Op:
             operations_order_matrix[i, stroke_op_count] = 1
 
 
