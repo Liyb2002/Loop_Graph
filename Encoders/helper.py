@@ -9,6 +9,50 @@ def get_kth_operation(op_to_index_matrix, k):
 
     return kth_operation
 
+
+def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features):
+    """
+    Given stroke_selection_mask and sketch_selection_mask, find if a stroke in stroke_selection_mask
+    has one point in common with a stroke in sketch_selection_mask and mark it as chosen.
+    
+    Parameters:
+    stroke_selection_mask (np.ndarray): A binary mask of shape (num_strokes, 1) for extrude strokes.
+    sketch_selection_mask (np.ndarray): A binary mask of shape (num_strokes, 1) for sketch strokes.
+    stroke_node_features (np.ndarray): A numpy array of shape (num_strokes, 6), where each row contains two 3D points.
+    
+    Returns:
+    extrude_strokes (np.ndarray): A binary mask of shape (num_strokes, 1), indicating which extrude strokes are chosen.
+    """
+    num_strokes = stroke_selection_mask.shape[0]
+    
+    # Initialize the output matrix with zeros
+    extrude_strokes = torch.zeros((num_strokes, 1), dtype=torch.float32)
+    
+    # Iterate through all strokes in stroke_selection_mask
+    for i in range(num_strokes):
+        # If the stroke is marked in stroke_selection_mask
+        if stroke_selection_mask[i] == 1:
+            stroke_points = stroke_node_features[i]  # Get the 3D points of the stroke
+            chosen = False
+
+            # Check if any stroke in sketch_selection_mask shares a point with this stroke
+            for j in range(num_strokes):
+                if sketch_selection_mask[j] == 1:
+                    sketch_points = stroke_node_features[j]  # Get the 3D points of the sketch stroke
+
+                    # Compare points of the stroke with the points of the sketch stroke using np.allclose
+                    if (np.allclose(stroke_points[:3], sketch_points[:3]) or np.allclose(stroke_points[:3], sketch_points[3:6]) or
+                        np.allclose(stroke_points[3:6], sketch_points[:3]) or np.allclose(stroke_points[3:6], sketch_points[3:6])):
+                        chosen = True
+                        break
+
+            # If the stroke has one of its points in any of the sketch strokes, mark it as chosen
+            if chosen:
+                extrude_strokes[i] = 1
+
+    return extrude_strokes
+
+
 def stroke_to_face(kth_operation, face_to_stroke):
     num_faces = len(face_to_stroke)
     face_chosen = torch.zeros((num_faces, 1), dtype=torch.float32)
