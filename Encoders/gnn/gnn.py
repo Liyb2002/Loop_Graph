@@ -35,6 +35,32 @@ class SemanticModule(nn.Module):
 
 
 
+class sketch_base_SemanticModule(nn.Module):
+    def __init__(self, in_channels=7):
+        super(sketch_base_SemanticModule, self).__init__()
+        self.local_head = Encoders.gnn.basic.GeneralHeteroConv(['connect_mean', 'order_add'], in_channels, 32)
+
+        self.layers = nn.ModuleList([
+            Encoders.gnn.basic.GeneralHeteroConv(['connect_mean', 'order_add'], 32, 32),
+            Encoders.gnn.basic.GeneralHeteroConv(['connect_mean', 'order_add'], 32, 32),
+            Encoders.gnn.basic.GeneralHeteroConv(['connect_mean', 'order_add'], 32, 32),
+            Encoders.gnn.basic.GeneralHeteroConv(['connect_mean', 'order_add'], 32, 32)
+        ])
+
+
+    def forward(self, x_dict, edge_index_dict):
+
+        x_dict = self.local_head(x_dict, edge_index_dict)
+
+        for layer in self.layers:
+            x_dict = layer(x_dict, edge_index_dict)
+        
+        x_dict = {key: x.relu() for key, x in x_dict.items()}
+
+        return x_dict
+
+
+
 
 class Sketch_prediction(nn.Module):
     def __init__(self, hidden_channels=256):

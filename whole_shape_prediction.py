@@ -243,46 +243,7 @@ def eval():
 
 
 
-def train_extrude_prediction_baseline():
-    load_models()
-    # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
-    print(f"Total number of shape data: {len(dataset)}")
-
-
-    graphs = []
-    stroke_selection_masks = []
-
-    # Preprocess and build the graphs
-    for data in tqdm(dataset, desc=f"Building Graphs"):
-        # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
-
-        stroke_selection_mask = stroke_operations_order_matrix[:, -1].reshape(-1, 1)
-        sketch_selection_mask = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
-        extrude_selection_mask = Encoders.helper.choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features)
-
-        if not (extrude_selection_mask == 1).any():
-            continue
-        
-        
-        stroke_node_features = torch.tensor(stroke_node_features, dtype=torch.float32)
-        final_brep_edges = torch.tensor(final_brep_edges, dtype=torch.float32)
-
-        # Build the graph
-        gnn_graph = Preprocessing.gnn_graph.SketchHeteroData(
-            stroke_node_features, 
-            final_brep_edges
-        )
-
-        # Encoders.helper.vis_brep(final_brep_edges)
-        Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask)
-
-        # # Prepare the pair
-        graphs.append(gnn_graph)
-        stroke_selection_masks.append(extrude_selection_mask)
-
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train_extrude_prediction_baseline()
+train()

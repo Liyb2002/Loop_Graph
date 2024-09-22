@@ -17,6 +17,7 @@ operations_dict = {     "terminate": 0,
                         "extrude": 2,
                         "fillet": 3
                     } 
+
 class SketchHeteroData(HeteroData):
     def __init__(self, stroke_node_features, final_brep_edges):
         super(SketchHeteroData, self).__init__()
