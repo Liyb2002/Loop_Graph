@@ -23,9 +23,9 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 0, start = 0)
-        self.generate_dataset('dataset/simple', number_data = 3000, start = 995)
-        self.generate_dataset('dataset/eval', number_data = 300, start = 0)
+        self.generate_dataset('dataset/test', number_data = 5, start = 0)
+        self.generate_dataset('dataset/simple', number_data = 0, start = 995)
+        self.generate_dataset('dataset/eval', number_data = 0, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -83,6 +83,7 @@ class dataset_generator():
             stroke_cloud_class.read_next(next_stop_idx)
             stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_class.edges)
             stroke_node_features = np.round(stroke_node_features, 4)
+            connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(stroke_node_features)
             # stroke_node_features = stroke_node_features[:, :-1]
 
 
@@ -151,6 +152,7 @@ class dataset_generator():
                     'brep_loops': brep_loops,
 
                     'stroke_node_features': stroke_node_features,
+                    'connected_stroke_nodes': connected_stroke_nodes,
                     'final_brep_edges': final_brep_edges,
                     'stroke_operations_order_matrix': stroke_operations_order_matrix, 
 

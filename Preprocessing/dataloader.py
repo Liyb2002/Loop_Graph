@@ -67,6 +67,7 @@ class Program_Graph_Dataset(Dataset):
         
         stroke_cloud_loops = [list(fset) for fset in shape_data['stroke_cloud_loops']]
         stroke_node_features = shape_data['stroke_node_features']
+        connected_stroke_nodes = shape_data['connected_stroke_nodes']
 
         # Convert remaining numpy arrays to tensors
         
@@ -80,7 +81,7 @@ class Program_Graph_Dataset(Dataset):
         # Load stroke_operations_order_matrix and convert to tensor
         stroke_operations_order_matrix = torch.tensor(shape_data['stroke_operations_order_matrix'], dtype=torch.float32)
 
-        return stroke_cloud_loops, stroke_node_features,loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges
+        return stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges
 
 
 

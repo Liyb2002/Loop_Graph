@@ -133,15 +133,16 @@ class SketchHeteroData(HeteroData):
 
 
 
+
 class SketchLoopGraph(HeteroData):
-    def __init__(self, stroke_cloud_loops, stroke_node_features, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_to_brep):
+    def __init__(self, stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_to_brep):
         super(SketchLoopGraph, self).__init__()
 
-        # Use only the first 6 values of stroke_node_features
-        self['stroke'].x = torch.tensor(stroke_node_features[:, :6], dtype=torch.float)
+        # Use all 7 values of stroke_node_features
+        self['stroke'].x = torch.tensor(stroke_node_features, dtype=torch.float)
 
-        # Loop node features based on the strokes and loop_to_brep
-        self['loop'].x = self._compute_loop_features(stroke_cloud_loops, stroke_node_features, loop_to_brep)
+        # Loop node features based on whether the loop is used (repeated 7 times)
+        self['loop'].x = self._compute_loop_features(stroke_cloud_loops, loop_to_brep)
 
         # Create edges between loops and strokes
         loop_indices, stroke_indices = self._create_loop_stroke_edges(stroke_cloud_loops)
@@ -159,34 +160,31 @@ class SketchLoopGraph(HeteroData):
         contained_loop_edges = self._create_contained_edges(loop_neighboring_contained)
         self['loop', 'contains', 'loop'].edge_index = torch.tensor(contained_loop_edges, dtype=torch.long)
 
-        # Create directed edges between loops based on their order
-        ordered_loop_edges = self._create_ordered_loop_edges(stroke_cloud_loops)
-        self['loop', 'order', 'loop'].edge_index = torch.tensor(ordered_loop_edges, dtype=torch.long)
+        # Create stroke order edges
+        self._create_stroke_order_edges(stroke_node_features)
 
-    def _compute_loop_features(self, stroke_cloud_loops, stroke_node_features, loop_to_brep):
+        # Create stroke connect edges from connected_stroke_nodes
+        self._create_stroke_connect_edges(connected_stroke_nodes)
+
+    def _compute_loop_features(self, stroke_cloud_loops, loop_to_brep):
+        """
+        Compute loop features. If the loop is used (based on loop_to_brep), assign 1, otherwise 0.
+        Repeat the value 7 times to match the feature size of 7.
+        """
         num_loops = len(stroke_cloud_loops)
         loop_features = []
 
         # Process each loop
-        for loop_idx, loop in enumerate(stroke_cloud_loops):
-            # The first 5 values: average of the 7th value from connected strokes
-            stroke_seventh_values = [stroke_node_features[stroke_idx, 6] for stroke_idx in loop]
-            if len(stroke_seventh_values) > 0:
-                avg_value = sum(stroke_seventh_values) / len(stroke_seventh_values)
-            else:
-                avg_value = 0  # In case of an empty loop
-            
-            loop_feature = [avg_value] * 5  # Repeat the average for the first 5 values
-
-            # The last value: check the sum of the loop's corresponding row in loop_to_brep
+        for loop_idx in range(num_loops):
+            # Check if the loop is used or not
             if loop_to_brep.shape[0] == 0:
                 last_value = 0  # If loop_to_brep is empty, set to 0
             else:
                 # Compute the last value: 1 if any value in the row is 1, otherwise 0
                 last_value = float(loop_to_brep[loop_idx, :].sum() > 0)
 
-            loop_feature.append(last_value)  # Add the last value
-
+            # Repeat the last_value 7 times for the loop feature
+            loop_feature = [last_value] * 7
             loop_features.append(loop_feature)
 
         return torch.tensor(loop_features, dtype=torch.float)
@@ -229,21 +227,44 @@ class SketchLoopGraph(HeteroData):
         
         return loop_edge_indices
 
-    def _create_ordered_loop_edges(self, stroke_cloud_loops):
-        # Compute the average stroke index for each loop
-        loop_order = [(idx, sum(loop) / len(loop) if len(loop) > 0 else float('inf')) for idx, loop in enumerate(stroke_cloud_loops)]
-        # Sort loops by average stroke index (ascending order)
-        loop_order.sort(key=lambda x: x[1])
+    def _create_stroke_order_edges(self, stroke_node_features):
+        """
+        Create directed edges between strokes based on their order in stroke_node_features.
+        """
+        num_strokes = stroke_node_features.shape[0]
+        edge_index = [[], []]
 
-        # Create directed edges from the first loop to the last one
-        ordered_loop_edges = ([], [])
-        for i in range(len(loop_order) - 1):
-            ordered_loop_edges[0].append(loop_order[i][0])
-            ordered_loop_edges[1].append(loop_order[i + 1][0])
+        # Create order edges by connecting stroke i to stroke i+1
+        for i in range(num_strokes - 1):
+            edge_index[0].append(i)
+            edge_index[1].append(i + 1)
+
+        # Store the edges in the graph
+        self['stroke', 'order', 'stroke'].edge_index = torch.tensor(edge_index, dtype=torch.long)
+
+    def _create_stroke_connect_edges(self, connected_stroke_nodes):
+        """
+        Create undirected edges between strokes based on the connected_stroke_nodes matrix.
         
-        return ordered_loop_edges
+        Parameters:
+        connected_stroke_nodes (np.ndarray or torch.Tensor): A matrix of shape (num_strokes, num_strokes)
+                                                             where [i, j] = 1 if stroke i and stroke j are connected.
+        """
+        num_strokes = connected_stroke_nodes.shape[0]
+        edge_index = [[], []]
 
+        # Iterate over the connected_stroke_nodes matrix
+        for i in range(num_strokes):
+            for j in range(i + 1, num_strokes):  # Only consider upper triangle to avoid duplicates
 
+                if connected_stroke_nodes[i, j] == 1:
+                    edge_index[0].append(i)
+                    edge_index[1].append(j)
+                    edge_index[0].append(j)
+                    edge_index[1].append(i)  # Add the reverse edge for undirected connection
+
+        # Store the edges in the graph
+        self['stroke', 'connect', 'stroke'].edge_index = torch.tensor(edge_index, dtype=torch.long)
 
 
 

@@ -821,6 +821,41 @@ def check_validacy(matrix1, matrix2):
 
 
 
+def connected_strokes(stroke_node_features):
+    """
+    Returns a matrix indicating if two strokes share a common point.
+    
+    Parameters:
+    stroke_node_features (np.ndarray): A numpy array of shape (num_strokes, 7), where the first 6 values
+                                       represent two 3D points of a stroke and the last value is unused.
+    
+    Returns:
+    connected (np.ndarray): A binary matrix of shape (num_strokes, num_strokes), where [i, j] is 1 if stroke i and stroke j share a common point.
+    """
+    num_strokes = stroke_node_features.shape[0]
+    
+    # Initialize the connected matrix with zeros
+    connected = np.zeros((num_strokes, num_strokes), dtype=np.float32)
+    
+    # Iterate over each pair of strokes
+    for i in range(num_strokes):
+        stroke_i_start = stroke_node_features[i, :3]  # First point of stroke i
+        stroke_i_end = stroke_node_features[i, 3:6]   # Second point of stroke i
+        
+        for j in range(i + 1, num_strokes):
+            stroke_j_start = stroke_node_features[j, :3]  # First point of stroke j
+            stroke_j_end = stroke_node_features[j, 3:6]   # Second point of stroke j
+
+            # Check if stroke i and stroke j share a common point (either order)
+            if (np.allclose(stroke_i_start, stroke_j_start) or np.allclose(stroke_i_start, stroke_j_end) or
+                np.allclose(stroke_i_end, stroke_j_start) or np.allclose(stroke_i_end, stroke_j_end)):
+                
+                connected[i, j] = 1
+                connected[j, i] = 1  # Symmetric connection since it's undirected
+
+    return connected
+ 
+
 #----------------------------------------------------------------------------------#
 def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges):
     """

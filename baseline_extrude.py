@@ -52,8 +52,8 @@ def train_extrude_prediction_baseline():
     dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
     print(f"Total number of shape data: {len(dataset)}")
 
-    best_val_accuracy = 0
-    epochs = 50
+    best_val_loss = 100.0
+    epochs = 10
 
     graphs = []
     stroke_selection_masks = []
@@ -152,26 +152,29 @@ def train_extrude_prediction_baseline():
                 val_loss += loss.item()
         
 
+        train_loss /= len(train_graphs)
         val_loss /= len(val_graphs)
         
 
         accuracy = correct / total if total > 0 else 0
         print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.5f} - Validation Loss: {val_loss:.5f} - Validation Accuracy: {accuracy:.5f}")
 
-        if accuracy > best_val_accuracy:
-            best_val_accuracy = accuracy
+        if val_loss <  best_val_loss:
+            best_val_loss = val_loss
             save_models()
             print(f"Models saved at epoch {epoch+1} with validation accuracy: {accuracy:.5f}")
 
 
 
-def eval__extrude_prediction_baseline():
+def eval_extrude_prediction_baseline():
     load_models()
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
 
 
     graphs = []
     stroke_selection_masks = []
+    correct = 0
+    total = 0
 
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
@@ -195,18 +198,35 @@ def eval__extrude_prediction_baseline():
         )
 
         # Encoders.helper.vis_brep(final_brep_edges)
+        # Encoders.helper.vis_stroke_graph(gnn_graph, sketch_selection_mask)
         # Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask)
 
         # Prepare the pair
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
 
-        if len(graphs) > 1000:
-            break
     
-    
+    for gnn_graph, loop_selection_mask in tqdm(zip(graphs, stroke_selection_masks), dynamic_ncols=True):
+        graph_encoder.eval()
+        graph_decoder.eval()
+        x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+        output = graph_decoder(x_dict)
 
-    print(f"Total number of preprocessed graphs: {len(graphs)}")
+
+        condition_1 = (loop_selection_mask == 1) & (output > 0.5)
+        condition_2 = (loop_selection_mask == 0) & (output < 0.5)
+
+        if torch.all(condition_1 | condition_2):
+            correct += 1
+        else:
+            Encoders.helper.vis_stroke_graph(gnn_graph, output.detach())
+            Encoders.helper.vis_stroke_graph(gnn_graph, loop_selection_mask)
+        total += 1
+
+
+        accuracy = correct / total if total > 0 else 0
+
+    print(f"Accuracy: {accuracy:.5f}")
 
 #---------------------------------- Public Functions ----------------------------------#
 
