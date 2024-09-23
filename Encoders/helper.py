@@ -517,7 +517,7 @@ def vis_stroke_graph(graph, stroke_selection_mask):
     # Plot all strokes, using red for selected strokes and blue for unchosen ones
     for idx, stroke in enumerate(stroke_node_features):
         start, end = stroke[:3], stroke[3:6]
-        color = 'red' if stroke_selection_mask[idx] == 1 else 'blue'
+        color = 'red' if stroke_selection_mask[idx] > 0.5 else 'blue'
         
         # Update the min and max limits for each axis
         x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])

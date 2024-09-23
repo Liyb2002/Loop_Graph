@@ -35,9 +35,9 @@ class SemanticModule(nn.Module):
 
 
 
-class sketch_base_SemanticModule(nn.Module):
+class Sketch_base_SemanticModule(nn.Module):
     def __init__(self, in_channels=7):
-        super(sketch_base_SemanticModule, self).__init__()
+        super(Sketch_base_SemanticModule, self).__init__()
         self.local_head = Encoders.gnn.basic.GeneralHeteroConv(['connect_mean', 'order_add'], in_channels, 32)
 
         self.layers = nn.ModuleList([
@@ -79,6 +79,22 @@ class Sketch_prediction(nn.Module):
 
     def forward(self, x_dict):
         return torch.sigmoid(self.decoder(x_dict['loop']))
+
+
+class Extrude_prediction(nn.Module):
+    def __init__(self, hidden_channels=54):
+        super(Extrude_prediction, self).__init__()
+
+        self.decoder = nn.Sequential(
+            nn.Linear(32, hidden_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.1),
+            nn.Linear(hidden_channels, 1),
+
+        )
+
+    def forward(self, x_dict):
+        return torch.sigmoid(self.decoder(x_dict['stroke']))
 
 
 #---------------------------------- Loss Function ----------------------------------#

@@ -271,7 +271,7 @@ class create_stroke_cloud():
             self.edges[line.order_count] = line
         
 
-        #find the edges that has the current operation 
+        # find the edges that has the current operation 
         # but not created by the current operation
         # self.find_unwritten_edges(cur_op_vertex_ids, op, index)
 
