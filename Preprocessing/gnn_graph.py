@@ -133,7 +133,6 @@ class SketchHeteroData(HeteroData):
 
 
 
-
 class SketchLoopGraph(HeteroData):
     def __init__(self, stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_to_brep):
         super(SketchLoopGraph, self).__init__()
@@ -145,8 +144,8 @@ class SketchLoopGraph(HeteroData):
         self['loop'].x = self._compute_loop_features(stroke_cloud_loops, loop_to_brep)
 
         # Create edges between loops and strokes
-        loop_indices, stroke_indices = self._create_loop_stroke_edges(stroke_cloud_loops)
-        self['loop', 'representedBy', 'stroke'].edge_index = torch.tensor([loop_indices, stroke_indices], dtype=torch.long)
+        loop_stroke_edges = self._create_loop_stroke_edges(stroke_cloud_loops)
+        self['loop', 'representedBy', 'stroke'].edge_index = torch.tensor(loop_stroke_edges, dtype=torch.long)
         
         # Create neighboring_vertical edges
         vertical_edge_indices = self._create_loop_neighbor_edges(loop_neighboring_vertical)
@@ -161,10 +160,12 @@ class SketchLoopGraph(HeteroData):
         self['loop', 'contains', 'loop'].edge_index = torch.tensor(contained_loop_edges, dtype=torch.long)
 
         # Create stroke order edges
-        self._create_stroke_order_edges(stroke_node_features)
+        stroke_order_edges = self._create_stroke_order_edges(stroke_node_features)
+        self['stroke', 'order', 'stroke'].edge_index = torch.tensor(stroke_order_edges, dtype=torch.long)
 
         # Create stroke connect edges from connected_stroke_nodes
-        self._create_stroke_connect_edges(connected_stroke_nodes)
+        stroke_connect_edges = self._create_stroke_connect_edges(connected_stroke_nodes)
+        self['stroke', 'connect', 'stroke'].edge_index = torch.tensor(stroke_connect_edges, dtype=torch.long)
 
     def _compute_loop_features(self, stroke_cloud_loops, loop_to_brep):
         """
@@ -199,7 +200,7 @@ class SketchLoopGraph(HeteroData):
                 loop_indices.append(loop_idx)  # Connect the current loop node
                 stroke_indices.append(stroke_idx)  # To each stroke node in the sublist
         
-        return loop_indices, stroke_indices
+        return [loop_indices, stroke_indices]
 
     def _create_loop_neighbor_edges(self, loop_neighboring):
         """ Create non-directed edges for neighboring loops """
@@ -239,8 +240,7 @@ class SketchLoopGraph(HeteroData):
             edge_index[0].append(i)
             edge_index[1].append(i + 1)
 
-        # Store the edges in the graph
-        self['stroke', 'order', 'stroke'].edge_index = torch.tensor(edge_index, dtype=torch.long)
+        return edge_index
 
     def _create_stroke_connect_edges(self, connected_stroke_nodes):
         """
@@ -256,15 +256,13 @@ class SketchLoopGraph(HeteroData):
         # Iterate over the connected_stroke_nodes matrix
         for i in range(num_strokes):
             for j in range(i + 1, num_strokes):  # Only consider upper triangle to avoid duplicates
-
                 if connected_stroke_nodes[i, j] == 1:
                     edge_index[0].append(i)
                     edge_index[1].append(j)
                     edge_index[0].append(j)
                     edge_index[1].append(i)  # Add the reverse edge for undirected connection
 
-        # Store the edges in the graph
-        self['stroke', 'connect', 'stroke'].edge_index = torch.tensor(edge_index, dtype=torch.long)
+        return edge_index
 
 
 
