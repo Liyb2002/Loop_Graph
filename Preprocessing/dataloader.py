@@ -74,6 +74,7 @@ class Program_Graph_Dataset(Dataset):
         loop_neighboring_vertical = torch.tensor(shape_data['loop_neighboring_vertical'], dtype=torch.long, device=device)
         loop_neighboring_horizontal = torch.tensor(shape_data['loop_neighboring_horizontal'], dtype=torch.long, device=device)
         loop_neighboring_contained = torch.tensor(shape_data['loop_neighboring_contained'], dtype=torch.long, device=device)
+        loop_neighboring_coplanar = torch.tensor(shape_data['loop_neighboring_coplanar'], dtype=torch.long, device=device)
 
         stroke_to_brep = torch.tensor(shape_data['stroke_to_brep'], dtype=torch.long, device=device)
         final_brep_edges = torch.tensor(shape_data['final_brep_edges'], dtype=torch.float32, device=device)
@@ -81,7 +82,7 @@ class Program_Graph_Dataset(Dataset):
         # Load stroke_operations_order_matrix and convert to tensor
         stroke_operations_order_matrix = torch.tensor(shape_data['stroke_operations_order_matrix'], dtype=torch.float32)
 
-        return stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges
+        return stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges
 
 
 

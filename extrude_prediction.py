@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
-graph_decoder = Encoders.gnn.gnn.Sketch_prediction()
+graph_decoder = Encoders.gnn.gnn.Extrude_Decoder()
 
 graph_encoder.to(device)
 graph_decoder.to(device)
@@ -29,7 +29,7 @@ optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.par
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
+save_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -46,20 +46,20 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
     print(f"Total number of shape data: {len(dataset)}")
     
-    best_val_accuracy = 0
-    epochs = 30
+    best_val_loss = float('inf')
+    epochs = 100
     
     graphs = []
-    loop_selection_masks = []
+    stroke_selection_masks = []
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
         stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
-        print("connected_stroke_nodes", connected_stroke_nodes.shape)
+        
         stroke_selection_mask = stroke_operations_order_matrix[:, -1].reshape(-1, 1)
         sketch_selection_mask = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
         extrude_selection_mask = Encoders.helper.choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features)
@@ -79,7 +79,75 @@ def train():
             loop_neighboring_contained,
             stroke_to_brep
         )
-        print("build graph")
+        graphs.append(gnn_graph)
+        stroke_selection_masks.append(extrude_selection_mask)
+
+
+
+    print(f"Total number of preprocessed graphs: {len(graphs)}")
+    # Split the dataset into training and validation sets (80-20 split)
+    split_index = int(0.8 * len(graphs))
+    train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
+    train_masks, val_masks = stroke_selection_masks[:split_index], stroke_selection_masks[split_index:]
+
+
+    for epoch in range(epochs):
+        train_loss = 0.0
+        graph_encoder.train()
+        graph_decoder.train()
+
+        val_loss = 0.0
+        correct = 0
+        total = 0
+
+
+        for gnn_graph, loop_selection_mask in tqdm(zip(train_graphs, train_masks), desc=f"Epoch {epoch+1}/{epochs} - Training", dynamic_ncols=True):
+            optimizer.zero_grad()
+            x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+            output = graph_decoder(x_dict)
+
+            
+            loss = criterion(output, loop_selection_mask)
+            
+            loss.backward()
+            optimizer.step()
+
+            train_loss += loss.item()
+
+
+        graph_encoder.eval()
+        graph_decoder.eval()
+        
+        with torch.no_grad():
+            for gnn_graph, loop_selection_mask in tqdm(zip(val_graphs, val_masks), desc=f"Epoch {epoch+1}/{epochs} - Validation"):
+                x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+                output = graph_decoder(x_dict)
+                loss = criterion(output, loop_selection_mask)
+
+
+                condition_1 = (loop_selection_mask == 1) & (output > 0.5)
+                condition_2 = (loop_selection_mask == 0) & (output < 0.5)
+
+                if torch.all(condition_1 | condition_2):
+                    correct += 1
+                else:
+                    pass
+
+                total += 1
+                val_loss += loss.item()
+        
+
+        train_loss /= len(train_graphs)
+        val_loss /= len(val_graphs)
+        
+
+        accuracy = correct / total if total > 0 else 0
+        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.5f} - Validation Loss: {val_loss:.5f} - Validation Accuracy: {accuracy:.5f}")
+
+        if val_loss <  best_val_loss:
+            best_val_loss = val_loss
+            save_models()
+            print(f"Models saved at epoch {epoch+1} with validation accuracy: {accuracy:.5f}")
 
 
 #---------------------------------- Public Functions ----------------------------------#

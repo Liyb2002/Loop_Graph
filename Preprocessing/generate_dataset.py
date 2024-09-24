@@ -23,8 +23,8 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 5, start = 0)
-        self.generate_dataset('dataset/simple', number_data = 0, start = 995)
+        self.generate_dataset('dataset/test', number_data = 0, start = 0)
+        self.generate_dataset('dataset/simple', number_data = 500, start = 0)
         self.generate_dataset('dataset/eval', number_data = 0, start = 0)
 
 
@@ -97,7 +97,8 @@ class dataset_generator():
             loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(stroke_cloud_loops, stroke_node_features)
             loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(loop_neighboring_all, loop_neighboring_vertical)
             loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(stroke_cloud_loops, stroke_node_features)
-            
+            loop_neighboring_coplanar = Preprocessing.proc_CAD.helper.loop_coplanar(stroke_cloud_loops, stroke_node_features)
+
             # 4) Load Brep
             # brep_edges = stroke_cloud_class.brep_edges
             if prev_stop_idx == 0:
@@ -159,6 +160,7 @@ class dataset_generator():
                     'loop_neighboring_vertical': loop_neighboring_vertical,
                     'loop_neighboring_horizontal': loop_neighboring_horizontal,
                     'loop_neighboring_contained': loop_neighboring_contained,
+                    'loop_neighboring_coplanar':loop_neighboring_coplanar,
 
                     'brep_loop_neighboring': brep_loop_neighboring,
 

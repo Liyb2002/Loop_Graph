@@ -7,44 +7,18 @@ from torch_geometric.data import HeteroData
 import Encoders.gnn.basic
 
 class SemanticModule(nn.Module):
-    def __init__(self, in_channels=6):
-        super(SemanticModule, self).__init__()
-        self.local_head = Encoders.gnn.basic.GeneralHeteroConv(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'order_add'], in_channels, 16)
-
-        self.layers = nn.ModuleList([
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'order_add'], 16, 32),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'order_add'], 32, 64),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'order_add'], 64, 128),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'order_add'], 128, 128),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'order_add'], 128, 128),
-            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'order_add'], 128, 128)
-
-        ])
-
-
-    def forward(self, x_dict, edge_index_dict):
-
-        x_dict = self.local_head(x_dict, edge_index_dict)
-
-        for layer in self.layers:
-            x_dict = layer(x_dict, edge_index_dict)
-        
-        x_dict = {key: x.relu() for key, x in x_dict.items()}
-
-        return x_dict
-
-
-
-class Sketch_base_SemanticModule(nn.Module):
     def __init__(self, in_channels=7):
-        super(Sketch_base_SemanticModule, self).__init__()
-        self.local_head = Encoders.gnn.basic.GeneralHeteroConv(['connect_mean', 'order_add'], in_channels, 32)
+        super(SemanticModule, self).__init__()
+        self.local_head = Encoders.gnn.basic.GeneralHeteroConv(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'coplanar_mean', 'order_add', 'connect_mean'], in_channels, 16)
 
         self.layers = nn.ModuleList([
-            Encoders.gnn.basic.GeneralHeteroConv(['connect_mean', 'order_add'], 32, 32),
-            Encoders.gnn.basic.GeneralHeteroConv(['connect_mean', 'order_add'], 32, 32),
-            Encoders.gnn.basic.GeneralHeteroConv(['connect_mean', 'order_add'], 32, 32),
-            Encoders.gnn.basic.GeneralHeteroConv(['connect_mean', 'order_add'], 32, 32)
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'coplanar_mean', 'order_add', 'connect_mean'], 16, 32),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'coplanar_mean', 'order_add', 'connect_mean'], 32, 64),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'coplanar_mean', 'order_add', 'connect_mean'], 64, 128),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'coplanar_mean', 'order_add', 'connect_mean'], 128, 128),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'coplanar_mean', 'order_add', 'connect_mean'], 128, 128),
+            Encoders.gnn.basic.ResidualGeneralHeteroConvBlock(['representedBy_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_mean', 'coplanar_mean', 'order_add', 'connect_mean'], 128, 128)
+
         ])
 
 
@@ -61,10 +35,9 @@ class Sketch_base_SemanticModule(nn.Module):
 
 
 
-
-class Sketch_prediction(nn.Module):
+class Sketch_Decoder(nn.Module):
     def __init__(self, hidden_channels=256):
-        super(Sketch_prediction, self).__init__()
+        super(Sketch_Decoder, self).__init__()
 
         self.decoder = nn.Sequential(
             nn.Linear(128, hidden_channels),
@@ -81,15 +54,18 @@ class Sketch_prediction(nn.Module):
         return torch.sigmoid(self.decoder(x_dict['loop']))
 
 
-class Extrude_prediction(nn.Module):
-    def __init__(self, hidden_channels=54):
-        super(Extrude_prediction, self).__init__()
+class Extrude_Decoder(nn.Module):
+    def __init__(self, hidden_channels=256):
+        super(Extrude_Decoder, self).__init__()
 
         self.decoder = nn.Sequential(
-            nn.Linear(32, hidden_channels),
+            nn.Linear(128, hidden_channels),
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.1),
-            nn.Linear(hidden_channels, 1),
+            nn.Linear(hidden_channels, 64),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.1),
+            nn.Linear(64, 1),
 
         )
 

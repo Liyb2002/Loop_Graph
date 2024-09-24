@@ -799,6 +799,55 @@ def loop_contained(loops, stroke_node_features):
 
 
 
+def loop_coplanar(loops, stroke_node_features):
+    """
+    Determine which loops are co-planar by comparing common values in the x, y, or z axes.
+    
+    Parameters:
+    loops (list of lists): A list where each sublist contains indices of strokes forming a loop.
+    stroke_node_features (np.ndarray): A NumPy array of shape (num_strokes, 7), where the first 6 values represent two 3D points.
+
+    Returns:
+    coplanar_matrix (np.ndarray): A binary matrix of shape (num_loops, num_loops), where [i, j] = 1 if loops i and j are co-planar.
+    """
+    num_loops = len(loops)
+    coplanar_matrix = np.zeros((num_loops, num_loops), dtype=np.float32)
+
+    # To store the (axis, value) for each loop
+    loop_features = []
+
+    # Step 1: Compute the (axis, value) for each loop
+    for loop in loops:
+        points = []
+        # Gather all the points from the strokes in the loop
+        for stroke_idx in loop:
+            stroke_points = stroke_node_features[stroke_idx, :6]  # First 6 values represent two 3D points
+            points.append(stroke_points[:3])  # Start point
+            points.append(stroke_points[3:6])  # End point
+        
+        points = np.array(points)
+        
+        # Check if all points share the same value in the x, y, or z axis
+        if np.all(points[:, 0] == points[0, 0]):
+            loop_features.append(('x', points[0, 0]))
+        elif np.all(points[:, 1] == points[0, 1]):
+            loop_features.append(('y', points[0, 1]))
+        elif np.all(points[:, 2] == points[0, 2]):
+            loop_features.append(('z', points[0, 2]))
+        else:
+            loop_features.append(('none', 0))
+
+    # Step 2: Determine co-planar loops
+    for i in range(num_loops):
+        for j in range(i + 1, num_loops):
+            # If two loops have the same (axis, value), they are co-planar
+            if loop_features[i] == loop_features[j]:
+                coplanar_matrix[i, j] = 1
+                coplanar_matrix[j, i] = 1  # Symmetric for undirected relationship
+
+    return coplanar_matrix
+    
+
 def check_validacy(matrix1, matrix2):
     """
     Check the validity between two matrices.
