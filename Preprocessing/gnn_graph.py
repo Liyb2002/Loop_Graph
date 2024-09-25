@@ -17,10 +17,8 @@ operations_dict = {     "terminate": 0,
                         "extrude": 2,
                         "fillet": 3
                     } 
-
-
 class SketchLoopGraph(HeteroData):
-    def __init__(self, stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, loop_to_brep):
+    def __init__(self, stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_to_brep):
         super(SketchLoopGraph, self).__init__()
 
         # Use all 7 values of stroke_node_features
@@ -42,12 +40,8 @@ class SketchLoopGraph(HeteroData):
         self['loop', 'neighboring_horizontal', 'loop'].edge_index = torch.tensor(horizontal_edge_indices, dtype=torch.long)
 
         # Create directed edges for contained loops
-        contained_loop_edges = self._create_loop_neighbor_edges(loop_neighboring_contained)
-        self['loop', 'contains', 'loop'].edge_index = torch.tensor(contained_loop_edges, dtype=torch.long)
-
-        # Create coplanar edges
-        coplanar_edge_indices = self._create_loop_neighbor_edges(loop_neighboring_coplanar)
-        self['loop', 'coplanar', 'loop'].edge_index = torch.tensor(coplanar_edge_indices, dtype=torch.long)
+        contains_edges, is_contained_by_edges = self._create_containment_edges(loop_neighboring_contained)
+        self['loop', 'contains', 'loop'].edge_index = torch.tensor(contains_edges, dtype=torch.long)
 
         # Create stroke order edges
         stroke_order_edges = self._create_stroke_order_edges(stroke_node_features)
@@ -105,6 +99,30 @@ class SketchLoopGraph(HeteroData):
         
         return loop_edge_indices
 
+    def _create_containment_edges(self, loop_neighboring_contained):
+        """
+        Create directed containment edges.
+        If [i, j] = 1, then loop i contains loop j. Add edges for both 'contains' and 'is_contained_by'.
+        
+        Returns:
+        - contains_edges: Edges for 'contains' relation.
+        - is_contained_by_edges: Edges for 'is_contained_by' relation.
+        """
+        contains_edges = ([], [])
+        is_contained_by_edges = ([], [])
+
+        num_loops = loop_neighboring_contained.shape[0]
+        for i in range(num_loops):
+            for j in range(num_loops):
+                if loop_neighboring_contained[i, j] == 1:  # If loop i contains loop j
+                    contains_edges[0].append(i)
+                    contains_edges[1].append(j)
+                    
+                    # Reverse the edge for 'is_contained_by'
+                    is_contained_by_edges[0].append(j)
+                    is_contained_by_edges[1].append(i)
+
+        return contains_edges, is_contained_by_edges
 
     def _create_stroke_order_edges(self, stroke_node_features):
         """
@@ -141,7 +159,6 @@ class SketchLoopGraph(HeteroData):
                     edge_index[1].append(i)  # Add the reverse edge for undirected connection
 
         return edge_index
-
 
 
 

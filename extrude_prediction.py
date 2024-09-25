@@ -58,7 +58,7 @@ def train():
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
+        stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
         
         stroke_selection_mask = stroke_operations_order_matrix[:, -1].reshape(-1, 1)
         sketch_selection_mask = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
@@ -150,7 +150,74 @@ def train():
             print(f"Models saved at epoch {epoch+1} with validation accuracy: {accuracy:.5f}")
 
 
+
+def eval():
+    load_models()
+    # Load the dataset
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
+    print(f"Total number of shape data: {len(dataset)}")
+        
+    graphs = []
+    stroke_selection_masks = []
+
+    correct = 0
+    total = 0
+
+    # Preprocess and build the graphs
+    for data in tqdm(dataset, desc=f"Building Graphs"):
+        # Extract the necessary elements from the dataset
+        stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
+        
+        stroke_selection_mask = stroke_operations_order_matrix[:, -1].reshape(-1, 1)
+        sketch_selection_mask = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
+        extrude_selection_mask = Encoders.helper.choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features)
+
+        if not (extrude_selection_mask == 1).any():
+            continue
+
+        stroke_node_features = torch.tensor(stroke_node_features, dtype=torch.float32)
+        final_brep_edges = torch.tensor(final_brep_edges, dtype=torch.float32)
+
+        gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
+            stroke_cloud_loops, 
+            stroke_node_features, 
+            connected_stroke_nodes,
+            loop_neighboring_vertical, 
+            loop_neighboring_horizontal, 
+            loop_neighboring_contained,
+            stroke_to_brep
+        )
+        graphs.append(gnn_graph)
+        stroke_selection_masks.append(extrude_selection_mask)
+
+    with torch.no_grad():
+        for gnn_graph, loop_selection_mask in tqdm(zip(graphs, stroke_selection_masks), desc=f"Evaluation"):
+            x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+            output = graph_decoder(x_dict)
+            
+
+            condition_1 = (loop_selection_mask == 1) & (output > 0.5)
+            condition_2 = (loop_selection_mask == 0) & (output < 0.5)
+
+            if torch.all(condition_1 | condition_2):
+                correct += 1
+            else:
+                pass
+                # indices = torch.nonzero(loop_selection_mask == 1, as_tuple=True)[0]
+                # output_values_at_indices = output[indices]
+                # print("Output values where loop_selection_mask is 1", output_values_at_indices)
+
+                # Encoders.helper.vis_stroke_graph(gnn_graph, loop_selection_mask)
+                # Encoders.helper.vis_stroke_graph(gnn_graph, output.detach())
+            total += 1
+
+
+    print(f"Total number of eval graphs: {len(graphs)}, Correct graphs {correct}")
+    accuracy = correct / total if total > 0 else 0
+    print(f"Validation Accuracy: {accuracy:.5f}")
+
+
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

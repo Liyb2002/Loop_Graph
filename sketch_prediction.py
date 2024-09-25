@@ -48,7 +48,7 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -83,7 +83,6 @@ def train():
             loop_neighboring_vertical, 
             loop_neighboring_horizontal, 
             loop_neighboring_contained,
-            loop_neighboring_coplanar,
             stroke_to_brep
         )
 
@@ -168,7 +167,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -178,7 +177,7 @@ def eval():
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
+        stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
 
         second_last_column = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
         chosen_strokes = (second_last_column == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
