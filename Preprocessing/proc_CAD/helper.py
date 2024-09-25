@@ -614,6 +614,25 @@ def reorder_loops(loops):
     return reordered_loops
 
 
+def swap_rows_with_probability(matrix_a, matrix_b, swap_range=5, swap_prob=0.3):
+    num_rows = matrix_a.shape[0]
+    
+    for i in range(num_rows):
+        # Perform the swap with the given probability
+        if random.random() < swap_prob:
+            # Determine the range of valid indices to swap with
+            lower_bound = max(0, i - swap_range)
+            upper_bound = min(num_rows - 1, i + swap_range)
+            
+            # Choose a random index within the swap range
+            swap_idx = random.randint(lower_bound, upper_bound)
+            
+            # Swap rows in both matrices if the chosen index is different from the current index
+            if swap_idx != i:
+                matrix_a[[i, swap_idx]] = matrix_a[[swap_idx, i]]
+                matrix_b[[i, swap_idx]] = matrix_b[[swap_idx, i]]
+    
+    return matrix_a, matrix_b
 
 
 #----------------------------------------------------------------------------------#

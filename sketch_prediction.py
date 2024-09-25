@@ -48,7 +48,7 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -86,6 +86,7 @@ def train():
             stroke_to_brep
         )
 
+        # Encoders.helper.vis_stroke_with_order(stroke_node_features)
         # Encoders.helper.vis_brep(final_brep_edges)
         # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
 

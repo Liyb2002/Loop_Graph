@@ -1,5 +1,6 @@
 import os
 import torch
+import random
 
 import os
 import sys
@@ -162,7 +163,7 @@ class SketchLoopGraph(HeteroData):
 
 
 
-def build_graph(stroke_dict):
+def build_graph(stroke_dict, messy = False):
     num_strokes = len(stroke_dict)
     num_operations = 0
 
@@ -203,4 +204,5 @@ def build_graph(stroke_dict):
 
 
     return node_features, operations_order_matrix
+
 

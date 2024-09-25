@@ -564,3 +564,19 @@ def remove_single_point(all_edges):
             del all_edges[edge_id]
 
     return all_edges
+
+
+def random_remove_construction_lines(all_edges):
+    """
+    Removes edges with edge_type 'construction_line' with a 50% chance.
+    """
+    # Iterate through each edge in all_edges
+    for edge_id, edge in list(all_edges.items()):
+        # Check if the edge is a 'construction_line'
+        if edge.edge_type == 'construction_line':
+            # Use random to determine if the edge should be removed (30% chance)
+            if random.random() < 0.3:
+                del all_edges[edge_id]
+
+    return all_edges
+ 

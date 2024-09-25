@@ -26,7 +26,8 @@ class dataset_generator():
         self.generate_dataset('dataset/test', number_data = 0, start = 0)
         self.generate_dataset('dataset/simple', number_data = 0, start = 0)
         self.generate_dataset('dataset/eval', number_data = 0, start = 0)
-        self.generate_dataset('dataset/messy', number_data = 10, start = 0)
+        self.generate_dataset('dataset/messy', number_data = 0, start = 0)
+        self.generate_dataset('dataset/messy_order', number_data = 1000, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -64,7 +65,7 @@ class dataset_generator():
             return False
         
         
-        stroke_cloud_class = Preprocessing.proc_CAD.draw_all_lines.create_stroke_cloud_class(data_directory)
+        stroke_cloud_class = Preprocessing.proc_CAD.draw_all_lines.create_stroke_cloud_class(data_directory, True)
 
         brep_directory = os.path.join(data_directory, 'canvas')
         brep_files = [file_name for file_name in os.listdir(brep_directory) if file_name.startswith('brep_') and file_name.endswith('.step')]
@@ -83,6 +84,7 @@ class dataset_generator():
             
             stroke_cloud_class.read_next(next_stop_idx)
             stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_class.edges)
+            stroke_node_features, stroke_operations_order_matrix = Preprocessing.proc_CAD.helper.swap_rows_with_probability(stroke_node_features, stroke_operations_order_matrix)
             stroke_node_features = np.round(stroke_node_features, 4)
             connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(stroke_node_features)
             # stroke_node_features = stroke_node_features[:, :-1]

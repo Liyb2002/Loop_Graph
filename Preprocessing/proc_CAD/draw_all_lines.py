@@ -11,7 +11,7 @@ from scipy.interpolate import CubicSpline
 
 
 class create_stroke_cloud():
-    def __init__(self, directory, output = True):
+    def __init__(self, directory, messy = False):
         self.directory = directory
 
         self.order_count = 0
@@ -19,6 +19,8 @@ class create_stroke_cloud():
         self.edges = {}
         self.vertices = {}
         self.id_to_count = {}
+
+        self.messy = messy
 
         self.load_file()    
         self.current_index = 0
@@ -535,6 +537,10 @@ class create_stroke_cloud():
 
 
     def finishing_production(self):
+
+        if self.messy:
+            self.edges = Preprocessing.proc_CAD.line_utils.random_remove_construction_lines(self.edges)
+
         construction_lines = Preprocessing.proc_CAD.line_utils.whole_bounding_box_lines(self.edges)
         for line in construction_lines:
             line.set_edge_type('construction_line')
@@ -553,11 +559,12 @@ class create_stroke_cloud():
         
         self.adj_edges()
         self.map_id_to_count()
+        # self.vis_stroke_cloud(self.directory, True)
         # self.vis_brep()
 
 
 
-def create_stroke_cloud_class(directory):
-    stroke_cloud_class = create_stroke_cloud(directory)
+def create_stroke_cloud_class(directory, messy = False):
+    stroke_cloud_class = create_stroke_cloud(directory, messy)
     return stroke_cloud_class
 

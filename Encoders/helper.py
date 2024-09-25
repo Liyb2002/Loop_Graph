@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
+
 def get_kth_operation(op_to_index_matrix, k):    
     squeezed_matrix = op_to_index_matrix.squeeze(0)
     kth_operation = squeezed_matrix[:, k].unsqueeze(1)
@@ -347,9 +348,6 @@ def vis_whole_graph(graph, selected_loop):
     graph (SketchLoopGraph): A single graph object containing loops and strokes.
     loop_selection_masks (np.ndarray or torch.Tensor): A binary mask of shape (num_loops, 1), where 1 indicates a chosen loop.
     """
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-    import numpy as np
 
     # Extract loop-stroke connection edges and stroke features
     loops_to_strokes = graph['loop', 'representedBy', 'stroke'].edge_index
@@ -423,9 +421,6 @@ def vis_used_graph(graph):
     Parameters:
     graph (SketchLoopGraph): A single graph object containing loops and strokes.
     """
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-    import numpy as np
 
     # Extract loop-stroke connection edges and stroke features
     loops_to_strokes = graph['loop', 'representedBy', 'stroke'].edge_index
@@ -496,9 +491,6 @@ def vis_stroke_graph(graph, stroke_selection_mask):
     graph (SketchHeteroData): A single graph object containing strokes.
     stroke_selection_mask (np.ndarray or torch.Tensor): A binary mask of shape (num_strokes, 1), where 1 indicates a chosen stroke (red), and 0 indicates an unchosen stroke (blue).
     """
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-    import numpy as np
 
     # Extract stroke features from the graph
     stroke_node_features = graph['stroke'].x.numpy()
@@ -547,3 +539,37 @@ def vis_stroke_graph(graph, stroke_selection_mask):
 
     # Show plot
     plt.show()
+
+
+def vis_stroke_with_order(stroke_node_features):
+    """
+    Visualize strokes progressively. Initially plots 1 stroke, then 2 strokes, and so on.
+    
+    Parameters:
+    stroke_node_features (np.ndarray): A matrix of shape (num_strokes, 6), where the first 3 columns 
+                                       represent the start point and the next 3 columns represent the end point.
+    """
+
+    # Loop through the stroke_node_features progressively, plotting one more stroke each time
+    for i in range(1, len(stroke_node_features) + 1):
+        # Initialize the 3D plot for each step
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.grid(False)
+
+        # Plot the first i strokes
+        for stroke in stroke_node_features[:i]:
+            start, end = stroke[:3], stroke[3:6]
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+
+        # Set axis labels
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
+        # Set equal scaling for all axes
+        ax.set_box_aspect([1, 1, 1])
+
+        # Show plot for each step
+        plt.show()
+    

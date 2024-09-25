@@ -46,7 +46,7 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_loss = float('inf')
@@ -81,6 +81,7 @@ def train():
         )
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
+        # Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask)
 
 
 
@@ -220,4 +221,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()
