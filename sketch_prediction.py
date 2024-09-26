@@ -168,7 +168,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -214,8 +214,14 @@ def eval():
     # Eval
     graph_encoder.eval()
     graph_decoder.eval()
-    correct = 0
-    total = 0
+    lv1_correct = 0
+    lv1_total = 0
+    lv2_correct = 0
+    lv2_total = 0
+    lv3_correct = 0
+    lv3_total = 0
+    lv4_correct = 0
+    lv4_total = 0
 
     eval_loss = 0.0
 
@@ -225,28 +231,50 @@ def eval():
             output = graph_decoder(x_dict)
             
 
+            if x_dict['loop'].shape[0] < 15: 
+                lv1_total += 1
+            elif x_dict['loop'].shape[0] < 40: 
+                lv2_total += 1
+            elif x_dict['loop'].shape[0] < 60: 
+                lv3_total += 1
+            elif x_dict['loop'].shape[0] < 200: 
+                lv4_total += 1
+
             # Check if the selected loop is correct
             if torch.argmax(output) == torch.argmax(loop_selection_mask):
-                correct += 1
-            else:
-                Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
-                Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+                if x_dict['loop'].shape[0] < 15: 
+                    lv1_correct += 1
+                elif x_dict['loop'].shape[0] < 40: 
+                    lv2_correct += 1
+                elif x_dict['loop'].shape[0] < 60: 
+                    lv3_correct += 1
+                elif x_dict['loop'].shape[0] < 200: 
+                    lv4_correct += 1
 
-            total += 1
+            # else:
+            #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
+            #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+
 
             loss = criterion(output, loop_selection_mask)
             eval_loss += loss.item()
         
         eval_loss /= len(graphs)
 
-    
-    print(f"Total number of eval graphs: {len(graphs)}, Correct graphs {correct}")
-    accuracy = correct / total if total > 0 else 0
-    print(f"Validation Accuracy: {accuracy:.5f}")
+    lv1_accuracy = lv1_correct / lv1_total if lv1_total > 0 else 0 
+    lv2_accuracy = lv2_correct / lv2_total if lv2_total > 0 else 0 
+    lv3_accuracy = lv3_correct / lv3_total if lv3_total > 0 else 0 
+    lv4_accuracy = lv4_correct / lv4_total if lv4_total > 0 else 0 
+
+
+    print(f"lv1_accuracy: {lv1_accuracy:.5f}")
+    print(f"lv2_accuracy: {lv2_accuracy:.5f}")
+    print(f"lv3_accuracy: {lv3_accuracy:.5f}")
+    print(f"lv4_accuracy: {lv4_accuracy:.5f}")
 
 
 
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()
