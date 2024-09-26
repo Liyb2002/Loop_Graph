@@ -23,12 +23,12 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 0, start = 0)
+        self.generate_dataset('dataset/test', number_data = 2, start = 0)
         self.generate_dataset('dataset/simple', number_data = 0, start = 0)
         self.generate_dataset('dataset/eval', number_data = 0, start = 0)
         self.generate_dataset('dataset/messy', number_data = 0, start = 0)
         self.generate_dataset('dataset/messy_order', number_data = 0, start = 0)
-        self.generate_dataset('dataset/messy_order_eval', number_data = 500, start = 0)
+        self.generate_dataset('dataset/messy_order_eval', number_data = 0, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -66,7 +66,7 @@ class dataset_generator():
             return False
         
         
-        stroke_cloud_class = Preprocessing.proc_CAD.draw_all_lines.create_stroke_cloud_class(data_directory, True)
+        stroke_cloud_class = Preprocessing.proc_CAD.draw_all_lines.create_stroke_cloud_class(data_directory, False)
 
         brep_directory = os.path.join(data_directory, 'canvas')
         brep_files = [file_name for file_name in os.listdir(brep_directory) if file_name.startswith('brep_') and file_name.endswith('.step')]

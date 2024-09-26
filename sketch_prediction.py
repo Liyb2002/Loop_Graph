@@ -251,9 +251,9 @@ def eval():
                 elif x_dict['loop'].shape[0] < 200: 
                     lv4_correct += 1
 
-            # else:
-            #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
-            #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+            else:
+                Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
+                Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
 
 
             loss = criterion(output, loop_selection_mask)

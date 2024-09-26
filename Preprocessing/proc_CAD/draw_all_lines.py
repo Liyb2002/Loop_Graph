@@ -247,6 +247,7 @@ class create_stroke_cloud():
             edge = Edge(id=edge_data['id'], vertices=vertices)
             edge.set_Op(op, index)
             edge.set_order_count(self.order_count)
+            self.order_count += 1
             new_edges.append(edge)
 
             # self.edges[edge.order_count] = edge
@@ -346,7 +347,6 @@ class create_stroke_cloud():
         for edge_id, edge in self.edges.items():
             self.id_to_count[edge_id] = edge.order_count
 
-
     def add_new_edges(self, new_edges):
         """
         Adds new edges to the existing set of edges (self.edges).
@@ -415,9 +415,11 @@ class create_stroke_cloud():
 
         # Step 1: Iterate through each new edge
         for new_edge in new_edges:
+            
             is_edge_contained = False
             edges_to_remove = []
             edges_to_add = []
+
 
             # Check if the new edge is contained within any existing edge
             for _, prev_edge in list(self.edges.items()):
@@ -446,9 +448,14 @@ class create_stroke_cloud():
                     for i in range(len(unique_positions) - 1):
                         start = vertex_map[unique_positions[i]]
                         end = vertex_map[unique_positions[i + 1]]
+
+                        # Skip adding if this segment is the same as the new_edge
+                        if (start.position == C and end.position == D) or (start.position == D and end.position == C):
+                            continue
+
                         edge_id = f"edge_{len(self.edges)}_{i}"
-                        new_edge = Edge(id=edge_id, vertices=(start, end))
-                        edges_to_add.append(new_edge)
+                        split_edge = Edge(id=edge_id, vertices=(start, end))
+                        edges_to_add.append(split_edge)
 
                     edges_to_remove.append(prev_edge.order_count)
                     break  # No need to check other previous edges since it is already contained
@@ -459,12 +466,17 @@ class create_stroke_cloud():
                 self.order_count += 1
                 self.edges[new_edge.order_count] = new_edge
             else:
+                new_edge.set_order_count(self.order_count)
+                self.order_count += 1
+                self.edges[new_edge.order_count] = new_edge
+
                 # Remove the contained edge and add the new split edges
-                for edge_id in edges_to_remove:
-                    self.edges[edge_id].set_edge_type('construction_line')
-                    # del self.edges[edge_id]
+                # for edge_id in edges_to_remove:
+                #     self.edges[edge_id].set_edge_type('construction_line')
+                #     del self.edges[edge_id]
                 for edge in edges_to_add:
                     edge.set_order_count(self.order_count)
+                    # edge.set_Op('na', self.current_index)
                     self.order_count += 1
                     self.edges[edge.order_count] = edge
         

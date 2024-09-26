@@ -46,7 +46,7 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_loss = float('inf')
@@ -81,7 +81,8 @@ def train():
         )
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
-        # Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask)
+        print("extrude_selection_mask", extrude_selection_mask)
+        Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask)
 
 
 
@@ -155,11 +156,20 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
     print(f"Total number of shape data: {len(dataset)}")
         
     graphs = []
     stroke_selection_masks = []
+
+    lv1_correct = 0
+    lv1_total = 0
+    lv2_correct = 0
+    lv2_total = 0
+    lv3_correct = 0
+    lv3_total = 0
+    lv4_correct = 0
+    lv4_total = 0
 
     correct = 0
     total = 0
@@ -202,20 +212,46 @@ def eval():
 
             if torch.all(condition_1 | condition_2):
                 correct += 1
-            else:
-                pass
-                # indices = torch.nonzero(loop_selection_mask == 1, as_tuple=True)[0]
-                # output_values_at_indices = output[indices]
-                # print("Output values where loop_selection_mask is 1", output_values_at_indices)
+                if x_dict['loop'].shape[0] < 15: 
+                    lv1_correct += 1
+                elif x_dict['loop'].shape[0] < 35: 
+                    lv2_correct += 1
+                elif x_dict['loop'].shape[0] < 50: 
+                    lv3_correct += 1
+                elif x_dict['loop'].shape[0] < 200: 
+                    lv4_correct += 1
 
-                # Encoders.helper.vis_stroke_graph(gnn_graph, loop_selection_mask)
-                # Encoders.helper.vis_stroke_graph(gnn_graph, output.detach())
+            else:
+                indices = torch.nonzero(loop_selection_mask == 1, as_tuple=True)[0]
+                output_values_at_indices = output[indices]
+                print("Output values where loop_selection_mask is 1", output_values_at_indices)
+
+                Encoders.helper.vis_stroke_graph(gnn_graph, loop_selection_mask)
+                Encoders.helper.vis_stroke_graph(gnn_graph, output.detach())
+
+            if x_dict['loop'].shape[0] < 15: 
+                lv1_total += 1
+            elif x_dict['loop'].shape[0] < 35: 
+                lv2_total += 1
+            elif x_dict['loop'].shape[0] < 50: 
+                lv3_total += 1
+            elif x_dict['loop'].shape[0] < 200: 
+                lv4_total += 1
             total += 1
 
 
-    print(f"Total number of eval graphs: {len(graphs)}, Correct graphs {correct}")
-    accuracy = correct / total if total > 0 else 0
-    print(f"Validation Accuracy: {accuracy:.5f}")
+    lv1_accuracy = lv1_correct / lv1_total if lv1_total > 0 else 0 
+    lv2_accuracy = lv2_correct / lv2_total if lv2_total > 0 else 0 
+    lv3_accuracy = lv3_correct / lv3_total if lv3_total > 0 else 0 
+    lv4_accuracy = lv4_correct / lv4_total if lv4_total > 0 else 0 
+    accuracy = correct / total if total > 0 else 0 
+
+
+    print(f"lv1_accuracy: {lv1_accuracy:.5f}")
+    print(f"lv2_accuracy: {lv2_accuracy:.5f}")
+    print(f"lv3_accuracy: {lv3_accuracy:.5f}")
+    print(f"lv4_accuracy: {lv4_accuracy:.5f}")
+    print(f"accuracy: {accuracy:.5f}")
 
 
 #---------------------------------- Public Functions ----------------------------------#
