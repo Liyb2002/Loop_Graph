@@ -46,7 +46,7 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_loss = float('inf')
@@ -81,8 +81,7 @@ def train():
         )
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
-        print("extrude_selection_mask", extrude_selection_mask)
-        Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask)
+        # Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask)
 
 
 
@@ -156,7 +155,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_eval')
     print(f"Total number of shape data: {len(dataset)}")
         
     graphs = []
@@ -223,8 +222,8 @@ def eval():
 
             else:
                 indices = torch.nonzero(loop_selection_mask == 1, as_tuple=True)[0]
-                output_values_at_indices = output[indices]
-                print("Output values where loop_selection_mask is 1", output_values_at_indices)
+                # output_values_at_indices = output[indices]
+                # print("Output values where loop_selection_mask is 1", output_values_at_indices)
 
                 Encoders.helper.vis_stroke_graph(gnn_graph, loop_selection_mask)
                 Encoders.helper.vis_stroke_graph(gnn_graph, output.detach())
@@ -257,4 +256,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

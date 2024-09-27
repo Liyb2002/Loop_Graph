@@ -168,7 +168,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_eval')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -251,9 +251,9 @@ def eval():
                 elif x_dict['loop'].shape[0] < 200: 
                     lv4_correct += 1
 
-            else:
-                Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
-                Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+            # else:
+            #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
+            #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
 
 
             loss = criterion(output, loop_selection_mask)

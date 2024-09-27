@@ -614,7 +614,7 @@ def reorder_loops(loops):
     return reordered_loops
 
 
-def swap_rows_with_probability(matrix_a, matrix_b, swap_range=5, swap_prob=0.3):
+def swap_rows_with_probability(matrix_a, matrix_b, swap_range=20, swap_prob=1.0):
     num_rows = matrix_a.shape[0]
     
     for i in range(num_rows):
