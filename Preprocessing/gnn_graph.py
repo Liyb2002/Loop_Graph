@@ -161,6 +161,40 @@ class SketchLoopGraph(HeteroData):
 
         return edge_index
 
+    def _full_shape(self):
+        """
+        Check if all loop nodes in the graph form a full_shape. 
+        A loop is considered a full_shape if and only if the sum of its neighboring_vertical and neighboring_horizontal edges (val_1)
+        is greater than the number of its representedBy edges to strokes (val_2).
+
+        Returns:
+        bool: True if all loops are full shapes, False otherwise.
+        """
+        # Get the number of loop nodes
+        num_loops = self['loop'].num_nodes
+
+        # Get edge indices for each relation
+        neighboring_vertical_edges = self['loop', 'neighboring_vertical', 'loop'].edge_index
+        neighboring_horizontal_edges = self['loop', 'neighboring_horizontal', 'loop'].edge_index
+        represented_by_edges = self['loop', 'representedBy', 'stroke'].edge_index
+
+        # Iterate through all loop nodes
+        for loop_idx in range(num_loops):
+            # Calculate val_1: sum of neighboring_vertical and neighboring_horizontal edges for this loop
+            val_1 = (
+                torch.sum(neighboring_vertical_edges[0] == loop_idx).item() +
+                torch.sum(neighboring_horizontal_edges[0] == loop_idx).item()
+            )
+            
+            # Calculate val_2: number of representedBy edges for this loop
+            val_2 = torch.sum(represented_by_edges[0] == loop_idx).item()
+
+            # Check if it's a full_shape
+            if val_1 <= val_2:
+                return False  # If any loop is not a full shape, return False
+
+        return True  # All loops are full shapes
+
 
 
 def build_graph(stroke_dict, messy = False):

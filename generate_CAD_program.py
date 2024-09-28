@@ -53,6 +53,7 @@ pass
 for data in tqdm(dataset, desc=f"Generating CAD Progams"):
     stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
     
+    print("NEW SHAPE -----------------!")
     # We only want to process complicated shapes
     if len(stroke_cloud_loops)< 60:
         continue
@@ -64,8 +65,12 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
 
     # Strokes in the Graph
     stroke_in_graph = 0
+    prev_loops_in_graph = 0
+
     while stroke_in_graph < stroke_node_features.shape[0]:
-    
+        print("stroke_node_features.shape[0]", stroke_node_features.shape[0])
+        print("stroke_in_graph", stroke_in_graph)
+
     # -------------------- Prepare the graph informations -------------------- #
         # 1) Get stroke cloud loops
         read_strokes = stroke_node_features[:stroke_in_graph + 1]
@@ -82,7 +87,7 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
         # 3) Stroke to Brep
         stroke_to_brep = Preprocessing.proc_CAD.helper.stroke_to_brep(loops, brep_loops, read_strokes, brep_edges)
 
-        # 4) Build graph 
+        # 4) Build graph & check validity of the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             loops, 
             read_strokes, 
@@ -92,8 +97,17 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
             loop_neighboring_contained,
             stroke_to_brep
         )
+        is_full_shape_graph = gnn_graph._full_shape()
+
+        
+        # 5) If it satisfy the condition, we can build the operations
+        if is_full_shape_graph and gnn_graph['loop'].x.shape[0] > prev_loops_in_graph:
+            print("build !!")
+            pass
 
 
+        # n) Lastly, update the strokes 
         stroke_in_graph += 1
-        print("gnn_graph", gnn_graph['loop'].x.shape)
+        prev_loops_in_graph = gnn_graph['loop'].x.shape[0]
+        print("gnn_graph._full_shape()", gnn_graph._full_shape())
         print('------')

@@ -23,7 +23,7 @@ graph_decoder = Encoders.gnn.gnn.Sketch_Decoder()
 graph_encoder.to(device)
 graph_decoder.to(device)
 
-criterion = Encoders.gnn.gnn.FocalLoss(alpha=0.9, gamma=3.0)
+criterion = Encoders.gnn.gnn.FocalLoss(alpha=0.75, gamma=2.5)
 optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
 
 # ------------------------------------------------------------------------------# 
@@ -48,7 +48,7 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/very_messy')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -168,7 +168,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/very_messy')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -277,4 +277,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()
