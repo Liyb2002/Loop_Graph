@@ -8,6 +8,8 @@ import Preprocessing.proc_CAD.Program_to_STL
 import Preprocessing.proc_CAD.brep_read
 import Preprocessing.proc_CAD.helper
 
+import whole_process_helper.helper
+
 import Models.loop_embeddings
 
 import Encoders.gnn.gnn
@@ -63,33 +65,33 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
     brep_loops = []
 
 
-    # Strokes in the Graph
+    # Strokes / Loops in the Graph
     stroke_in_graph = 0
     prev_loops_in_graph = 0
+    existing_loops = []
 
     while stroke_in_graph < stroke_node_features.shape[0]:
-        print("stroke_node_features.shape[0]", stroke_node_features.shape[0])
-        print("stroke_in_graph", stroke_in_graph)
+        print("stroke_in_graph", stroke_in_graph, "out of", stroke_node_features.shape[0])
 
     # -------------------- Prepare the graph informations -------------------- #
         # 1) Get stroke cloud loops
         read_strokes = stroke_node_features[:stroke_in_graph + 1]
-        loops_fset = Preprocessing.proc_CAD.helper.face_aggregate_networkx(read_strokes)
-        loops = [list(fset) for fset in loops_fset]
+        loops_fset = whole_process_helper.helper.face_aggregate_addStroke(read_strokes)
+        existing_loops += [list(fset) for fset in loops_fset]
 
         # 2) Compute stroke / loop information 
         connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(read_strokes)
-        loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(loops)
-        loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(loops, read_strokes)
+        loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(existing_loops)
+        loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(existing_loops, read_strokes)
         loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(loop_neighboring_all, loop_neighboring_vertical)
-        loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(loops, read_strokes)
+        loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(existing_loops, read_strokes)
 
         # 3) Stroke to Brep
-        stroke_to_brep = Preprocessing.proc_CAD.helper.stroke_to_brep(loops, brep_loops, read_strokes, brep_edges)
+        stroke_to_brep = Preprocessing.proc_CAD.helper.stroke_to_brep(existing_loops, brep_loops, read_strokes, brep_edges)
 
         # 4) Build graph & check validity of the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
-            loops, 
+            existing_loops, 
             read_strokes, 
             connected_stroke_nodes,
             loop_neighboring_vertical, 
@@ -101,7 +103,7 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
 
         
         # 5) If it satisfy the condition, we can build the operations
-        if is_full_shape_graph and gnn_graph['loop'].x.shape[0] > prev_loops_in_graph:
+        if is_full_shape_graph and len(loops_fset) > 0:
             print("build !!")
             pass
 

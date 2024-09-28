@@ -1,4 +1,105 @@
 
+import numpy as np
+import networkx as nx
+from itertools import combinations, permutations
+
 # --------------------------------------------------------------------------- #
-def build_loops():
-    pass
+
+def face_aggregate_addStroke(stroke_matrix):
+    """
+    This function finds valid loops of strokes with size 3 or 4 using NetworkX, ensuring that each loop
+    contains the last stroke from the matrix. Only groups involving the last stroke are considered.
+    
+    Parameters:
+    stroke_matrix (numpy.ndarray): A matrix of shape (num_strokes, 7) where each row represents a stroke
+                                   with start and end points in 3D space.
+
+    Returns:
+    list: A list of indices of valid loops of strokes, where each loop contains either 3 or 4 strokes,
+          and every group includes the last row of the stroke matrix.
+    """
+    
+    # Check if there are fewer than 4 strokes
+    if stroke_matrix.shape[0] < 4:
+        return []
+
+    # Ensure input is a numpy array and ignore the last column
+    stroke_matrix = np.array(stroke_matrix)[:, :6]
+    
+    # Split the matrix into the last stroke and the rest
+    last_stroke = stroke_matrix[-1]
+    rest_strokes = stroke_matrix[:-1]
+    
+    # Initialize the graph
+    G = nx.Graph()
+    
+    # Add edges to the graph based on strokes and store the edge-to-stroke mapping
+    edge_to_stroke_id = {}
+    for idx, stroke in enumerate(stroke_matrix):
+        start_point = tuple(np.round(stroke[:3], 4))
+        end_point = tuple(np.round(stroke[3:], 4))
+        G.add_edge(start_point, end_point)
+        # Store both directions in the dictionary to handle undirected edges
+        edge_to_stroke_id[(start_point, end_point)] = idx
+        edge_to_stroke_id[(end_point, start_point)] = idx  # Add both directions for undirected graph
+
+    # List to store valid groups
+    valid_groups = []
+
+    # Get the nodes of the last stroke
+    last_start_point = tuple(np.round(last_stroke[:3], 4))
+    last_end_point = tuple(np.round(last_stroke[3:], 4))
+
+    # List of nodes excluding those of the last stroke
+    nodes = list(G.nodes)
+    nodes.remove(last_start_point)
+    nodes.remove(last_end_point)
+
+    # Helper function to check if a set of edges forms a valid cycle
+    def check_valid_edges(edges):
+        point_count = {}
+        for edge in edges:
+            point_count[edge[0]] = point_count.get(edge[0], 0) + 1
+            point_count[edge[1]] = point_count.get(edge[1], 0) + 1
+        # A valid cycle has each node exactly twice
+        return all(count == 2 for count in point_count.values())
+
+    # Check for valid loops of size 3 (2 nodes + last stroke)
+    for group_nodes in combinations(nodes, 2):
+        group_with_last = list(group_nodes) + [last_start_point, last_end_point]
+        # Check if these nodes can form a valid subgraph
+        if nx.is_connected(G.subgraph(group_with_last)):
+            # Generate all permutations of the edges
+            for perm_edges in permutations(combinations(group_with_last, 2), 3):
+                if check_valid_edges(perm_edges):
+                    strokes_in_group = [edge_to_stroke_id.get(edge) or edge_to_stroke_id.get((edge[1], edge[0])) for edge in perm_edges]
+                    if None not in strokes_in_group:  # Ensure all edges are found in the mapping
+                        valid_groups.append(sorted(strokes_in_group))
+
+    # Check for valid loops of size 4 (3 nodes + last stroke)
+    for group_nodes in combinations(nodes, 3):
+        group_with_last = list(group_nodes) + [last_start_point, last_end_point]
+        # Check if these nodes can form a valid subgraph
+        if nx.is_connected(G.subgraph(group_with_last)):
+            # Generate all permutations of the edges
+            for perm_edges in permutations(combinations(group_with_last, 2), 4):
+                if check_valid_edges(perm_edges):
+                    strokes_in_group = [edge_to_stroke_id.get(edge) or edge_to_stroke_id.get((edge[1], edge[0])) for edge in perm_edges]
+                    if None not in strokes_in_group:  # Ensure all edges are found in the mapping
+                        valid_groups.append(sorted(strokes_in_group))
+
+    # Remove duplicate loops by converting to a set of frozensets
+    unique_groups = list(set(frozenset(group) for group in valid_groups))
+
+    # Final check: Ensure each group has the same number of unique points as edges
+    final_groups = []
+    for group in unique_groups:
+        points = set()
+        for edge_id in group:
+            stroke = stroke_matrix[edge_id]
+            points.add(tuple(stroke[:3]))
+            points.add(tuple(stroke[3:]))
+        if len(points) == len(group):
+            final_groups.append(group)
+
+    return final_groups
