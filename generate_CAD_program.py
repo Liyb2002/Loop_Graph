@@ -40,11 +40,29 @@ output_relative_dir = ('program_output/canvas')
 
 
 # --------------------- Skecth Network --------------------- #
-pass
+sketch_graph_encoder = Encoders.gnn.gnn.SemanticModule()
+sketch_graph_decoder = Encoders.gnn.gnn.Sketch_Decoder()
+sketch_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
+sketch_graph_encoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_encoder.pth')))
+sketch_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_decoder.pth')))
+
+def predict_sketch(graph):
+    x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+    sketch_selection_mask = sketch_graph_decoder(x_dict)
+    return sketch_selection_mask
+
 
 # --------------------- Extrude Network --------------------- #
-pass
+extrude_graph_encoder = Encoders.gnn.gnn.SemanticModule()
+extrude_graph_decoder = Encoders.gnn.gnn.Extrude_Decoder()
+extrude_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction')
+extrude_graph_encoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_encoder.pth')))
+extrude_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_decoder.pth')))
 
+def predict_extrude(graph):
+    x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+    sketch_selection_mask = sketch_graph_decoder(x_dict)
+    return sketch_selection_mask
 
 
 # --------------------- Cascade Brep Features --------------------- #
@@ -99,6 +117,7 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
             loop_neighboring_contained,
             stroke_to_brep
         )
+        
         is_full_shape_graph = gnn_graph._full_shape()
 
         

@@ -161,6 +161,28 @@ class SketchLoopGraph(HeteroData):
 
         return edge_index
 
+
+    def set_select_sketch(self, sketch_loop_selection_mask):
+        """
+        Update the loop node features based on the sketch_loop_selection_mask.
+        If a loop is selected (value is 1 in sketch_loop_selection_mask), 
+        update its features to be 2, repeated 7 times.
+
+        Parameters:
+        sketch_loop_selection_mask (torch.Tensor): A tensor of shape (num_loops, 1), where a value of 1 
+                                                indicates that the loop is selected.
+        """
+        # Ensure the mask is the correct shape
+        num_loops = self['loop'].num_nodes
+        assert sketch_loop_selection_mask.shape == (num_loops, 1), "Invalid mask shape"
+
+        # Update loop node features based on the mask
+        for loop_idx in range(num_loops):
+            if sketch_loop_selection_mask[loop_idx].item() == 1:
+                # If the loop is selected, set its features to 2, repeated 7 times
+                self['loop'].x[loop_idx] = torch.tensor([2] * 7, dtype=torch.float)
+
+
     def _full_shape(self):
         """
         Check if all loop nodes in the graph form a full_shape. 

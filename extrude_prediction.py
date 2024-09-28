@@ -64,8 +64,21 @@ def train():
         sketch_selection_mask = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
         extrude_selection_mask = Encoders.helper.choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features)
 
-        if not (extrude_selection_mask == 1).any():
+        # find the sketch_loops
+        chosen_strokes = (sketch_selection_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        loop_chosen_mask = []
+        for loop in stroke_cloud_loops:
+            if all(stroke in chosen_strokes for stroke in loop):
+                loop_chosen_mask.append(1)  # Loop is chosen
+            else:
+                loop_chosen_mask.append(0)  # Loop is not chosen
+        
+        sketch_loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1).to(device)
+
+
+        if not (extrude_selection_mask == 1).any() and not (sketch_loop_selection_mask == 1).any():
             continue
+
 
         stroke_node_features = torch.tensor(stroke_node_features, dtype=torch.float32)
         final_brep_edges = torch.tensor(final_brep_edges, dtype=torch.float32)
@@ -79,6 +92,9 @@ def train():
             loop_neighboring_contained,
             stroke_to_brep
         )
+
+        gnn_graph.set_select_sketch(sketch_loop_selection_mask)
+
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
         # Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask)
@@ -182,7 +198,18 @@ def eval():
         sketch_selection_mask = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
         extrude_selection_mask = Encoders.helper.choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features)
 
-        if not (extrude_selection_mask == 1).any():
+        # find the sketch_loops
+        chosen_strokes = (sketch_selection_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        loop_chosen_mask = []
+        for loop in stroke_cloud_loops:
+            if all(stroke in chosen_strokes for stroke in loop):
+                loop_chosen_mask.append(1)  # Loop is chosen
+            else:
+                loop_chosen_mask.append(0)  # Loop is not chosen
+        
+        sketch_loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1).to(device)
+
+        if not (extrude_selection_mask == 1).any() and not (sketch_selection_mask == 1).any():
             continue
 
         stroke_node_features = torch.tensor(stroke_node_features, dtype=torch.float32)
@@ -197,6 +224,8 @@ def eval():
             loop_neighboring_contained,
             stroke_to_brep
         )
+        gnn_graph.set_select_sketch(sketch_loop_selection_mask)
+
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
 
