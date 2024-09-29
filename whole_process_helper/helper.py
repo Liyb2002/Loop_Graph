@@ -3,6 +3,9 @@ import numpy as np
 import networkx as nx
 from itertools import combinations, permutations
 
+import torch
+from collections import Counter
+
 # --------------------------------------------------------------------------- #
 
 def face_aggregate_addStroke(stroke_matrix):
@@ -103,3 +106,101 @@ def face_aggregate_addStroke(stroke_matrix):
             final_groups.append(group)
 
     return final_groups
+
+
+
+def extract_unique_points(sketch_selection_mask, gnn_graph):
+    """
+    Extract the unique points from the strokes connected to the loop with the highest probability in the selection mask.
+    
+    Parameters:
+    sketch_selection_mask (torch.Tensor): A tensor of shape (num_loops, 1) representing probabilities for selecting loops.
+    gnn_graph (HeteroData): The graph containing loop and stroke nodes, and edges representing their relationships.
+    
+    Returns:
+    unique_points (torch.Tensor): A tensor of unique 3D points extracted from the stroke nodes.
+    """
+
+    # 1. Find the loop with the highest probability
+    max_prob_loop_idx = torch.argmax(sketch_selection_mask).item()
+
+    # 2. Find the stroke nodes connected to this loop node via 'representedBy' edges
+    # Edge indices for 'loop' -> 'stroke' are stored in gnn_graph['loop', 'representedBy', 'stroke'].edge_index
+    loop_stroke_edges = gnn_graph['loop', 'representedBy', 'stroke'].edge_index
+    connected_stroke_indices = loop_stroke_edges[1][loop_stroke_edges[0] == max_prob_loop_idx]  # Get stroke indices for the selected loop
+
+    # 3. Extract points from the connected stroke nodes
+    stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
+    points = []
+    for stroke_idx in connected_stroke_indices:
+        stroke_feature = stroke_features[stroke_idx]
+        point1 = stroke_feature[:3] 
+        point2 = stroke_feature[3:6] 
+        points.append(point1)
+        points.append(point2)
+
+    # 4. Remove duplicate points to get unique points
+    points_tensor = torch.stack(points)  
+    unique_points_tensor = torch.unique(points_tensor, dim=0)  
+
+    return unique_points_tensor
+
+
+
+
+def get_extrude_amount(gnn_graph, extrude_selection_mask):
+    """
+    Calculate the extrude amount and direction from the stroke with the highest probability in the extrude_selection_mask.
+    
+    Parameters:
+    gnn_graph (HeteroData): The graph containing stroke nodes and their features.
+    extrude_selection_mask (torch.Tensor): A tensor of shape (num_strokes, 1) representing probabilities for selecting strokes.
+    
+    Returns:
+    tuple: (float, list) The stroke length and direction of extrusion for the stroke with the highest probability.
+    """
+
+    # 1. Find the stroke with the highest value in extrude_selection_mask
+    max_prob_stroke_idx = torch.argmax(extrude_selection_mask).item()
+
+    # 2. Extract stroke node features for the selected stroke
+    stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
+    
+    # Get the stroke feature for the stroke with the highest probability
+    stroke_feature = stroke_features[max_prob_stroke_idx]
+    
+    # Extract the two 3D points
+    point1 = stroke_feature[:3]
+    point2 = stroke_feature[3:6]
+    
+    # Compute the Euclidean distance (length of the stroke)
+    stroke_length = torch.dist(point1, point2).item()
+    
+    # Compute the direction of the stroke (normalized vector)
+    direction_vector = (point2 - point1).tolist()  # Vector from point1 to point2
+
+    return stroke_length, direction_vector
+
+
+def extrude_strokes(gnn_graph, extrude_selection_mask):
+    """
+    Outputs the stroke features of all selected strokes in the extrude_selection_mask.
+    
+    Parameters:
+    gnn_graph (HeteroData): The graph containing stroke nodes and their features.
+    extrude_selection_mask (torch.Tensor): A tensor of shape (num_strokes, 1) representing probabilities for selecting strokes.
+    
+    Returns:
+    torch.Tensor: A tensor containing the features of the selected strokes.
+    """
+
+    # 1. Select stroke nodes with prob > 0.5
+    max_prob_stroke_idx = torch.argmax(extrude_selection_mask).item()
+
+    # 2. Extract stroke features for the selected stroke indices
+    stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
+    
+    # 3. Get the features for the selected strokes
+    selected_stroke_feature = stroke_features[max_prob_stroke_idx]
+
+    return selected_stroke_feature

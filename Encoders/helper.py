@@ -94,57 +94,7 @@ def predict_face_coplanar_with_brep(predicted_index, coplanar_matrix, node_featu
     # Step 3: If no coplanar face is used, return False
     return False
 
-#------------------------------------------------------------------------------------------------------#
 
-
-
-def vis_clean_strokes(node_features, edge_features):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Convert tensors to set of tuples for easy comparison
-    edge_set = {tuple(edge.numpy()) for edge in edge_features}
-
-    # Initialize min and max limits
-    x_min, x_max = float('inf'), float('-inf')
-    y_min, y_max = float('inf'), float('-inf')
-    z_min, z_max = float('inf'), float('-inf')
-
-    # Plot node_features in blue if they are not in edge_features
-    for stroke in node_features:
-        stroke_tuple = tuple(stroke.numpy())
-        
-        if stroke_tuple not in edge_set:
-            x = [stroke[0], stroke[3]]
-            y = [stroke[1], stroke[4]]
-            z = [stroke[2], stroke[5]]
-
-            # Update the min and max limits for each axis
-            x_min, x_max = min(x_min, x[0], x[1]), max(x_max, x[0], x[1])
-            y_min, y_max = min(y_min, y[0], y[1]), max(y_max, y[0], y[1])
-            z_min, z_max = min(z_min, z[0], z[1]), max(z_max, z[0], z[1])
-
-            ax.plot(x, y, z, color='blue')
-
-    # Compute the center of the shape
-    x_center = (x_min + x_max) / 2
-    y_center = (y_min + y_max) / 2
-    z_center = (z_min + z_max) / 2
-
-    # Compute the maximum difference across x, y, z directions
-    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
-
-    # Set the same limits for x, y, and z axes centered around the computed center
-    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
-    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
-    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    plt.show()
-    
 
 
 #------------------------------------------------------------------------------------------------------#
@@ -182,37 +132,6 @@ def clean_face_choice(predicted_index, node_features):
         return False
 
 
-def vis_specific_loop(loop, strokes):
-    """
-    Visualize specific loops and strokes.
-    
-    Parameters:
-    loop (list of int): A list containing indices of the strokes to be highlighted.
-    strokes (np.ndarray): A matrix of shape (num_strokes, 7), where the first 6 columns represent two 3D points.
-    """
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-
-    # Initialize the 3D plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Plot all strokes in blue
-    for stroke in strokes:
-        start, end = stroke[:3], stroke[3:6]
-        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', alpha=0.5)
-
-    # Plot strokes in the loop in red
-    for idx in loop:
-        stroke = strokes[idx]
-        start, end = stroke[:3], stroke[3:6]
-        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='red', linewidth=2)
-
-    # Set labels and show plot
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    plt.show()
 
 
 #------------------------------------------------------------------------------------------------------#

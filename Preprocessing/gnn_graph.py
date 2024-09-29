@@ -18,6 +18,7 @@ operations_dict = {     "terminate": 0,
                         "extrude": 2,
                         "fillet": 3
                     } 
+
 class SketchLoopGraph(HeteroData):
     def __init__(self, stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_to_brep):
         super(SketchLoopGraph, self).__init__()
@@ -217,6 +218,9 @@ class SketchLoopGraph(HeteroData):
 
         return True  # All loops are full shapes
 
+
+    def _has_shape(self):
+        pass
 
 
 def build_graph(stroke_dict, messy = False):
