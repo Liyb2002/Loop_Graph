@@ -219,8 +219,72 @@ class SketchLoopGraph(HeteroData):
         return True  # All loops are full shapes
 
 
-    def _has_shape(self):
-        pass
+
+    def _has_circle_shape(self):
+        """
+        Determine if there is a subgraph of loop nodes (filtered by specific conditions) that forms a circular structure
+        using 'neighboring_vertical' edges. The subgraph must have > 4 nodes.
+
+        Returns:
+        bool: True if such a full shape exists, False otherwise.
+        """
+        # Step 1: Filter loop nodes based on the given criteria
+
+        # Get the number of loop nodes
+        num_loops = self['loop'].num_nodes
+
+        # Get edge indices for each relation
+        neighboring_vertical_edges = self['loop', 'neighboring_vertical', 'loop'].edge_index
+        represented_by_edges = self['loop', 'representedBy', 'stroke'].edge_index
+
+        # Initialize an empty list to store valid loop nodes
+        valid_loop_nodes = []
+
+        # Iterate over all loop nodes
+        for loop_idx in range(num_loops):
+            # Get the loop features (check if the loop is used)
+            loop_features = self['loop'].x[loop_idx].tolist()
+            
+            # Condition A: Skip loops that have features all equal to 1
+            if loop_features == [1] * 7:
+                continue
+
+            # Condition B: Calculate number of neighboring_vertical and representedBy edges
+            num_vertical_edges = torch.sum(neighboring_vertical_edges[0] == loop_idx).item()
+            num_represented_by_edges = torch.sum(represented_by_edges[0] == loop_idx).item()
+
+            # Check if the number of vertical edges is greater than representedBy edges
+            if num_vertical_edges <= num_represented_by_edges:
+                continue
+
+            # If both conditions are satisfied, add the loop node to valid_loop_nodes
+            valid_loop_nodes.append(loop_idx)
+
+        # Step 2: Check if a subgraph formed by neighboring_vertical edges contains a connected component with > 4 nodes
+
+        # If there are fewer than 4 valid loops, return False
+        if len(valid_loop_nodes) < 4:
+            return False
+
+        # Create a graph using the filtered nodes and the neighboring_vertical edges
+        G = nx.Graph()
+
+        # Add valid nodes to the graph
+        G.add_nodes_from(valid_loop_nodes)
+
+        # Add neighboring_vertical edges between the valid nodes
+        for i in range(neighboring_vertical_edges.shape[1]):
+            src, tgt = neighboring_vertical_edges[:, i]
+            if src.item() in valid_loop_nodes and tgt.item() in valid_loop_nodes:
+                G.add_edge(src.item(), tgt.item())
+
+        # Step 3: Find if there is a connected component (subgraph) with > 4 nodes
+        for component in nx.connected_components(G):
+            if len(component) > 4:
+                return True  # Found a connected component with more than 4 nodes
+
+        # If no valid subgraph with > 4 nodes is found, return False
+        return False
 
 
 def build_graph(stroke_dict, messy = False):

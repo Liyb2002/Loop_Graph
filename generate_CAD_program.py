@@ -141,11 +141,9 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
             stroke_to_brep
         )
         
-        is_full_shape_graph = gnn_graph._full_shape()
-
         
         # 5) If it satisfy the condition, we can build the operations
-        if is_full_shape_graph and len(loops_fset) > 0:
+        if gnn_graph._full_shape and gnn_graph._has_circle_shape():
             print("build !!")
             print("gnn_graph", gnn_graph['loop'].x.shape)
             Encoders.helper.vis_whole_graph(gnn_graph, -1)
