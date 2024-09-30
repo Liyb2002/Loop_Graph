@@ -120,7 +120,7 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
         loops_fset = whole_process_helper.helper.face_aggregate_addStroke(read_strokes)
         existing_loops += [list(fset) for fset in loops_fset]
 
-        Preprocessing.proc_CAD.helper.vis_multiple_loops([list(fset) for fset in loops_fset], read_strokes)
+        # Preprocessing.proc_CAD.helper.vis_multiple_loops([list(fset) for fset in loops_fset], read_strokes)
 
         # 2) Compute stroke / loop information 
         connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(read_strokes)
@@ -128,9 +128,6 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
         loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(existing_loops, read_strokes)
         loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(loop_neighboring_all, loop_neighboring_vertical)
         loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(existing_loops, read_strokes)
-
-        print("loop_neighboring_all", loop_neighboring_all.shape)
-        print("loop_neighboring_vertical", loop_neighboring_vertical.shape)
         
         # 3) Stroke to Brep
         stroke_to_brep = Preprocessing.proc_CAD.helper.stroke_to_brep(existing_loops, brep_loops, read_strokes, brep_edges)
@@ -152,8 +149,6 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
             Encoders.helper.vis_whole_graph(gnn_graph, -1)
 
             print("build !!")
-            print("gnn_graph", gnn_graph['loop'].x.shape)
-            Encoders.helper.vis_whole_graph(gnn_graph, -1)
 
             
             # 5.1) Do sketch

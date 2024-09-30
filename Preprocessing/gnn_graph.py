@@ -34,7 +34,8 @@ class SketchLoopGraph(HeteroData):
         self['loop', 'representedBy', 'stroke'].edge_index = torch.tensor(loop_stroke_edges, dtype=torch.long)
         
         # Create neighboring_vertical edges
-        vertical_edge_indices = self._create_loop_neighbor_edges(loop_neighboring_vertical)
+        self.loop_neighboring_vertical = loop_neighboring_vertical
+        vertical_edge_indices = self._create_loop_vertical_neighbor_edges(loop_neighboring_vertical)
         self['loop', 'neighboring_vertical', 'loop'].edge_index = torch.tensor(vertical_edge_indices, dtype=torch.long)
 
         # Create neighboring_horizontal edges
@@ -96,6 +97,20 @@ class SketchLoopGraph(HeteroData):
         for i in range(num_loops):
             for j in range(num_loops):
                 if loop_neighboring[i, j] == 1:
+                    loop_edge_indices[0].append(i)
+                    loop_edge_indices[1].append(j)
+        
+        return loop_edge_indices
+
+
+    def _create_loop_vertical_neighbor_edges(self, loop_neighboring):
+        """ Create non-directed edges for neighboring loops """
+        loop_edge_indices = ([], [])
+        
+        num_loops = loop_neighboring.shape[0]
+        for i in range(num_loops):
+            for j in range(num_loops):
+                if loop_neighboring[i, j] != -1:
                     loop_edge_indices[0].append(i)
                     loop_edge_indices[1].append(j)
         
@@ -223,7 +238,8 @@ class SketchLoopGraph(HeteroData):
     def _has_circle_shape(self):
         """
         Determine if there is a subgraph of loop nodes (filtered by specific conditions) that forms a circular structure
-        using 'neighboring_vertical' edges. The subgraph must have > 4 nodes.
+        using 'neighboring_vertical' edges. The subgraph must have > 4 nodes and each loop node must have a vertical
+        neighboring edge for all its representedBy stroke indices.
 
         Returns:
         bool: True if such a full shape exists, False otherwise.
@@ -233,8 +249,8 @@ class SketchLoopGraph(HeteroData):
         # Get the number of loop nodes
         num_loops = self['loop'].num_nodes
 
-        # Get edge indices for each relation
-        neighboring_vertical_edges = self['loop', 'neighboring_vertical', 'loop'].edge_index
+        # Get the 'neighboring_vertical' matrix and representedBy edges
+        loop_neighboring_vertical_matrix = self.loop_neighboring_vertical  # np.array
         represented_by_edges = self['loop', 'representedBy', 'stroke'].edge_index
 
         # Initialize an empty list to store valid loop nodes
@@ -250,15 +266,22 @@ class SketchLoopGraph(HeteroData):
                 continue
 
             # Condition B: Calculate number of neighboring_vertical and representedBy edges
-            num_vertical_edges = torch.sum(neighboring_vertical_edges[0] == loop_idx).item()
-            num_represented_by_edges = torch.sum(represented_by_edges[0] == loop_idx).item()
-            # print("num_represented_by_edges", num_represented_by_edges)
-            # print("neighboring_vertical_edges", neighboring_vertical_edges)
-            # print('-------')
+            num_vertical_edges = (loop_neighboring_vertical_matrix[loop_idx] != -1).sum()
+            num_represented_by_edges = (represented_by_edges[0] == loop_idx).sum().item()
 
             # Check if the number of vertical edges is greater than representedBy edges
             if num_vertical_edges <= num_represented_by_edges:
                 continue
+
+            # Now, get the stroke indices for this loop
+            stroke_indices = represented_by_edges[1][represented_by_edges[0] == loop_idx].tolist()  # Get the strokes it is connected to
+            
+            # Get all the stroke indices of neighboring vertical edges from loop_neighboring_vertical_matrix
+            neighboring_strokes = set(loop_neighboring_vertical_matrix[loop_idx, loop_neighboring_vertical_matrix[loop_idx] != -1].tolist())
+
+            # Check if all the stroke_indices are present in the neighboring strokes
+            if not set(stroke_indices).issubset(neighboring_strokes):
+                continue  # Skip this loop if it doesn't satisfy the condition
 
             # If both conditions are satisfied, add the loop node to valid_loop_nodes
             valid_loop_nodes.append(loop_idx)
@@ -266,8 +289,6 @@ class SketchLoopGraph(HeteroData):
         # Step 2: Check if a subgraph formed by neighboring_vertical edges contains a connected component with > 4 nodes
 
         # If there are fewer than 4 valid loops, return False
-        # print("len(valid_loop_nodes)", len(valid_loop_nodes))
-        # print('num nodes', self['loop'].x.shape)
         if len(valid_loop_nodes) < 4:
             return False
 
@@ -277,11 +298,11 @@ class SketchLoopGraph(HeteroData):
         # Add valid nodes to the graph
         G.add_nodes_from(valid_loop_nodes)
 
-        # Add neighboring_vertical edges between the valid nodes
-        for i in range(neighboring_vertical_edges.shape[1]):
-            src, tgt = neighboring_vertical_edges[:, i]
-            if src.item() in valid_loop_nodes and tgt.item() in valid_loop_nodes:
-                G.add_edge(src.item(), tgt.item())
+        # Add neighboring_vertical edges between the valid nodes based on the matrix values
+        for i in valid_loop_nodes:
+            for j in valid_loop_nodes:
+                if loop_neighboring_vertical_matrix[i, j] != -1:  # Check if a valid edge exists
+                    G.add_edge(i, j)
 
         # Step 3: Find if there is a connected component (subgraph) with > 4 nodes
         for component in nx.connected_components(G):

@@ -664,18 +664,18 @@ def loop_neighboring_simple(loops):
 
 def loop_neighboring_complex(loops, stroke_node_features):
     """
-    Determine neighboring loops based on shared edges and different normals.
+    Determine neighboring loops based on shared edges and different normals, and populate the matrix with the shared stroke index.
     
     Parameters:
     loops (list of list of int): A list where each sublist contains indices representing edges of a loop.
     stroke_node_features (np.ndarray): A (num_strokes, 7) matrix where the first 6 columns represent two 3D points forming a line.
     
     Returns:
-    np.ndarray: A matrix of shape (num_loops, num_loops) where [i, j] is 1 if loops i and j are connected, otherwise 0.
+    np.ndarray: A matrix of shape (num_loops, num_loops) where [i, j] contains the index of the shared stroke if loops i and j are connected, otherwise 0.
     """
     num_loops = len(loops)
-    # Initialize the neighboring matrix with zeros with dtype float32
-    neighboring_matrix = np.zeros((num_loops, num_loops), dtype=np.float32)
+    # Initialize the neighboring matrix with zeros, using dtype int to store stroke indices
+    neighboring_matrix = np.full((num_loops, num_loops), -1, dtype=np.int32)
     
     # Function to compute the normal of a loop
     def compute_normal(loop_indices):
@@ -730,12 +730,15 @@ def loop_neighboring_complex(loops, stroke_node_features):
     # Iterate over each pair of loops to check for shared edges and different normals
     for i in range(num_loops):
         for j in range(i + 1, num_loops):
-            # Check if loops i and j share any edge
-            if set(loops[i]).intersection(set(loops[j])):
+            # Check if loops i and j share any edge (stroke)
+            shared_strokes = set(loops[i]).intersection(set(loops[j]))
+            if shared_strokes:
+                shared_stroke = list(shared_strokes)[0]  # Take the first shared stroke
+                
                 # Check if the normals are different
                 if not np.allclose(loop_normals[i], loop_normals[j]):
-                    neighboring_matrix[i, j] = 1.0
-                    neighboring_matrix[j, i] = 1.0  # Since the matrix is symmetric
+                    neighboring_matrix[i, j] = shared_stroke
+                    neighboring_matrix[j, i] = shared_stroke  # Since the matrix is symmetric
 
     return neighboring_matrix
 
