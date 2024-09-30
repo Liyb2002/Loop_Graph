@@ -252,6 +252,9 @@ class SketchLoopGraph(HeteroData):
             # Condition B: Calculate number of neighboring_vertical and representedBy edges
             num_vertical_edges = torch.sum(neighboring_vertical_edges[0] == loop_idx).item()
             num_represented_by_edges = torch.sum(represented_by_edges[0] == loop_idx).item()
+            # print("num_represented_by_edges", num_represented_by_edges)
+            # print("neighboring_vertical_edges", neighboring_vertical_edges)
+            # print('-------')
 
             # Check if the number of vertical edges is greater than representedBy edges
             if num_vertical_edges <= num_represented_by_edges:
@@ -263,6 +266,8 @@ class SketchLoopGraph(HeteroData):
         # Step 2: Check if a subgraph formed by neighboring_vertical edges contains a connected component with > 4 nodes
 
         # If there are fewer than 4 valid loops, return False
+        # print("len(valid_loop_nodes)", len(valid_loop_nodes))
+        # print('num nodes', self['loop'].x.shape)
         if len(valid_loop_nodes) < 4:
             return False
 

@@ -8,6 +8,10 @@ from collections import Counter
 
 # --------------------------------------------------------------------------- #
 
+import numpy as np
+import networkx as nx
+from itertools import combinations, permutations
+
 def face_aggregate_addStroke(stroke_matrix):
     """
     This function finds valid loops of strokes with size 3 or 4 using NetworkX, ensuring that each loop
@@ -49,7 +53,7 @@ def face_aggregate_addStroke(stroke_matrix):
     # List to store valid groups
     valid_groups = []
 
-    # Get the nodes of the last stroke
+    # Get the nodes (points) of the last stroke
     last_start_point = tuple(np.round(last_stroke[:3], 4))
     last_end_point = tuple(np.round(last_stroke[3:], 4))
 
@@ -58,38 +62,37 @@ def face_aggregate_addStroke(stroke_matrix):
     nodes.remove(last_start_point)
     nodes.remove(last_end_point)
 
-    # Helper function to check if a set of edges forms a valid cycle
-    def check_valid_edges(edges):
+    # Helper function to check if a set of strokes forms a valid cycle
+    def check_valid_strokes(strokes):
         point_count = {}
-        for edge in edges:
-            point_count[edge[0]] = point_count.get(edge[0], 0) + 1
-            point_count[edge[1]] = point_count.get(edge[1], 0) + 1
-        # A valid cycle has each node exactly twice
+        for stroke_idx in strokes:
+            stroke = stroke_matrix[stroke_idx]
+            start_point = tuple(stroke[:3])
+            end_point = tuple(stroke[3:])
+            point_count[start_point] = point_count.get(start_point, 0) + 1
+            point_count[end_point] = point_count.get(end_point, 0) + 1
+        # A valid cycle has each point exactly twice
         return all(count == 2 for count in point_count.values())
 
-    # Check for valid loops of size 3 (2 nodes + last stroke)
-    for group_nodes in combinations(nodes, 2):
-        group_with_last = list(group_nodes) + [last_start_point, last_end_point]
-        # Check if these nodes can form a valid subgraph
-        if nx.is_connected(G.subgraph(group_with_last)):
-            # Generate all permutations of the edges
-            for perm_edges in permutations(combinations(group_with_last, 2), 3):
-                if check_valid_edges(perm_edges):
-                    strokes_in_group = [edge_to_stroke_id.get(edge) or edge_to_stroke_id.get((edge[1], edge[0])) for edge in perm_edges]
-                    if None not in strokes_in_group:  # Ensure all edges are found in the mapping
-                        valid_groups.append(sorted(strokes_in_group))
+    # Check for valid loops of size 3 (3 strokes, including the last one)
+    for group_nodes in combinations(nodes, 1):  # Find one additional point (last stroke gives 2 points)
+        group_with_last = [last_start_point, last_end_point] + list(group_nodes)
+        # Find all possible combinations of strokes that connect these 3 points
+        for perm_edges in permutations(combinations(group_with_last, 2), 3):
+            strokes_in_group = [edge_to_stroke_id.get(edge) or edge_to_stroke_id.get((edge[1], edge[0])) for edge in perm_edges]
+            if None not in strokes_in_group and check_valid_strokes(strokes_in_group):
+                if edge_to_stroke_id[(last_start_point, last_end_point)] in strokes_in_group:
+                    valid_groups.append(sorted(strokes_in_group))
 
-    # Check for valid loops of size 4 (3 nodes + last stroke)
-    for group_nodes in combinations(nodes, 3):
-        group_with_last = list(group_nodes) + [last_start_point, last_end_point]
-        # Check if these nodes can form a valid subgraph
-        if nx.is_connected(G.subgraph(group_with_last)):
-            # Generate all permutations of the edges
-            for perm_edges in permutations(combinations(group_with_last, 2), 4):
-                if check_valid_edges(perm_edges):
-                    strokes_in_group = [edge_to_stroke_id.get(edge) or edge_to_stroke_id.get((edge[1], edge[0])) for edge in perm_edges]
-                    if None not in strokes_in_group:  # Ensure all edges are found in the mapping
-                        valid_groups.append(sorted(strokes_in_group))
+    # Check for valid loops of size 4 (4 strokes, including the last one)
+    for group_nodes in combinations(nodes, 2):  # Find two additional points (last stroke gives 2 points)
+        group_with_last = [last_start_point, last_end_point] + list(group_nodes)
+        # Find all possible combinations of strokes that connect these 4 points
+        for perm_edges in permutations(combinations(group_with_last, 2), 4):
+            strokes_in_group = [edge_to_stroke_id.get(edge) or edge_to_stroke_id.get((edge[1], edge[0])) for edge in perm_edges]
+            if None not in strokes_in_group and check_valid_strokes(strokes_in_group):
+                if edge_to_stroke_id[(last_start_point, last_end_point)] in strokes_in_group:
+                    valid_groups.append(sorted(strokes_in_group))
 
     # Remove duplicate loops by converting to a set of frozensets
     unique_groups = list(set(frozenset(group) for group in valid_groups))
@@ -102,7 +105,7 @@ def face_aggregate_addStroke(stroke_matrix):
             stroke = stroke_matrix[edge_id]
             points.add(tuple(stroke[:3]))
             points.add(tuple(stroke[3:]))
-        if len(points) == len(group):
+        if len(points) == len(group):  # A valid cycle should have exactly len(group) + 1 unique points
             final_groups.append(group)
 
     return final_groups
