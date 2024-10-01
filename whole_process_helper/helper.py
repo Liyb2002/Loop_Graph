@@ -129,7 +129,7 @@ def extract_unique_points(sketch_selection_mask, gnn_graph):
 
     # 2. Find the stroke nodes connected to this loop node via 'representedBy' edges
     # Edge indices for 'loop' -> 'stroke' are stored in gnn_graph['loop', 'representedBy', 'stroke'].edge_index
-    loop_stroke_edges = gnn_graph['loop', 'representedBy', 'stroke'].edge_index
+    loop_stroke_edges = gnn_graph['loop', 'represented_by', 'stroke'].edge_index
     connected_stroke_indices = loop_stroke_edges[1][loop_stroke_edges[0] == max_prob_loop_idx]  # Get stroke indices for the selected loop
 
     # 3. Extract points from the connected stroke nodes

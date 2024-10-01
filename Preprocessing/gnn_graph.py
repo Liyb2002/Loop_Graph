@@ -30,9 +30,10 @@ class SketchLoopGraph(HeteroData):
         self['loop'].x = self._compute_loop_features(stroke_cloud_loops, loop_to_brep)
 
         # Create edges between loops and strokes
-        loop_stroke_edges = self._create_loop_stroke_edges(stroke_cloud_loops)
-        self['loop', 'representedBy', 'stroke'].edge_index = torch.tensor(loop_stroke_edges, dtype=torch.long)
-        
+        stroke_loop_edges, loop_stroke_edges= self._create_loop_stroke_edges(stroke_cloud_loops)
+        self['stroke', 'represents', 'loop'].edge_index = torch.tensor(stroke_loop_edges, dtype=torch.long)
+        self['loop', 'represented_by', 'stroke'].edge_index = torch.tensor(loop_stroke_edges, dtype=torch.long)
+
         # Create neighboring_vertical edges
         self.loop_neighboring_vertical = loop_neighboring_vertical
         vertical_edge_indices = self._create_loop_vertical_neighbor_edges(loop_neighboring_vertical)
@@ -87,7 +88,7 @@ class SketchLoopGraph(HeteroData):
                 loop_indices.append(loop_idx)  # Connect the current loop node
                 stroke_indices.append(stroke_idx)  # To each stroke node in the sublist
         
-        return [loop_indices, stroke_indices]
+        return [stroke_indices, loop_indices], [loop_indices, stroke_indices]
 
     def _create_loop_neighbor_edges(self, loop_neighboring):
         """ Create non-directed edges for neighboring loops """
@@ -214,7 +215,7 @@ class SketchLoopGraph(HeteroData):
         # Get edge indices for each relation
         neighboring_vertical_edges = self['loop', 'neighboring_vertical', 'loop'].edge_index
         neighboring_horizontal_edges = self['loop', 'neighboring_horizontal', 'loop'].edge_index
-        represented_by_edges = self['loop', 'representedBy', 'stroke'].edge_index
+        represented_by_edges = self['loop', 'represented_by', 'stroke'].edge_index
 
         # Iterate through all loop nodes
         for loop_idx in range(num_loops):
@@ -251,7 +252,7 @@ class SketchLoopGraph(HeteroData):
 
         # Get the 'neighboring_vertical' matrix and representedBy edges
         loop_neighboring_vertical_matrix = self.loop_neighboring_vertical  # np.array
-        represented_by_edges = self['loop', 'representedBy', 'stroke'].edge_index
+        represented_by_edges = self['loop', 'represented_by', 'stroke'].edge_index
 
         # Initialize an empty list to store valid loop nodes
         valid_loop_nodes = []

@@ -268,16 +268,16 @@ def vis_whole_graph(graph, selected_loop):
     loop_selection_masks (np.ndarray or torch.Tensor): A binary mask of shape (num_loops, 1), where 1 indicates a chosen loop.
     """
 
-    # Extract loop-stroke connection edges and stroke features
-    loops_to_strokes = graph['loop', 'representedBy', 'stroke'].edge_index
+    # Extract stroke-loop connection edges and stroke features
+    strokes_to_loops = graph['stroke', 'represents', 'loop'].edge_index
     stroke_node_features = graph['stroke'].x.numpy()
 
     # Convert edge indices to a more accessible format
-    loop_to_strokes = {}
-    for loop_idx, stroke_idx in zip(loops_to_strokes[0], loops_to_strokes[1]):
-        if loop_idx.item() not in loop_to_strokes:
-            loop_to_strokes[loop_idx.item()] = []
-        loop_to_strokes[loop_idx.item()].append(stroke_idx.item())
+    stroke_to_loops = {}
+    for stroke_idx, loop_idx in zip(strokes_to_loops[0], strokes_to_loops[1]):
+        if loop_idx.item() not in stroke_to_loops:
+            stroke_to_loops[loop_idx.item()] = []
+        stroke_to_loops[loop_idx.item()].append(stroke_idx.item())
 
     # Initialize the 3D plot
     fig = plt.figure()
@@ -290,7 +290,7 @@ def vis_whole_graph(graph, selected_loop):
     z_min, z_max = float('inf'), float('-inf')
 
     # Plot all loops in blue
-    for loop_idx, stroke_indices in loop_to_strokes.items():
+    for loop_idx, stroke_indices in stroke_to_loops.items():
         for idx in stroke_indices:
             stroke = stroke_node_features[idx]
             start, end = stroke[:3], stroke[3:6]
@@ -303,7 +303,7 @@ def vis_whole_graph(graph, selected_loop):
             ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1, alpha=0.5)
 
     # Plot chosen loops in red
-    for loop_idx, stroke_indices in loop_to_strokes.items():
+    for loop_idx, stroke_indices in stroke_to_loops.items():
         if loop_idx == selected_loop:  # Plot only the selected loop
             for idx in stroke_indices:
                 stroke = stroke_node_features[idx]
@@ -330,7 +330,6 @@ def vis_whole_graph(graph, selected_loop):
 
     # Show plot
     plt.show()
-
 
 def vis_used_graph(graph):
     """

@@ -48,7 +48,7 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/very_messy')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -168,7 +168,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/very_messy')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -230,6 +230,9 @@ def eval():
             x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
             output = graph_decoder(x_dict)
             
+            # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
+            # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+
 
             if x_dict['loop'].shape[0] < 15: 
                 lv1_total += 1
@@ -252,8 +255,8 @@ def eval():
                     lv4_correct += 1
 
             # else:
-            #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
-            #     Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+                # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
+                # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
 
 
             loss = criterion(output, loop_selection_mask)
