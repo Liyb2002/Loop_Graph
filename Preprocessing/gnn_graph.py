@@ -27,7 +27,7 @@ class SketchLoopGraph(HeteroData):
         self['stroke'].x = torch.tensor(stroke_node_features, dtype=torch.float)
 
         # Loop node features based on whether the loop is used (repeated 7 times)
-        self['loop'].x = self._compute_loop_features(stroke_cloud_loops, loop_to_brep)
+        self._compute_loop_features(stroke_cloud_loops, loop_to_brep)
 
         # Create edges between loops and strokes
         stroke_loop_edges, loop_stroke_edges= self._create_loop_stroke_edges(stroke_cloud_loops)
@@ -76,7 +76,30 @@ class SketchLoopGraph(HeteroData):
             loop_feature = [last_value] * 7
             loop_features.append(loop_feature)
 
-        return torch.tensor(loop_features, dtype=torch.float)
+        self['loop'].x = torch.tensor(loop_features, dtype=torch.float)
+        return 
+
+    def set_loop_features(self, loop_to_brep):
+        # Erase the current loop features
+        num_loops = self['loop'].num_nodes
+        self['loop'].x = torch.zeros((num_loops, 7), dtype=torch.float)  # Set all features to 0 initially
+
+        # Recompute the loop features using loop_to_brep
+        loop_features = []
+        for loop_idx in range(num_loops):
+            if loop_to_brep.shape[0] == 0:
+                last_value = 0  # If loop_to_brep is empty, set to 0
+            else:
+                # Compute the last value: 1 if any value in the row is 1, otherwise 0
+                last_value = float(loop_to_brep[loop_idx, :].sum() > 0)
+
+            # Repeat the last_value 7 times for the loop feature
+            loop_feature = [last_value] * 7
+            loop_features.append(loop_feature)
+
+        # Update the loop features
+        self['loop'].x = torch.tensor(loop_features, dtype=torch.float)
+
 
     def _create_loop_stroke_edges(self, stroke_cloud_loops):
         loop_indices = []

@@ -256,7 +256,6 @@ class Brep:
         for count in range(0, self.idx):
             op = self.op[count][0]
             self.write_Op(self.op[count], count, data)
-            break
         
         self.write_terminate(data)  
 
@@ -308,7 +307,6 @@ class Brep:
         
         for vertex in self.Vertices:
             if vertex.id.split('_')[1] == str(index):
-                print("vertex.id", vertex.id)
                 vertex = {
                     'id': vertex.id,
                     'coordinates': vertex.position 

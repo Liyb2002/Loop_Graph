@@ -25,7 +25,7 @@ import torch.nn as nn
 import torch.optim as optim
 import os
 import shutil
-
+import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
@@ -51,7 +51,7 @@ sketch_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_
 def predict_sketch(gnn_graph):
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     sketch_selection_mask = sketch_graph_decoder(x_dict)
-    # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(sketch_selection_mask))
+    Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(sketch_selection_mask))
 
     return sketch_selection_mask
 
@@ -77,7 +77,7 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
 
     x_dict = extrude_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     extrude_selection_mask = extrude_graph_decoder(x_dict)
-    # Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask.detach())
+    Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask.detach())
     return extrude_selection_mask
 
 # This extrude_amount, extrude_direction is not total correct. Work on it later
@@ -88,7 +88,31 @@ def do_extrude(gnn_graph, sketch_selection_mask):
 
 
 # --------------------- Cascade Brep Features --------------------- #
-pass
+def cascade_brep(brep_files):
+    final_brep_edges_list = []
+    prev_brep_edges = []
+
+    for file_name in brep_files:
+        brep_directory = os.path.join(output_dir, 'canvas')
+        brep_file_path = os.path.join(brep_directory, file_name)
+
+        edge_features_list, _= Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
+        if len(prev_brep_edges) == 0:
+            final_brep_edges_list = edge_features_list
+            prev_brep_edges = edge_features_list
+            new_features = edge_features_list
+        else:
+            # We already have brep
+            new_features= Preprocessing.generate_dataset.find_new_features(prev_brep_edges, edge_features_list) 
+            final_brep_edges_list += new_features
+            prev_brep_edges = edge_features_list
+    
+    final_brep_edges = np.array(final_brep_edges_list)
+    final_brep_edges = np.round(final_brep_edges, 4)
+    brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(final_brep_edges)
+
+    return final_brep_edges, brep_loops
+
 
 
 # --------------------- Main Code --------------------- #
@@ -103,6 +127,7 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
     # Init Brep
     brep_edges = torch.zeros(0)
     brep_loops = []
+    file_path = os.path.join(output_dir, 'Program.json')
 
 
     # Program State Init
@@ -112,7 +137,6 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
 
     # Strokes / Loops in the Graph
     stroke_in_graph = 0
-    prev_loops_in_graph = 0
     existing_loops = []
 
     while stroke_in_graph < stroke_node_features.shape[0]:
@@ -170,8 +194,25 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
             cur__brep_class.write_to_json(output_dir)
 
 
+            # 5.4) Read the program and produce the brep file
+            if os.path.exists(output_relative_dir):
+                shutil.rmtree(output_relative_dir)
+            os.makedirs(output_relative_dir, exist_ok=True)
+
+            parsed_program_class = Preprocessing.proc_CAD.Program_to_STL.parsed_program(file_path, output_dir)
+            parsed_program_class.read_json_file()
+
+
+            # 5.5) Read brep file
+            brep_files = [file_name for file_name in os.listdir(os.path.join(output_dir, 'canvas'))
+                    if file_name.startswith('brep_') and file_name.endswith('.step')]
+            brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+
+
+            # 5.6) Update brep data
+            brep_edges, brep_loops = cascade_brep(brep_files)
+
+
         # n) Lastly, update the strokes 
         stroke_in_graph += 1
-        prev_loops_in_graph = gnn_graph['loop'].x.shape[0]
-        print("gnn_graph._full_shape()", gnn_graph._full_shape())
         print('------')
