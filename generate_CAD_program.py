@@ -29,7 +29,7 @@ import shutil
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
 
 
 # --------------------- Directory --------------------- #
@@ -42,6 +42,8 @@ output_relative_dir = ('program_output/canvas')
 # --------------------- Skecth Network --------------------- #
 sketch_graph_encoder = Encoders.gnn.gnn.SemanticModule()
 sketch_graph_decoder = Encoders.gnn.gnn.Sketch_Decoder()
+sketch_graph_encoder.eval()
+sketch_graph_decoder.eval()
 sketch_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
 sketch_graph_encoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_encoder.pth')))
 sketch_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_decoder.pth')))
@@ -50,12 +52,14 @@ def predict_sketch(gnn_graph):
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     sketch_selection_mask = sketch_graph_decoder(x_dict)
 
+    print("sketch_selection_mask", sketch_selection_mask)
     return sketch_selection_mask
 
 def do_sketch(gnn_graph):
     sketch_selection_mask = predict_sketch(gnn_graph)
     sketch_points = whole_process_helper.helper.extract_unique_points(sketch_selection_mask, gnn_graph)
     normal = [1, 0, 0]
+    sketch_selection_mask = whole_process_helper.helper.clean_mask(sketch_selection_mask)
 
     return sketch_selection_mask, sketch_points, normal
 
@@ -63,8 +67,10 @@ def do_sketch(gnn_graph):
 extrude_graph_encoder = Encoders.gnn.gnn.SemanticModule()
 extrude_graph_decoder = Encoders.gnn.gnn.Extrude_Decoder()
 extrude_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction')
-extrude_graph_encoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_encoder.pth')))
-extrude_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_decoder.pth')))
+extrude_graph_encoder.eval()
+extrude_graph_decoder.eval()
+extrude_graph_encoder.load_state_dict(torch.load(os.path.join(extrude_dir, 'graph_encoder.pth')))
+extrude_graph_decoder.load_state_dict(torch.load(os.path.join(extrude_dir, 'graph_decoder.pth')))
 
 def predict_extrude(gnn_graph, sketch_selection_mask):
     gnn_graph.set_select_sketch(sketch_selection_mask)
@@ -72,6 +78,7 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
     x_dict = extrude_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     extrude_selection_mask = extrude_graph_decoder(x_dict)
 
+    Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(sketch_selection_mask))
     Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask.detach())
     return extrude_selection_mask
 
@@ -144,13 +151,11 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
         )
         
         
+        next = 0
         # 5) If it satisfy the condition, we can build the operations
         if gnn_graph._full_shape and gnn_graph._has_circle_shape():
-            Encoders.helper.vis_whole_graph(gnn_graph, -1)
-
             print("build !!")
 
-            
             # 5.1) Do sketch
             sketch_selection_mask, sketch_points, normal = do_sketch(gnn_graph)
             cur__brep_class._sketch_op(sketch_points, normal, sketch_points)
@@ -166,7 +171,11 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
 
 
             # 5.3) Write to brep
-            cur__brep_class.write_to_json(output_dir)
+            # cur__brep_class.write_to_json(output_dir)
+            next = 1
+        
+        if next == 1:
+            break
 
         # n) Lastly, update the strokes 
         stroke_in_graph += 1

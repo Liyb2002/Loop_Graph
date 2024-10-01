@@ -207,3 +207,18 @@ def extrude_strokes(gnn_graph, extrude_selection_mask):
     selected_stroke_feature = stroke_features[max_prob_stroke_idx]
 
     return selected_stroke_feature
+
+
+
+def clean_mask(sketch_selection_mask):
+    # Find the index of the maximum value in the sketch_selection_mask
+    max_index = torch.argmax(sketch_selection_mask)
+
+    # Create a tensor of zeros with the same shape as sketch_selection_mask
+    cleaned_mask = torch.zeros_like(sketch_selection_mask)
+
+    # Set the row with the highest probability to 1
+    cleaned_mask[max_index] = 1
+
+    return cleaned_mask
+    
