@@ -55,6 +55,9 @@ class Brep:
         self.Faces.append(face)
         
         self.idx += 1
+
+        if type(boundary_points) != list:
+            boundary_points = boundary_points.tolist()
         self.op.append(['sketch', boundary_points])
 
 
@@ -253,8 +256,10 @@ class Brep:
         for count in range(0, self.idx):
             op = self.op[count][0]
             self.write_Op(self.op[count], count, data)
+            break
+        
+        self.write_terminate(data)  
 
-        self.write_terminate(data)        
         with open(filename, 'w') as f:
             json.dump(data, f, indent=4)
         
@@ -269,7 +274,7 @@ class Brep:
             'vertices': []
         }
 
-                # Add each point with an ID to the vertices list
+        # Add each point with an ID to the vertices list
         
         for face in self.Faces:
             if face.id.split('_')[1] == str(index):
@@ -303,9 +308,10 @@ class Brep:
         
         for vertex in self.Vertices:
             if vertex.id.split('_')[1] == str(index):
+                print("vertex.id", vertex.id)
                 vertex = {
                     'id': vertex.id,
-                    'coordinates': vertex.position  # Convert numpy array to list for JSON serialization
+                    'coordinates': vertex.position 
                 }
                 operation['vertices'].append(vertex)
         

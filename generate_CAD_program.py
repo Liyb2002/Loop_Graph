@@ -51,8 +51,8 @@ sketch_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_
 def predict_sketch(gnn_graph):
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     sketch_selection_mask = sketch_graph_decoder(x_dict)
+    # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(sketch_selection_mask))
 
-    print("sketch_selection_mask", sketch_selection_mask)
     return sketch_selection_mask
 
 def do_sketch(gnn_graph):
@@ -77,15 +77,12 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
 
     x_dict = extrude_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     extrude_selection_mask = extrude_graph_decoder(x_dict)
-
-    Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(sketch_selection_mask))
-    Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask.detach())
+    # Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask.detach())
     return extrude_selection_mask
 
 # This extrude_amount, extrude_direction is not total correct. Work on it later
 def do_extrude(gnn_graph, sketch_selection_mask):
     extrude_selection_mask = predict_extrude(gnn_graph, sketch_selection_mask)
-    print("extrude stroke", whole_process_helper.helper.extrude_strokes(gnn_graph, extrude_selection_mask))
     extrude_amount, extrude_direction = whole_process_helper.helper.get_extrude_amount(gnn_graph, extrude_selection_mask)
     return extrude_amount, extrude_direction
 
@@ -151,7 +148,6 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
         )
         
         
-        next = 0
         # 5) If it satisfy the condition, we can build the operations
         if gnn_graph._full_shape and gnn_graph._has_circle_shape():
             print("build !!")
@@ -171,11 +167,8 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
 
 
             # 5.3) Write to brep
-            # cur__brep_class.write_to_json(output_dir)
-            next = 1
-        
-        if next == 1:
-            break
+            cur__brep_class.write_to_json(output_dir)
+
 
         # n) Lastly, update the strokes 
         stroke_in_graph += 1
