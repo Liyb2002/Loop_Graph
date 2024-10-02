@@ -268,6 +268,8 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
     matched_brep_edges = []
     for sketch_stroke in grouped_sketch_strokes:
         for brep_edge in brep_edges:
+            brep_edge = torch.from_numpy(brep_edge).float()
+
             if torch.allclose(sketch_stroke, brep_edge, atol=1e-4):
                 matched_brep_edges.append(brep_edge)
                 break
