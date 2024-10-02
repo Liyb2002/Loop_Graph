@@ -112,6 +112,50 @@ def face_aggregate_addStroke(stroke_matrix):
 
 
 
+# --------------------------------------------------------------------------- #
+
+
+def are_neighbors(pointA, pointB):
+    """
+    Check if two points are 'neighbors', meaning only one coordinate is different.
+    
+    Parameters:
+    pointA, pointB (torch.Tensor): Tensors representing two 3D points.
+    
+    Returns:
+    bool: True if the points are neighbors, False otherwise.
+    """
+    diff = (pointA != pointB).sum().item()  # Count the number of different coordinates
+    return diff == 1  # Neighboring points must differ by exactly one coordinate
+
+
+def reorder_points_to_neighbors(unique_points):
+    """
+    Reorder points so that each point in the list is neighboring to the next one.
+    
+    Parameters:
+    unique_points (torch.Tensor): Tensor of unique 3D points.
+    
+    Returns:
+    ordered_points (torch.Tensor): Tensor of ordered points where each point is neighboring to the next one.
+    """
+    ordered_points = [unique_points[0]]  # Start with the first point
+    remaining_points = unique_points[1:].tolist()  # Convert remaining points to a list for easier manipulation
+
+    # Greedy algorithm to reorder points based on the neighboring condition
+    while remaining_points:
+        last_point = ordered_points[-1]
+        # Find the first neighboring point from the remaining points
+        for i, candidate in enumerate(remaining_points):
+            candidate_tensor = torch.tensor(candidate)
+            if are_neighbors(last_point, candidate_tensor):
+                ordered_points.append(candidate_tensor)
+                remaining_points.pop(i)
+                break
+    
+    return torch.stack(ordered_points)  # Convert the list back to a tensor
+
+
 def extract_unique_points(sketch_selection_mask, gnn_graph):
     """
     Extract the unique points from the strokes connected to the loop with the highest probability in the selection mask.
@@ -146,9 +190,16 @@ def extract_unique_points(sketch_selection_mask, gnn_graph):
     points_tensor = torch.stack(points)  
     unique_points_tensor = torch.unique(points_tensor, dim=0)  
 
-    return unique_points_tensor
+    # 5. Reorder points so that each point is neighboring to the next one
+    ordered_points_tensor = reorder_points_to_neighbors(unique_points_tensor)
+
+    return ordered_points_tensor
 
 
+
+
+
+# --------------------------------------------------------------------------- #
 
 
 def get_extrude_amount(gnn_graph, extrude_selection_mask):

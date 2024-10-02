@@ -187,7 +187,7 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
             extrude_amount, extrude_direction = do_extrude(gnn_graph, sketch_selection_mask)
             print("extrude_direction", extrude_direction)
 
-            cur__brep_class.extrude_op(extrude_amount, extrude_direction)
+            cur__brep_class.extrude_op(abs(extrude_amount), extrude_direction)
 
 
             # 5.3) Write to brep
