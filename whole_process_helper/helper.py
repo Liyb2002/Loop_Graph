@@ -233,7 +233,7 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
     point2 = stroke_feature[3:6]
     
     # 3. Determine the common axis and value from the coplanar sketch_points
-    sketch_points = torch.tensor(sketch_points)
+    sketch_points = torch.tensor(sketch_points, dtype=torch.float32)  # Convert to float32 for consistency
     common_axes = (torch.all(sketch_points[:, 0] == sketch_points[0, 0]),
                    torch.all(sketch_points[:, 1] == sketch_points[0, 1]),
                    torch.all(sketch_points[:, 2] == sketch_points[0, 2]))
@@ -260,21 +260,26 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
     if brep_edges.shape[0] == 0:
         return stroke_length, direction_vector
 
-    # 7. Group sketch_points into strokes and find corresponding strokes in brep
-    # Assuming sketch_points are organized in pairs like strokes
-    grouped_sketch_strokes = sketch_points.view(-1, 6)  # Reshape into (num_sketch_strokes, 6)
-    
-    # Find matching brep edges that correspond to sketch strokes
-    matched_brep_edges = []
-    for sketch_stroke in grouped_sketch_strokes:
-        for brep_edge in brep_edges:
-            brep_edge = torch.from_numpy(brep_edge).float()
+    # 7. Permute sketch_points into strokes (pairs of points)
+    from itertools import permutations
+    sketch_strokes = []
+    for pair in permutations(sketch_points, 2):
+        sketch_strokes.append(torch.cat(pair))  # Concatenate two 3D points to form a stroke (6 values)
+    sketch_strokes = torch.stack(sketch_strokes)  # Convert list to tensor
 
+    # 8. Find matching brep edges that correspond to sketch strokes
+    matched_brep_edges = []
+    brep_edges = torch.tensor(brep_edges, dtype=torch.float32)  # Convert brep_edges to float32 for consistency
+    for sketch_stroke in sketch_strokes:
+        if sketch_stroke.dtype != brep_edges.dtype:
+            sketch_stroke = sketch_stroke.to(brep_edges.dtype)  # Ensure same dtype
+
+        for brep_edge in brep_edges:
             if torch.allclose(sketch_stroke, brep_edge, atol=1e-4):
                 matched_brep_edges.append(brep_edge)
                 break
 
-    # 8. Find the edges extending from the brep and compute their directions
+    # 9. Find the edges extending from the brep and compute their directions
     if matched_brep_edges:
         # Compute the direction of the brep edge (similar to the extrusion direction)
         brep_edge = matched_brep_edges[0]  # Use the first matched brep edge
@@ -282,7 +287,7 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
         brep_point2 = brep_edge[3:6]
         brep_direction = (brep_point2 - brep_point1).tolist()
 
-        # 9. Check if brep_direction is opposite to direction_vector
+        # 10. Check if brep_direction is opposite to direction_vector
         dot_product = sum(brep_direction[i] * direction_vector[i] for i in range(3))
 
         # If directions are opposite (dot product < 0), stroke_length should be positive, otherwise negative

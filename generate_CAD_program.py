@@ -117,7 +117,7 @@ def cascade_brep(brep_files):
 
 # --------------------- Main Code --------------------- #
 for data in tqdm(dataset, desc=f"Generating CAD Progams"):
-    stroke_cloud_loops, stroke_node_features, _, _, _, _, _, _, _, _ = data
+    stroke_cloud_loops, stroke_node_features, _, _, _, _, _, _, _ ,_ = data
     
     print("NEW SHAPE -----------------!")
     # We only want to process complicated shapes
@@ -152,23 +152,28 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
 
         # 2) Compute stroke / loop information 
         connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(read_strokes)
+        strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(read_strokes, connected_stroke_nodes)
+
+
         loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(existing_loops)
         loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(existing_loops, read_strokes)
         loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(loop_neighboring_all, loop_neighboring_vertical)
         loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(existing_loops, read_strokes)
         
         # 3) Stroke to Brep
-        stroke_to_brep = Preprocessing.proc_CAD.helper.stroke_to_brep(existing_loops, brep_loops, read_strokes, brep_edges)
+        stroke_to_loop = Preprocessing.proc_CAD.helper.stroke_to_brep(existing_loops, brep_loops, read_strokes, brep_edges)
+        stroke_to_edge = Preprocessing.proc_CAD.helper.stroke_to_edge(read_strokes, brep_edges)
 
         # 4) Build graph & check validity of the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             existing_loops, 
             read_strokes, 
-            connected_stroke_nodes,
+            strokes_perpendicular, 
             loop_neighboring_vertical, 
             loop_neighboring_horizontal, 
             loop_neighboring_contained,
-            stroke_to_brep
+            stroke_to_loop,
+            stroke_to_edge
         )
         
         
