@@ -614,7 +614,7 @@ def reorder_loops(loops):
     return reordered_loops
 
 
-def swap_rows_with_probability(matrix_a, matrix_b, swap_range=20, swap_prob=1.0):
+def swap_rows_with_probability(matrix_a, matrix_b, swap_range=5, swap_prob=0.3):
     num_rows = matrix_a.shape[0]
     
     for i in range(num_rows):
@@ -763,6 +763,47 @@ def coplanr_neighorbing_loop(matrix1, matrix2):
     result_matrix = np.where((matrix1 == 1) & (matrix2 != 1), 1, 0)
     
     return result_matrix
+    
+
+
+def stroke_relations(stroke_node_features, connected_stroke_nodes):
+    num_strokes = stroke_node_features.shape[0]
+    
+    # Initialize the result matrices with zeros
+    strokes_perpendicular = np.zeros((num_strokes, num_strokes), dtype=int)
+    strokes_non_perpendicular = np.zeros((num_strokes, num_strokes), dtype=int)
+    
+    # Function to calculate the direction vector of a stroke
+    def get_direction_vector(stroke_features):
+        point1 = stroke_features[:3]  # First 3D point
+        point2 = stroke_features[3:6]  # Second 3D point
+        return point2 - point1  # Direction vector
+
+    # Iterate over all pairs of strokes
+    for i in range(num_strokes):
+        for j in range(num_strokes):
+            if connected_stroke_nodes[i, j] == 1:
+                # Get the direction vectors for strokes i and j
+                vector_i = get_direction_vector(stroke_node_features[i])
+                vector_j = get_direction_vector(stroke_node_features[j])
+                
+                # Calculate the cross product
+                cross_product = np.cross(vector_i, vector_j)
+                
+                # Calculate the dot product
+                dot_product = np.dot(vector_i, vector_j)
+                
+                # Check if the strokes are perpendicular
+                if np.isclose(dot_product, 0):
+                    strokes_perpendicular[i, j] = 1
+                else:
+                    strokes_non_perpendicular[i, j] = 1
+            else:
+                # If not connected, they remain 0 in both matrices
+                strokes_perpendicular[i, j] = 0
+                strokes_non_perpendicular[i, j] = 0
+    
+    return strokes_perpendicular, strokes_non_perpendicular
     
 
 
@@ -928,6 +969,38 @@ def connected_strokes(stroke_node_features):
  
 
 #----------------------------------------------------------------------------------#
+def stroke_to_edge(stroke_node_features, final_brep_edges):
+    """
+    Determines if each stroke is used in the final BRep edges.
+    
+    Parameters:
+    stroke_node_features (np.ndarray): A matrix of shape (num_strokes, 7), where the first 6 columns represent two 3D points.
+    final_brep_edges (np.ndarray): A matrix of shape (num_brep_edges, 6) representing two 3D points for each edge.
+    
+    Returns:
+    np.ndarray: A column matrix with shape (num_stroke_node_features, 1) where each entry is 1 if the stroke is used, otherwise 0.
+    """
+    
+    # Initialize the output matrix to zeros
+    num_strokes = stroke_node_features.shape[0]
+    stroke_used_matrix = np.zeros((num_strokes, 1), dtype=np.float32)
+    
+    # Step 1: Find matching between stroke_node_features and final_brep_edges
+    for stroke_idx, stroke in enumerate(stroke_node_features):
+        stroke_points = set(map(tuple, [stroke[:3], stroke[3:6]]))  # Get the start and end points of the stroke
+        
+        for brep_edge in final_brep_edges:
+            brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))  # Get the start and end points of the BRep edge
+            
+            # Check if stroke points are part of any brep edge
+            if stroke_points.issubset(brep_points) or brep_points.issubset(stroke_points):
+                stroke_used_matrix[stroke_idx] = 1  # Mark this stroke as used
+                break  # No need to check further once a match is found
+    
+    return stroke_used_matrix
+
+
+
 def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges):
     """
     Find the correspondence between stroke loops and brep loops and visualize unrepresented stroke loops.

@@ -5,6 +5,8 @@ import Preprocessing.gnn_graph_stroke
 import Encoders.gnn.gnn
 import Encoders.helper
 
+import Preprocessing.proc_CAD
+import Preprocessing.proc_CAD.helper
 from torch_geometric.loader import DataLoader
 
 from tqdm import tqdm
@@ -23,7 +25,7 @@ graph_decoder = Encoders.gnn.gnn.Extrude_Decoder()
 graph_encoder.to(device)
 graph_decoder.to(device)
 
-criterion = Encoders.gnn.gnn.FocalLoss(alpha=0.9, gamma=3.0)
+criterion = nn.BCELoss()
 optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
 
 # ------------------------------------------------------------------------------# 
@@ -46,10 +48,10 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
     print(f"Total number of shape data: {len(dataset)}")
     
-    best_val_loss = float('inf')
+    best_accuracy = 0
     epochs = 100
     
     graphs = []
@@ -58,8 +60,8 @@ def train():
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
-        
+        stroke_cloud_loops, stroke_node_features, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_loop, stroke_to_edge ,stroke_operations_order_matrix = data
+
         stroke_selection_mask = stroke_operations_order_matrix[:, -1].reshape(-1, 1)
         sketch_selection_mask = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
         extrude_selection_mask = Encoders.helper.choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features)
@@ -81,22 +83,25 @@ def train():
 
 
         stroke_node_features = torch.tensor(stroke_node_features, dtype=torch.float32)
-        final_brep_edges = torch.tensor(final_brep_edges, dtype=torch.float32)
 
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
             stroke_node_features, 
-            connected_stroke_nodes,
+            strokes_perpendicular, 
             loop_neighboring_vertical, 
             loop_neighboring_horizontal, 
             loop_neighboring_contained,
-            stroke_to_brep
+            stroke_to_loop,
+            stroke_to_edge
         )
 
         gnn_graph.set_select_sketch(sketch_loop_selection_mask)
 
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
+
+        if len(graphs) > 4000:
+            break
         # Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask)
 
 
@@ -118,13 +123,16 @@ def train():
         total = 0
 
 
-        for gnn_graph, loop_selection_mask in tqdm(zip(train_graphs, train_masks), desc=f"Epoch {epoch+1}/{epochs} - Training", dynamic_ncols=True):
+        for gnn_graph, sketch_selection_mask in tqdm(zip(train_graphs, train_masks), desc=f"Epoch {epoch+1}/{epochs} - Training", dynamic_ncols=True):
             optimizer.zero_grad()
             x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
             output = graph_decoder(x_dict)
 
             
-            loss = criterion(output, loop_selection_mask)
+            # Encoders.helper.vis_stroke_graph(gnn_graph, sketch_selection_mask)
+            # Encoders.helper.vis_stroke_graph(gnn_graph, output.detach())
+
+            loss = criterion(output, sketch_selection_mask)
             
             loss.backward()
             optimizer.step()
@@ -161,8 +169,8 @@ def train():
         accuracy = correct / total if total > 0 else 0
         print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.5f} - Validation Loss: {val_loss:.5f} - Validation Accuracy: {accuracy:.5f}")
 
-        if val_loss <  best_val_loss:
-            best_val_loss = val_loss
+        if best_accuracy <  accuracy:
+            best_accuracy = accuracy
             save_models()
             print(f"Models saved at epoch {epoch+1} with validation accuracy: {accuracy:.5f}")
 
@@ -192,7 +200,7 @@ def eval():
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
+        stroke_cloud_loops, stroke_node_features, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_loop, stroke_to_edge ,stroke_operations_order_matrix = data
         
         stroke_selection_mask = stroke_operations_order_matrix[:, -1].reshape(-1, 1)
         sketch_selection_mask = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
@@ -215,14 +223,16 @@ def eval():
         stroke_node_features = torch.tensor(stroke_node_features, dtype=torch.float32)
         final_brep_edges = torch.tensor(final_brep_edges, dtype=torch.float32)
 
+
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
             stroke_node_features, 
-            connected_stroke_nodes,
+            strokes_perpendicular, 
             loop_neighboring_vertical, 
             loop_neighboring_horizontal, 
             loop_neighboring_contained,
-            stroke_to_brep
+            stroke_to_loop,
+            stroke_to_edge
         )
         gnn_graph.set_select_sketch(sketch_loop_selection_mask)
 

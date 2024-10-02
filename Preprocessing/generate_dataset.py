@@ -27,9 +27,9 @@ class dataset_generator():
         self.generate_dataset('dataset/simple', number_data = 0, start = 0)
         self.generate_dataset('dataset/eval', number_data = 0, start = 0)
         self.generate_dataset('dataset/messy', number_data = 0, start = 0)
-        self.generate_dataset('dataset/messy_order', number_data = 0, start = 0)
+        self.generate_dataset('dataset/messy_order', number_data = 100, start = 0)
         self.generate_dataset('dataset/messy_order_eval', number_data = 0, start = 0)
-        self.generate_dataset('dataset/very_messy', number_data = 1000, start = 0)
+        self.generate_dataset('dataset/very_messy', number_data = 0, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -88,7 +88,10 @@ class dataset_generator():
             stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_class.edges)
             stroke_node_features, stroke_operations_order_matrix = Preprocessing.proc_CAD.helper.swap_rows_with_probability(stroke_node_features, stroke_operations_order_matrix)
             stroke_node_features = np.round(stroke_node_features, 4)
+
             connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(stroke_node_features)
+            strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, connected_stroke_nodes)
+
             # stroke_node_features = stroke_node_features[:, :-1]
 
 
@@ -110,7 +113,8 @@ class dataset_generator():
                 final_brep_edges = np.zeros(0)
                 brep_loops = []
                 brep_loop_neighboring = np.zeros(0)
-                stroke_to_brep = np.zeros(0)
+                stroke_to_loop = np.zeros(0)
+                stroke_to_edge = np.zeros(0)
             
             else:
                 usable_brep_files = brep_files[:prev_stop_idx]
@@ -142,12 +146,11 @@ class dataset_generator():
 
 
                 # 5) Stroke_Cloud - Brep Connection
-                stroke_to_brep = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges)
-
+                stroke_to_loop = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges)
+                stroke_to_edge = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, final_brep_edges)
 
             # 6) Update the next brep file to read
             prev_stop_idx = next_stop_idx+1
-
 
             # 7) Write the data to file
             os.makedirs(os.path.join(data_directory, 'shape_info'), exist_ok=True)
@@ -158,7 +161,7 @@ class dataset_generator():
                     'brep_loops': brep_loops,
 
                     'stroke_node_features': stroke_node_features,
-                    'connected_stroke_nodes': connected_stroke_nodes,
+                    'strokes_perpendicular': strokes_perpendicular,
                     'final_brep_edges': final_brep_edges,
                     'stroke_operations_order_matrix': stroke_operations_order_matrix, 
 
@@ -169,7 +172,8 @@ class dataset_generator():
 
                     'brep_loop_neighboring': brep_loop_neighboring,
 
-                    'stroke_to_brep': stroke_to_brep
+                    'stroke_to_loop': stroke_to_loop,
+                    'stroke_to_edge': stroke_to_edge
                 }, f)
             
             file_count += 1

@@ -29,7 +29,7 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/simple')
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
 
 
 # --------------------- Directory --------------------- #
@@ -121,7 +121,7 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
     
     print("NEW SHAPE -----------------!")
     # We only want to process complicated shapes
-    if len(stroke_cloud_loops)< 60:
+    if len(stroke_cloud_loops)< 30:
         continue
     
     # Init Brep

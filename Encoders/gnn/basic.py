@@ -85,7 +85,8 @@ class GeneralHeteroConv(torch.nn.Module):
                        ('loop', 'neighboring_vertical', 'loop'),
                        ('loop', 'neighboring_horizontal', 'loop'),
                        ('loop', 'contains', 'loop'),
-                       ('stroke', 'connect', 'stroke')]
+                       ('stroke', 'order', 'stroke'),
+                       ('stroke', 'perpendicular', 'stroke')]
         
         aggr_fns = self.find_aggr_fun()
         for i in range(len(edges_types)):

@@ -60,7 +60,7 @@ def train():
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
+        stroke_cloud_loops, stroke_node_features, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_loop, stroke_to_edge ,stroke_operations_order_matrix = data
 
         second_last_column = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
         chosen_strokes = (second_last_column == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
@@ -79,11 +79,12 @@ def train():
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
             stroke_node_features, 
-            connected_stroke_nodes,
+            strokes_perpendicular, 
             loop_neighboring_vertical, 
             loop_neighboring_horizontal, 
             loop_neighboring_contained,
-            stroke_to_brep
+            stroke_to_loop,
+            stroke_to_edge
         )
 
         # Encoders.helper.vis_stroke_with_order(stroke_node_features)
@@ -178,7 +179,7 @@ def eval():
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
+        stroke_cloud_loops, stroke_node_features, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_loop, stroke_to_edge ,stroke_operations_order_matrix = data
 
         second_last_column = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
         chosen_strokes = (second_last_column == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
@@ -197,11 +198,12 @@ def eval():
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
             stroke_node_features, 
-            connected_stroke_nodes,
+            strokes_perpendicular, 
             loop_neighboring_vertical, 
             loop_neighboring_horizontal, 
             loop_neighboring_contained,
-            stroke_to_brep
+            stroke_to_loop,
+            stroke_to_edge
         )
 
         # Encoders.helper.vis_brep(final_brep_edges)
