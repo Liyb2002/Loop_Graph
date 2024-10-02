@@ -81,9 +81,9 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
     return extrude_selection_mask
 
 # This extrude_amount, extrude_direction is not total correct. Work on it later
-def do_extrude(gnn_graph, sketch_selection_mask):
+def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges):
     extrude_selection_mask = predict_extrude(gnn_graph, sketch_selection_mask)
-    extrude_amount, extrude_direction = whole_process_helper.helper.get_extrude_amount(gnn_graph, extrude_selection_mask)
+    extrude_amount, extrude_direction = whole_process_helper.helper.get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges)
     return extrude_amount, extrude_direction
 
 
@@ -117,7 +117,7 @@ def cascade_brep(brep_files):
 
 # --------------------- Main Code --------------------- #
 for data in tqdm(dataset, desc=f"Generating CAD Progams"):
-    stroke_cloud_loops, stroke_node_features, connected_stroke_nodes, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_brep, stroke_operations_order_matrix, final_brep_edges = data
+    stroke_cloud_loops, stroke_node_features, _, _, _, _, _, _, _, _ = data
     
     print("NEW SHAPE -----------------!")
     # We only want to process complicated shapes
@@ -184,7 +184,7 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
 
 
             # 5.2) Do Extrude
-            extrude_amount, extrude_direction = do_extrude(gnn_graph, sketch_selection_mask)
+            extrude_amount, extrude_direction = do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges)
             print("extrude_direction", extrude_direction)
 
             cur__brep_class.extrude_op(abs(extrude_amount), extrude_direction)
@@ -211,6 +211,7 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
 
             # 5.6) Update brep data
             brep_edges, brep_loops = cascade_brep(brep_files)
+            Encoders.helper.vis_brep(brep_edges)
 
 
         # n) Lastly, update the strokes 

@@ -202,14 +202,19 @@ def extract_unique_points(sketch_selection_mask, gnn_graph):
 # --------------------------------------------------------------------------- #
 
 
-def get_extrude_amount(gnn_graph, extrude_selection_mask):
+def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges):
     """
     Calculate the extrude amount and direction from the stroke with the highest probability in the extrude_selection_mask.
+    The extrusion direction is determined by identifying which point of the extruding stroke lies on the same plane
+    as the sketch_points (coplanar points). If brep_edges are provided, the function determines whether the extrusion 
+    is going into or out of the brep, and adjusts the stroke length accordingly.
     
     Parameters:
     gnn_graph (HeteroData): The graph containing stroke nodes and their features.
     extrude_selection_mask (torch.Tensor): A tensor of shape (num_strokes, 1) representing probabilities for selecting strokes.
-    
+    sketch_points (list): A list of points that are coplanar, meaning they share the same value along one axis.
+    brep_edges (torch.Tensor): A tensor of shape (num_strokes, 6) representing the brep edges.
+
     Returns:
     tuple: (float, list) The stroke length and direction of extrusion for the stroke with the highest probability.
     """
@@ -223,17 +228,69 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask):
     # Get the stroke feature for the stroke with the highest probability
     stroke_feature = stroke_features[max_prob_stroke_idx]
     
-    # Extract the two 3D points
+    # Extract the two 3D points for the stroke
     point1 = stroke_feature[:3]
     point2 = stroke_feature[3:6]
     
-    # Compute the Euclidean distance (length of the stroke)
-    stroke_length = torch.dist(point1, point2).item()
+    # 3. Determine the common axis and value from the coplanar sketch_points
+    sketch_points = torch.tensor(sketch_points)
+    common_axes = (torch.all(sketch_points[:, 0] == sketch_points[0, 0]),
+                   torch.all(sketch_points[:, 1] == sketch_points[0, 1]),
+                   torch.all(sketch_points[:, 2] == sketch_points[0, 2]))
+
+    # Find the index of the common axis (x: 0, y: 1, z: 2)
+    common_axis_idx = common_axes.index(True)
+    plane_value = sketch_points[0, common_axis_idx]
+
+    # 4. Determine which point of the extruding stroke is on the same plane as the sketch_points
+    if torch.isclose(point1[common_axis_idx], plane_value):
+        start_point = point1
+        end_point = point2
+    else:
+        start_point = point2
+        end_point = point1
+
+    # 5. Compute the Euclidean distance (length of the stroke)
+    stroke_length = torch.dist(start_point, end_point).item()
     
-    # Compute the direction of the stroke (normalized vector)
-    direction_vector = (point2 - point1).tolist()  # Vector from point1 to point2
+    # 6. Compute the direction of the extrusion (from start_point to end_point)
+    direction_vector = (end_point - start_point).tolist()
+
+    # If brep_edges is empty, return the stroke length as positive
+    if brep_edges.shape[0] == 0:
+        return stroke_length, direction_vector
+
+    # 7. Group sketch_points into strokes and find corresponding strokes in brep
+    # Assuming sketch_points are organized in pairs like strokes
+    grouped_sketch_strokes = sketch_points.view(-1, 6)  # Reshape into (num_sketch_strokes, 6)
+    
+    # Find matching brep edges that correspond to sketch strokes
+    matched_brep_edges = []
+    for sketch_stroke in grouped_sketch_strokes:
+        for brep_edge in brep_edges:
+            if torch.allclose(sketch_stroke, brep_edge, atol=1e-4):
+                matched_brep_edges.append(brep_edge)
+                break
+
+    # 8. Find the edges extending from the brep and compute their directions
+    if matched_brep_edges:
+        # Compute the direction of the brep edge (similar to the extrusion direction)
+        brep_edge = matched_brep_edges[0]  # Use the first matched brep edge
+        brep_point1 = brep_edge[:3]
+        brep_point2 = brep_edge[3:6]
+        brep_direction = (brep_point2 - brep_point1).tolist()
+
+        # 9. Check if brep_direction is opposite to direction_vector
+        dot_product = sum(brep_direction[i] * direction_vector[i] for i in range(3))
+
+        # If directions are opposite (dot product < 0), stroke_length should be positive, otherwise negative
+        if dot_product < 0:
+            stroke_length = abs(stroke_length)
+        else:
+            stroke_length = -abs(stroke_length)
 
     return stroke_length, direction_vector
+
 
 
 def extrude_strokes(gnn_graph, extrude_selection_mask):
