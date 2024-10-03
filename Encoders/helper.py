@@ -341,7 +341,7 @@ def vis_used_graph(graph):
     """
 
     # Extract loop-stroke connection edges and stroke features
-    loops_to_strokes = graph['loop', 'representedBy', 'stroke'].edge_index
+    loops_to_strokes = graph['loop', 'represented_by', 'stroke'].edge_index
     stroke_node_features = graph['stroke'].x.numpy()
     loop_features = graph['loop'].x.numpy()  # Assuming graph['loop'].x contains the features for each loop
 

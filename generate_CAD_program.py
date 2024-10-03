@@ -51,7 +51,7 @@ sketch_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_
 def predict_sketch(gnn_graph):
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     sketch_selection_mask = sketch_graph_decoder(x_dict)
-    Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(sketch_selection_mask))
+    # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(sketch_selection_mask))
 
     return sketch_selection_mask
 
@@ -77,7 +77,7 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
 
     x_dict = extrude_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     extrude_selection_mask = extrude_graph_decoder(x_dict)
-    Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask.detach())
+    # Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask.detach())
     return extrude_selection_mask
 
 # This extrude_amount, extrude_direction is not total correct. Work on it later
@@ -90,23 +90,23 @@ def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges):
 # --------------------- Cascade Brep Features --------------------- #
 def cascade_brep(brep_files):
     final_brep_edges_list = []
-    prev_brep_edges = []
 
     for file_name in brep_files:
         brep_directory = os.path.join(output_dir, 'canvas')
         brep_file_path = os.path.join(brep_directory, file_name)
 
         edge_features_list, _= Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
-        if len(prev_brep_edges) == 0:
+        if len(final_brep_edges_list) == 0:
             final_brep_edges_list = edge_features_list
-            prev_brep_edges = edge_features_list
             new_features = edge_features_list
         else:
             # We already have brep
-            new_features= Preprocessing.generate_dataset.find_new_features(prev_brep_edges, edge_features_list) 
+            new_features= Preprocessing.generate_dataset.find_new_features(final_brep_edges_list, edge_features_list) 
             final_brep_edges_list += new_features
-            prev_brep_edges = edge_features_list
-    
+
+        Encoders.helper.vis_brep(np.array(new_features))
+        Encoders.helper.vis_brep(np.array(final_brep_edges_list))
+
     final_brep_edges = np.array(final_brep_edges_list)
     final_brep_edges = np.round(final_brep_edges, 4)
     brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(final_brep_edges)
@@ -179,6 +179,7 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
         
         # 5) If it satisfy the condition, we can build the operations
         if gnn_graph._full_shape and gnn_graph._has_circle_shape():
+
             print("build !!")
 
             # 5.1) Do sketch
@@ -216,8 +217,7 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
 
             # 5.6) Update brep data
             brep_edges, brep_loops = cascade_brep(brep_files)
-            Encoders.helper.vis_brep(brep_edges)
-
+            
 
         # n) Lastly, update the strokes 
         stroke_in_graph += 1
