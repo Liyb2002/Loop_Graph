@@ -9,7 +9,6 @@ from torch_geometric.data import Batch as PyGBatch
 
 from Preprocessing.config import device
 import Preprocessing.proc_CAD.helper
-import Preprocessing.SBGCN.run_SBGCN
 import Preprocessing.gnn_graph
 
 import Models.loop_embeddings
@@ -23,8 +22,6 @@ class Program_Graph_Dataset(Dataset):
         print(f"Number of data directories: {len(self.data_dirs)}")
         print(f"Total number of brep_i.step files: {len(self.index_mapping)}")
 
-        self.load_loop_embed_model()
-
     def _create_index_mapping(self):
         index_mapping = []
         for data_dir in self.data_dirs:
@@ -37,16 +34,6 @@ class Program_Graph_Dataset(Dataset):
 
     def __len__(self):
         return len(self.index_mapping)
-
-
-    def load_loop_embed_model(self):
-        current_dir = os.getcwd()
-        loop_embedding_dir = os.path.join(current_dir, 'checkpoints', 'loop_embedding_model')
-
-        self.loop_embed_model = Models.loop_embeddings.LoopEmbeddingNetwork()
-        self.loop_embed_model.load_state_dict(torch.load(os.path.join(loop_embedding_dir, 'loop_embed_model.pth')))
-        self.loop_embed_model.to(device)
-        self.loop_embed_model.eval()
 
 
     def __getitem__(self, idx):

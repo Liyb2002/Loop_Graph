@@ -48,7 +48,7 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_full')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
