@@ -129,9 +129,50 @@ def are_neighbors(pointA, pointB):
     return diff == 1  # Neighboring points must differ by exactly one coordinate
 
 
+def find_unchanged_axis(unique_points):
+    """
+    Find the axis that remains constant across all points.
+    
+    Parameters:
+    unique_points (torch.Tensor): Tensor of unique 3D points.
+    
+    Returns:
+    unchanged_axis (int): The index of the axis (0 for x, 1 for y, 2 for z) that is constant.
+                          If no axis is constant, return None.
+    """
+    for axis in range(3):
+        if torch.all(unique_points[:, axis] == unique_points[0, axis]):
+            return axis
+    return None  # No axis is constant
+
+
+def create_new_point(last_point, remaining_points, unchanged_axis):
+    """
+    Create a new point by modifying one of the changing axes to match a value from remaining points.
+    
+    Parameters:
+    last_point (torch.Tensor): The last point in the ordered sequence.
+    remaining_points (list): List of remaining points to be reordered.
+    unchanged_axis (int): The axis that remains unchanged across all points.
+    
+    Returns:
+    new_point (torch.Tensor): A new point with one of the changing axes modified.
+    """
+    for axis in range(3):
+        if axis != unchanged_axis:
+            # Pick a value from the remaining points for this axis
+            for point in remaining_points:
+                if last_point[axis] != point[axis]:  # Ensure it's different
+                    new_point = last_point.clone()
+                    new_point[axis] = point[axis]
+                    return new_point
+    return last_point  # Fallback to returning the original point if no modification could be made
+
+
 def reorder_points_to_neighbors(unique_points):
     """
     Reorder points so that each point in the list is neighboring to the next one.
+    If no neighbor is found, a new point is generated to continue the process.
     
     Parameters:
     unique_points (torch.Tensor): Tensor of unique 3D points.
@@ -141,18 +182,27 @@ def reorder_points_to_neighbors(unique_points):
     """
     ordered_points = [unique_points[0]]  # Start with the first point
     remaining_points = unique_points[1:].tolist()  # Convert remaining points to a list for easier manipulation
+    unchanged_axis = find_unchanged_axis(unique_points)
 
     # Greedy algorithm to reorder points based on the neighboring condition
     while remaining_points:
         last_point = ordered_points[-1]
-        # Find the first neighboring point from the remaining points
+        neighbor_found = False
+
+        # Try to find a neighboring point
         for i, candidate in enumerate(remaining_points):
             candidate_tensor = torch.tensor(candidate)
             if are_neighbors(last_point, candidate_tensor):
                 ordered_points.append(candidate_tensor)
                 remaining_points.pop(i)
+                neighbor_found = True
                 break
-    
+
+        if not neighbor_found:
+            # If no neighbor is found, create a new point to continue
+            new_point = create_new_point(last_point, remaining_points, unchanged_axis)
+            ordered_points.append(new_point)
+
     return torch.stack(ordered_points)  # Convert the list back to a tensor
 
 
@@ -186,6 +236,7 @@ def extract_unique_points(sketch_selection_mask, gnn_graph):
         points.append(point1)
         points.append(point2)
 
+        print("stroke_feature", stroke_feature)
     # 4. Remove duplicate points to get unique points
     points_tensor = torch.stack(points)  
     unique_points_tensor = torch.unique(points_tensor, dim=0)  

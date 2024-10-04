@@ -135,17 +135,17 @@ def clean_face_choice(predicted_index, node_features):
 
 
 #------------------------------------------------------------------------------------------------------#
-def vis_partial_graph(loops, strokes, stroke_to_brep):
+def vis_full_graph(gnn_graph):
     """
-    Visualize multiple loops and strokes in 3D space, with all strokes in blue and rescaled axes.
-    Only visualize strokes that are part of a loop and exclude loops based on the stroke_to_brep matrix.
-
+    Visualize all strokes in the graph, regardless of whether they are used (i.e., the 8th value is 0 or 1).
+    
     Parameters:
-    loops (list of lists of int): A list of loops, where each loop is a list containing indices of strokes to be highlighted.
-    strokes (np.ndarray): A matrix of shape (num_strokes, 7), where the first 6 columns represent two 3D points.
-    stroke_to_brep (torch.Tensor): A tensor that either has shape (num_loops, num_brep) or [0].
-                                   If its shape is (num_loops, num_brep), a loop is excluded if it has a column value of 1.
+    gnn_graph (SketchLoopGraph): A single graph object containing loops and strokes.
     """
+
+    # Extract stroke features
+    stroke_node_features = gnn_graph['stroke'].x.numpy()
+
     # Initialize the 3D plot
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -156,26 +156,16 @@ def vis_partial_graph(loops, strokes, stroke_to_brep):
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
-    # Determine which loops to visualize based on stroke_to_brep
-    if stroke_to_brep.shape[0] > 0:
-        # Identify loops to exclude (any loop with a column value of 1)
-        exclude_loops = [i for i in range(stroke_to_brep.shape[0]) if torch.any(stroke_to_brep[i] == 1)]
-    else:
-        exclude_loops = []
+    # Plot all strokes, regardless of whether they are used
+    for stroke in stroke_node_features:
+        start, end = stroke[:3], stroke[3:6]
 
-    # Plot strokes in each loop with a line width of 0.5
-    for i, loop in enumerate(loops):
-        if i not in exclude_loops:
-            for idx in loop:
-                stroke = strokes[idx]
-                start, end = stroke[:3], stroke[3:6]
+        # Update the min and max limits for each axis
+        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
 
-                # Update the min and max limits for each axis
-                x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-                y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-                z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-                
-                ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
 
     # Compute the center of the shape
     x_center = (x_min + x_max) / 2
@@ -198,6 +188,59 @@ def vis_partial_graph(loops, strokes, stroke_to_brep):
     # Show plot
     plt.show()
 
+def vis_left_graph(graph):
+    """
+    Visualize only the strokes that are not used (i.e., have the 8th value as 0) in 3D space.
+    
+    Parameters:
+    graph (SketchLoopGraph): A single graph object containing loops and strokes.
+    """
+
+    # Extract stroke features
+    stroke_node_features = graph['stroke'].x.numpy()
+
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Plot only strokes where the 8th value (index 7) is 0
+    for stroke in stroke_node_features:
+        if stroke[7] == 0:  # Check if the 8th value is 0
+            start, end = stroke[:3], stroke[3:6]
+
+            # Update the min and max limits for each axis
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+
+    # Compute the center of the shape
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+
+    # Compute the maximum difference across x, y, z directions
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    # Set the same limits for x, y, and z axes centered around the computed center
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # Show plot
+    plt.show()
 
 
 def vis_brep(brep):
@@ -259,25 +302,17 @@ def vis_brep(brep):
     plt.show()
 
 
-def vis_whole_graph(graph, selected_loop):
+def vis_selected_loops(graph, selected_loop):
     """
     Visualize the graph with loops and strokes in 3D space.
     
     Parameters:
     graph (SketchLoopGraph): A single graph object containing loops and strokes.
-    loop_selection_masks (np.ndarray or torch.Tensor): A binary mask of shape (num_loops, 1), where 1 indicates a chosen loop.
+    selected_loop (int): The index of the loop that is chosen to be highlighted in red.
     """
 
-    # Extract stroke-loop connection edges and stroke features
-    strokes_to_loops = graph['stroke', 'represents', 'loop'].edge_index
+    # Extract stroke features
     stroke_node_features = graph['stroke'].x.numpy()
-
-    # Convert edge indices to a more accessible format
-    stroke_to_loops = {}
-    for stroke_idx, loop_idx in zip(strokes_to_loops[0], strokes_to_loops[1]):
-        if loop_idx.item() not in stroke_to_loops:
-            stroke_to_loops[loop_idx.item()] = []
-        stroke_to_loops[loop_idx.item()].append(stroke_idx.item())
 
     # Initialize the 3D plot
     fig = plt.figure()
@@ -289,20 +324,25 @@ def vis_whole_graph(graph, selected_loop):
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
-    # Plot all loops in blue
-    for loop_idx, stroke_indices in stroke_to_loops.items():
-        for idx in stroke_indices:
-            stroke = stroke_node_features[idx]
-            start, end = stroke[:3], stroke[3:6]
-            
-            # Update the min and max limits for each axis
-            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-            
-            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1, alpha=0.5)
+    # Plot all strokes in blue
+    for stroke in stroke_node_features:
+        start, end = stroke[:3], stroke[3:6]
+        
+        # Update the min and max limits for each axis
+        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+        
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
 
-    # Plot chosen loops in red
+    # Plot the chosen loop in red
+    strokes_to_loops = graph['stroke', 'represents', 'loop'].edge_index
+    stroke_to_loops = {}
+    for stroke_idx, loop_idx in zip(strokes_to_loops[0], strokes_to_loops[1]):
+        if loop_idx.item() not in stroke_to_loops:
+            stroke_to_loops[loop_idx.item()] = []
+        stroke_to_loops[loop_idx.item()].append(stroke_idx.item())
+
     for loop_idx, stroke_indices in stroke_to_loops.items():
         if loop_idx == selected_loop:  # Plot only the selected loop
             for idx in stroke_indices:
@@ -331,77 +371,8 @@ def vis_whole_graph(graph, selected_loop):
     # Show plot
     plt.show()
 
-def vis_used_graph(graph):
-    """
-    Visualize the graph with loops and strokes in 3D space.
-    Only visualize the loops with feature 0 (blue loops).
-    
-    Parameters:
-    graph (SketchLoopGraph): A single graph object containing loops and strokes.
-    """
 
-    # Extract loop-stroke connection edges and stroke features
-    loops_to_strokes = graph['loop', 'represented_by', 'stroke'].edge_index
-    stroke_node_features = graph['stroke'].x.numpy()
-    loop_features = graph['loop'].x.numpy()  # Assuming graph['loop'].x contains the features for each loop
-
-    # Convert edge indices to a more accessible format
-    loop_to_strokes = {}
-    for loop_idx, stroke_idx in zip(loops_to_strokes[0], loops_to_strokes[1]):
-        if loop_idx.item() not in loop_to_strokes:
-            loop_to_strokes[loop_idx.item()] = []
-        loop_to_strokes[loop_idx.item()].append(stroke_idx.item())
-
-    # Initialize the 3D plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.grid(False)
-
-    # Initialize min and max limits
-    x_min, x_max = float('inf'), float('-inf')
-    y_min, y_max = float('inf'), float('-inf')
-    z_min, z_max = float('inf'), float('-inf')
-
-    # Plot only the unused loops (with feature 0)
-    for loop_idx, stroke_indices in loop_to_strokes.items():
-        # Check if the current loop has a feature of 0
-        if loop_features[loop_idx][0] == 0:  # Only visualize if the first feature is 0
-            for idx in stroke_indices:
-                stroke = stroke_node_features[idx]
-                start, end = stroke[:3], stroke[3:6]
-
-                # Update the min and max limits for each axis
-                x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-                y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-                z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-
-                # Plot the stroke in blue
-                ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1, alpha=0.5)
-
-    # Compute the center of the shape
-    x_center = (x_min + x_max) / 2
-    y_center = (y_min + y_max) / 2
-    z_center = (z_min + z_max) / 2
-
-    # Compute the maximum difference across x, y, z directions
-    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
-
-    # Set the same limits for x, y, and z axes centered around the computed center
-    if max_diff > 0:  # Only set limits if max_diff is positive
-        ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
-        ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
-        ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
-
-    # Set axis labels
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    # Show plot
-    plt.show()
-
-
-def vis_stroke_graph(graph, stroke_selection_mask):
+def vis_selected_strokes(graph, stroke_selection_mask):
     """
     Visualize all strokes in the graph in 3D space. Strokes are colored based on stroke_selection_mask.
     
@@ -410,6 +381,7 @@ def vis_stroke_graph(graph, stroke_selection_mask):
     stroke_selection_mask (np.ndarray or torch.Tensor): A binary mask of shape (num_strokes, 1), where 1 indicates a chosen stroke (red), and 0 indicates an unchosen stroke (blue).
     """
 
+    
     # Extract stroke features from the graph
     stroke_node_features = graph['stroke'].x.numpy()
     stroke_selection_mask = stroke_selection_mask.numpy()
@@ -435,7 +407,8 @@ def vis_stroke_graph(graph, stroke_selection_mask):
         z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
         
         # Plot the stroke
-        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color=color, linewidth=1, alpha=0.8 if color == 'red' else 0.5)
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color=color, linewidth=1, alpha=1)
+
 
     # Compute the center of the shape
     x_center = (x_min + x_max) / 2
@@ -455,39 +428,6 @@ def vis_stroke_graph(graph, stroke_selection_mask):
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
 
+
     # Show plot
     plt.show()
-
-
-def vis_stroke_with_order(stroke_node_features):
-    """
-    Visualize strokes progressively. Initially plots 1 stroke, then 2 strokes, and so on.
-    
-    Parameters:
-    stroke_node_features (np.ndarray): A matrix of shape (num_strokes, 6), where the first 3 columns 
-                                       represent the start point and the next 3 columns represent the end point.
-    """
-
-    # Loop through the stroke_node_features progressively, plotting one more stroke each time
-    for i in range(1, len(stroke_node_features) + 1):
-        # Initialize the 3D plot for each step
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.grid(False)
-
-        # Plot the first i strokes
-        for stroke in stroke_node_features[:i]:
-            start, end = stroke[:3], stroke[3:6]
-            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
-
-        # Set axis labels
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-
-        # Set equal scaling for all axes
-        ax.set_box_aspect([1, 1, 1])
-
-        # Show plot for each step
-        plt.show()
-    

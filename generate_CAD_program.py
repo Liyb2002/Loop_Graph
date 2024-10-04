@@ -30,6 +30,7 @@ import random
 
 # --------------------- Dataset --------------------- #
 dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
+data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 
 # --------------------- Directory --------------------- #
@@ -51,7 +52,8 @@ sketch_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_
 def predict_sketch(gnn_graph):
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     sketch_selection_mask = sketch_graph_decoder(x_dict)
-    Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(sketch_selection_mask))
+
+    Encoders.helper.vis_selected_loops(gnn_graph, torch.argmax(sketch_selection_mask))
 
     return sketch_selection_mask
 
@@ -77,14 +79,13 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
 
     x_dict = extrude_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     extrude_selection_mask = extrude_graph_decoder(x_dict)
-    Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask.detach())
+    Encoders.helper.vis_selected_strokes(gnn_graph, extrude_selection_mask.detach())
     return extrude_selection_mask
 
 # This extrude_amount, extrude_direction is not total correct. Work on it later
 def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges):
     extrude_selection_mask = predict_extrude(gnn_graph, sketch_selection_mask)
     extrude_amount, extrude_direction = whole_process_helper.helper.get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges)
-    print("extrude_amount", extrude_amount)
     return extrude_amount, extrude_direction
 
 
@@ -114,12 +115,17 @@ def cascade_brep(brep_files):
 
 
 # --------------------- Main Code --------------------- #
-for data in tqdm(dataset, desc=f"Generating CAD Progams"):
-    stroke_cloud_loops, stroke_node_features, _, _, _, _, _, _, _ ,_ = data
+for data in tqdm(data_loader, desc="Generating CAD Programs"):
+    _, stroke_node_features, _, _, _, _, _, _, _ ,_ = data
     
+    stroke_node_features = stroke_node_features.squeeze(0)
+    stroke_node_features = stroke_node_features.cpu().numpy()
+    stroke_node_features = np.round(stroke_node_features, 4)
+
     print("NEW SHAPE -----------------!")
+    print("stroke_node_features", stroke_node_features.shape)
     # We only want to process complicated shapes
-    if stroke_node_features.shape[0] < 60:
+    if stroke_node_features.shape[0] < 90:
         continue
     
     # Init Brep
@@ -177,6 +183,8 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
         
         # 5) If it satisfy the condition, we can build the operations
         if gnn_graph._full_shape and gnn_graph._has_circle_shape():
+            Encoders.helper.vis_left_graph(gnn_graph)
+            Encoders.helper.vis_full_graph(gnn_graph)
 
             print("build !!")
 
@@ -189,9 +197,8 @@ for data in tqdm(dataset, desc=f"Generating CAD Progams"):
 
             # 5.2) Do Extrude
             extrude_amount, extrude_direction = do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges)
-            print("extrude_direction", extrude_direction)
 
-            cur__brep_class.extrude_op(abs(extrude_amount), extrude_direction)
+            cur__brep_class.extrude_op(extrude_amount, extrude_direction)
 
 
             # 5.3) Write to brep

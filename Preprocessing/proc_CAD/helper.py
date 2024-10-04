@@ -982,6 +982,7 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
     """
     
     # Initialize the output matrix to zeros
+
     num_strokes = stroke_node_features.shape[0]
     stroke_used_matrix = np.zeros((num_strokes, 1), dtype=np.float32)
     
@@ -1014,9 +1015,6 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
     Returns:
     np.ndarray: A matrix with shape (num_stroke_cloud_loops, num_brep_loops) where each entry is 1 if the loops match, otherwise 0.
     """
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
 
     # Initialize the correspondence matrix
     num_stroke_cloud_loops = len(stroke_cloud_loops)
