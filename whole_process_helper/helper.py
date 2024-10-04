@@ -114,139 +114,80 @@ def face_aggregate_addStroke(stroke_matrix):
 
 # --------------------------------------------------------------------------- #
 
-
-def are_neighbors(pointA, pointB):
+def reorder_strokes_to_neighbors(strokes):
     """
-    Check if two points are 'neighbors', meaning only one coordinate is different.
+    Reorder strokes so that they form a continuous loop of connected points.
     
     Parameters:
-    pointA, pointB (torch.Tensor): Tensors representing two 3D points.
+    strokes (list): A list of strokes, where each stroke is a tuple (A, B) representing two points.
     
     Returns:
-    bool: True if the points are neighbors, False otherwise.
+    ordered_points (torch.Tensor): A tensor of ordered points forming a continuous loop.
     """
-    diff = (pointA != pointB).sum().item()  # Count the number of different coordinates
-    return diff == 1  # Neighboring points must differ by exactly one coordinate
-
-
-def find_unchanged_axis(unique_points):
-    """
-    Find the axis that remains constant across all points.
+    # Start with the first stroke (A, B)
+    first_stroke = strokes[0]
+    ordered_points = [first_stroke[0], first_stroke[1]]
     
-    Parameters:
-    unique_points (torch.Tensor): Tensor of unique 3D points.
-    
-    Returns:
-    unchanged_axis (int): The index of the axis (0 for x, 1 for y, 2 for z) that is constant.
-                          If no axis is constant, return None.
-    """
-    for axis in range(3):
-        if torch.all(unique_points[:, axis] == unique_points[0, axis]):
-            return axis
-    return None  # No axis is constant
+    remaining_strokes = strokes[1:]
 
+    # Continue until we find the stroke that brings us back to the first point
+    while remaining_strokes:
+        last_point = ordered_points[-1]  # The last point in the ordered list
 
-def create_new_point(last_point, remaining_points, unchanged_axis):
-    """
-    Create a new point by modifying one of the changing axes to match a value from remaining points.
-    
-    Parameters:
-    last_point (torch.Tensor): The last point in the ordered sequence.
-    remaining_points (list): List of remaining points to be reordered.
-    unchanged_axis (int): The axis that remains unchanged across all points.
-    
-    Returns:
-    new_point (torch.Tensor): A new point with one of the changing axes modified.
-    """
-    for axis in range(3):
-        if axis != unchanged_axis:
-            # Pick a value from the remaining points for this axis
-            for point in remaining_points:
-                if last_point[axis] != point[axis]:  # Ensure it's different
-                    new_point = last_point.clone()
-                    new_point[axis] = point[axis]
-                    return new_point
-    return last_point  # Fallback to returning the original point if no modification could be made
-
-
-def reorder_points_to_neighbors(unique_points):
-    """
-    Reorder points so that each point in the list is neighboring to the next one.
-    If no neighbor is found, a new point is generated to continue the process.
-    
-    Parameters:
-    unique_points (torch.Tensor): Tensor of unique 3D points.
-    
-    Returns:
-    ordered_points (torch.Tensor): Tensor of ordered points where each point is neighboring to the next one.
-    """
-    ordered_points = [unique_points[0]]  # Start with the first point
-    remaining_points = unique_points[1:].tolist()  # Convert remaining points to a list for easier manipulation
-    unchanged_axis = find_unchanged_axis(unique_points)
-
-    # Greedy algorithm to reorder points based on the neighboring condition
-    while remaining_points:
-        last_point = ordered_points[-1]
-        neighbor_found = False
-
-        # Try to find a neighboring point
-        for i, candidate in enumerate(remaining_points):
-            candidate_tensor = torch.tensor(candidate)
-            if are_neighbors(last_point, candidate_tensor):
-                ordered_points.append(candidate_tensor)
-                remaining_points.pop(i)
-                neighbor_found = True
+        for i, stroke in enumerate(remaining_strokes):
+            pointA, pointB = stroke
+            
+            # Check if last_point is either pointA or pointB of the current stroke
+            if last_point.equal(pointA):  # If last_point matches pointA
+                ordered_points.append(pointB)  # Add pointB to the list
+                remaining_strokes.pop(i)  # Remove this stroke from the list
+                break
+            elif last_point.equal(pointB):  # If last_point matches pointB
+                ordered_points.append(pointA)  # Add pointA to the list
+                remaining_strokes.pop(i)  # Remove this stroke from the list
                 break
 
-        if not neighbor_found:
-            # If no neighbor is found, create a new point to continue
-            new_point = create_new_point(last_point, remaining_points, unchanged_axis)
-            ordered_points.append(new_point)
+        # Stop if we encounter the first point again
+        if ordered_points[-1].equal(ordered_points[0]):
+            break
+    
+    ordered_points.pop()
 
-    return torch.stack(ordered_points)  # Convert the list back to a tensor
+    return torch.stack(ordered_points)  # Convert the list of points back to a tensor
 
 
 def extract_unique_points(sketch_selection_mask, gnn_graph):
     """
-    Extract the unique points from the strokes connected to the loop with the highest probability in the selection mask.
+    Extract strokes from the loop with the highest probability in the selection mask and reorder them.
     
     Parameters:
     sketch_selection_mask (torch.Tensor): A tensor of shape (num_loops, 1) representing probabilities for selecting loops.
     gnn_graph (HeteroData): The graph containing loop and stroke nodes, and edges representing their relationships.
     
     Returns:
-    unique_points (torch.Tensor): A tensor of unique 3D points extracted from the stroke nodes.
+    ordered_points (torch.Tensor): A tensor of ordered points forming a continuous loop.
     """
 
     # 1. Find the loop with the highest probability
     max_prob_loop_idx = torch.argmax(sketch_selection_mask).item()
 
     # 2. Find the stroke nodes connected to this loop node via 'representedBy' edges
-    # Edge indices for 'loop' -> 'stroke' are stored in gnn_graph['loop', 'representedBy', 'stroke'].edge_index
     loop_stroke_edges = gnn_graph['loop', 'represented_by', 'stroke'].edge_index
-    connected_stroke_indices = loop_stroke_edges[1][loop_stroke_edges[0] == max_prob_loop_idx]  # Get stroke indices for the selected loop
+    connected_stroke_indices = loop_stroke_edges[1][loop_stroke_edges[0] == max_prob_loop_idx]
 
-    # 3. Extract points from the connected stroke nodes
+    # 3. Extract strokes (pairs of points) from the connected stroke nodes
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
-    points = []
+    strokes = []
     for stroke_idx in connected_stroke_indices:
         stroke_feature = stroke_features[stroke_idx]
-        point1 = stroke_feature[:3] 
-        point2 = stroke_feature[3:6] 
-        points.append(point1)
-        points.append(point2)
+        pointA = stroke_feature[:3]  # First point of the stroke
+        pointB = stroke_feature[3:6]  # Second point of the stroke
+        strokes.append((pointA, pointB))  # Store as a tuple (A, B)
 
-        print("stroke_feature", stroke_feature)
-    # 4. Remove duplicate points to get unique points
-    points_tensor = torch.stack(points)  
-    unique_points_tensor = torch.unique(points_tensor, dim=0)  
-
-    # 5. Reorder points so that each point is neighboring to the next one
-    ordered_points_tensor = reorder_points_to_neighbors(unique_points_tensor)
+    # 4. Reorder the strokes to form a continuous loop
+    ordered_points_tensor = reorder_strokes_to_neighbors(strokes)
 
     return ordered_points_tensor
-
-
 
 
 
