@@ -144,6 +144,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     # Strokes / Loops in the Graph
     stroke_in_graph = 0
     existing_loops = []
+    prev_operation_strokes = 0
 
     while stroke_in_graph < stroke_node_features.shape[0]:
         print("stroke_in_graph", stroke_in_graph, "out of", stroke_node_features.shape[0])
@@ -184,7 +185,9 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         
         
         # 5) If it satisfy the condition, we can build the operations
-        if gnn_graph._full_shape and gnn_graph._has_circle_shape():
+        if gnn_graph._full_shape and gnn_graph._has_circle_shape() and (stroke_in_graph - prev_operation_strokes) > 10:
+            prev_operation_strokes = stroke_in_graph
+            
             Encoders.helper.vis_left_graph(gnn_graph)
             Encoders.helper.vis_full_graph(gnn_graph)
 

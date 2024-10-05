@@ -7,7 +7,6 @@ import pickle
 import numpy as np
 from torch_geometric.data import Batch as PyGBatch
 
-from Preprocessing.config import device
 import Preprocessing.proc_CAD.helper
 import Preprocessing.gnn_graph
 
@@ -58,15 +57,15 @@ class Program_Graph_Dataset(Dataset):
 
         # Convert remaining numpy arrays to tensors
         
-        loop_neighboring_vertical = torch.tensor(shape_data['loop_neighboring_vertical'], dtype=torch.long, device=device)
-        loop_neighboring_horizontal = torch.tensor(shape_data['loop_neighboring_horizontal'], dtype=torch.long, device=device)
-        loop_neighboring_contained = torch.tensor(shape_data['loop_neighboring_contained'], dtype=torch.long, device=device)
-        loop_neighboring_coplanar = torch.tensor(shape_data['loop_neighboring_coplanar'], dtype=torch.long, device=device)
+        loop_neighboring_vertical = torch.tensor(shape_data['loop_neighboring_vertical'], dtype=torch.long)
+        loop_neighboring_horizontal = torch.tensor(shape_data['loop_neighboring_horizontal'], dtype=torch.long)
+        loop_neighboring_contained = torch.tensor(shape_data['loop_neighboring_contained'], dtype=torch.long)
+        loop_neighboring_coplanar = torch.tensor(shape_data['loop_neighboring_coplanar'], dtype=torch.long)
 
-        stroke_to_loop = torch.tensor(shape_data['stroke_to_loop'], dtype=torch.long, device=device)
-        stroke_to_edge = torch.tensor(shape_data['stroke_to_edge'], dtype=torch.long, device=device)
+        stroke_to_loop = torch.tensor(shape_data['stroke_to_loop'], dtype=torch.long)
+        stroke_to_edge = torch.tensor(shape_data['stroke_to_edge'], dtype=torch.long)
 
-        # final_brep_edges = torch.tensor(shape_data['final_brep_edges'], dtype=torch.float32, device=device)
+        # final_brep_edges = torch.tensor(shape_data['final_brep_edges'], dtype=torch.float32)
 
         # Load stroke_operations_order_matrix and convert to tensor
         stroke_operations_order_matrix = torch.tensor(shape_data['stroke_operations_order_matrix'], dtype=torch.float32)

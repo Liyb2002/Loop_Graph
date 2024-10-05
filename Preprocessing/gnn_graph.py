@@ -60,6 +60,16 @@ class SketchLoopGraph(HeteroData):
         self['stroke', 'perpendicular', 'stroke'].edge_index = torch.tensor(strokes_perpendicular_edges, dtype=torch.long)
 
 
+    def to_device(self, device):
+        for node_type in self.node_types:
+            if 'x' in self[node_type]:
+                self[node_type].x = self[node_type].x.to(device)
+        
+        for edge_type in self.edge_types:
+            if 'edge_index' in self[edge_type]:
+                self[edge_type].edge_index = self[edge_type].edge_index.to(device)
+
+
     def _compute_loop_features(self, stroke_cloud_loops, loop_to_brep):
         """
         Compute loop features. If the loop is used (based on loop_to_brep), assign 1, otherwise 0.

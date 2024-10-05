@@ -75,7 +75,7 @@ def train():
             else:
                 loop_chosen_mask.append(0)  # Loop is not chosen
         
-        sketch_loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1).to(device)
+        sketch_loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
 
 
         if not (extrude_selection_mask == 1).any() and not (sketch_loop_selection_mask == 1).any():
@@ -96,11 +96,14 @@ def train():
         )
 
         gnn_graph.set_select_sketch(sketch_loop_selection_mask)
+        gnn_graph.to_device(device)
+        extrude_selection_mask = extrude_selection_mask.to(device)
+
 
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
 
-        if len(graphs) > 4000:
+        if len(graphs) > 50:
             break
         # Encoders.helper.vis_stroke_graph(gnn_graph, extrude_selection_mask)
 
@@ -125,12 +128,14 @@ def train():
 
         for gnn_graph, sketch_selection_mask in tqdm(zip(train_graphs, train_masks), desc=f"Epoch {epoch+1}/{epochs} - Training", dynamic_ncols=True):
             optimizer.zero_grad()
+
             x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
             output = graph_decoder(x_dict)
 
             
             # Encoders.helper.vis_stroke_graph(gnn_graph, sketch_selection_mask)
             # Encoders.helper.vis_stroke_graph(gnn_graph, output.detach())
+
 
             loss = criterion(output, sketch_selection_mask)
             
@@ -215,7 +220,7 @@ def eval():
             else:
                 loop_chosen_mask.append(0)  # Loop is not chosen
         
-        sketch_loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1).to(device)
+        sketch_loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
 
         if not (extrude_selection_mask == 1).any() and not (sketch_selection_mask == 1).any():
             continue
