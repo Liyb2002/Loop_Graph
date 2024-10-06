@@ -98,7 +98,7 @@ def pad_masks(mask, target_size=(200, 1)):
     num_loops = mask.shape[0]
     if num_loops < target_size[0]:
         pad_size = target_size[0] - num_loops
-        padded_mask = torch.nn.functional.pad(mask, (0, 0, 0, pad_size), value=0)
+        padded_mask = torch.nn.functional.pad(mask, (0, 0, 0, pad_size), value=-1)
     else:
         padded_mask = mask
     return padded_mask

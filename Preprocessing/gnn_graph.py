@@ -23,9 +23,6 @@ class SketchLoopGraph(HeteroData):
     def __init__(self, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_to_brep, stroke_to_edge):
         super(SketchLoopGraph, self).__init__()
 
-        if stroke_node_features is None: 
-            return
-
         if stroke_to_edge is None or stroke_to_edge.shape[0] == 0:
             stroke_to_edge = np.zeros((stroke_node_features.shape[0], 1))
         
