@@ -45,10 +45,34 @@ def save_models():
 # ------------------------------------------------------------------------------# 
 
 
+def compute_accuracy(valid_output, valid_batch_masks):
+    batch_size = valid_output.shape[0] // 200
+    correct = 0
+
+    for i in range(batch_size):
+        output_slice = valid_output[i * 200:(i + 1) * 200]
+        mask_slice = valid_batch_masks[i * 200:(i + 1) * 200]
+
+        max_output_value, max_output_index = torch.max(output_slice, dim=0)
+        max_mask_value, max_mask_index = torch.max(mask_slice, dim=0)
+
+        values_where_mask_is_1 = output_slice[mask_slice == 1]
+        indices_where_mask_is_1 = torch.nonzero(mask_slice == 1).squeeze()
+
+        # print(f"Graph {i}: Values where mask is 1: {values_where_mask_is_1.tolist()}, Indices: {indices_where_mask_is_1.tolist()}")
+        # print(f"Graph {i}: max_output_index={max_output_index.item()}, max_mask_index={max_mask_index.item()}")
+
+        if max_output_index == max_mask_index:
+            correct += 1
+
+    return correct
+
+# ------------------------------------------------------------------------------# 
+
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_full')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -87,7 +111,7 @@ def train():
             stroke_to_edge
         )
 
-        gnn_graph.to_device(device)
+        gnn_graph.to_device_withPadding(device)
         loop_selection_mask = loop_selection_mask.to(device)
         # Encoders.helper.vis_stroke_with_order(stroke_node_features)
         # Encoders.helper.vis_brep(final_brep_edges)
@@ -104,6 +128,20 @@ def train():
     train_masks, val_masks = loop_selection_masks[:split_index], loop_selection_masks[split_index:]
 
 
+    # Convert train and validation graphs to HeteroData
+    hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]
+    padded_train_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in train_masks]
+
+    hetero_val_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in val_graphs]
+    padded_val_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in val_masks]
+
+    # Create DataLoaders for training and validation graphs/masks
+    graph_train_loader = DataLoader(hetero_train_graphs, batch_size=16, shuffle=False)
+    mask_train_loader = DataLoader(padded_train_masks, batch_size=16, shuffle=False)
+
+    graph_val_loader = DataLoader(hetero_val_graphs, batch_size=16, shuffle=False)
+    mask_val_loader = DataLoader(padded_val_masks, batch_size=16, shuffle=False)
+
 
 
     # Training loop
@@ -115,18 +153,25 @@ def train():
         train_total = 0
 
 
-        for gnn_graph, loop_selection_mask in tqdm(zip(train_graphs, train_masks), desc=f"Epoch {epoch+1}/{epochs} - Training", dynamic_ncols=True):
+        total_iterations = min(len(graph_train_loader), len(mask_train_loader))
+        for hetero_batch, batch_masks in tqdm(zip(graph_train_loader, mask_train_loader), 
+                                              desc=f"Epoch {epoch+1}/{epochs} - Training", 
+                                              dynamic_ncols=True, 
+                                              total=total_iterations):
 
             optimizer.zero_grad()
 
-            x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+            x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
             output = graph_decoder(x_dict)
 
-            loss = criterion(output, loop_selection_mask)
+            batch_masks = batch_masks.to(output.device).view(-1, 1)
+            valid_mask = (batch_masks != -1).float()
+            valid_output = output * valid_mask
+            valid_batch_masks = batch_masks * valid_mask
+            loss = criterion(valid_output, valid_batch_masks)
 
-            if torch.argmax(output) == torch.argmax(loop_selection_mask):
-                train_correct += 1
-            train_total += 1
+            train_correct += compute_accuracy(valid_output, valid_batch_masks)
+            train_total += 16
 
 
             loss.backward()
@@ -143,16 +188,23 @@ def train():
         graph_encoder.eval()
         graph_decoder.eval()
         with torch.no_grad():
-            for gnn_graph, loop_selection_mask in tqdm(zip(val_graphs, val_masks), desc=f"Epoch {epoch+1}/{epochs} - Validation"):
-                x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+            total_iterations_val = min(len(graph_val_loader), len(mask_val_loader))
+
+            for hetero_batch, batch_masks in tqdm(zip(graph_val_loader, mask_val_loader), 
+                                                  desc="Validation", 
+                                                  dynamic_ncols=True, 
+                                                  total=total_iterations_val):
+                x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
                 output = graph_decoder(x_dict)
 
-                loss = criterion(output, loop_selection_mask)
-                val_loss += loss.item()
+                batch_masks = batch_masks.to(output.device).view(-1, 1)
+                valid_mask = (batch_masks != -1).float()
+                valid_output = output * valid_mask
+                valid_batch_masks = batch_masks * valid_mask
+                loss = criterion(valid_output, valid_batch_masks)
 
-                if torch.argmax(output) == torch.argmax(loop_selection_mask):
-                    correct += 1
-                total += 1
+                correct += compute_accuracy(valid_output, valid_batch_masks)
+                total += 16
 
         
         val_loss /= len(val_graphs)
@@ -234,8 +286,8 @@ def eval():
             x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
             output = graph_decoder(x_dict)
             
-            # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
-            # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+            # Encoders.helper.vis_selected_loops(gnn_graph, torch.argmax(output))
+            # Encoders.helper.vis_selected_loops(gnn_graph, torch.argmax(loop_selection_mask))
 
 
             if x_dict['loop'].shape[0] < 15: 
@@ -284,4 +336,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()
