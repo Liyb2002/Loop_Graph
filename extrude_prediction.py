@@ -152,7 +152,7 @@ def train():
         )
 
         gnn_graph.set_select_sketch(sketch_loop_selection_mask)
-        gnn_graph.to_device(device)
+        gnn_graph.to_device_withPadding(device)
         extrude_selection_mask = extrude_selection_mask.to(device)
 
         graphs.append(gnn_graph)
@@ -180,7 +180,7 @@ def train():
     mask_val_loader = DataLoader(padded_val_masks, batch_size=16, shuffle=False)
 
     # Training and validation loop
-    epochs = 10  # Number of epochs
+    epochs = 30  # Number of epochs
     best_accuracy = 0.0
 
     for epoch in range(epochs):
@@ -327,7 +327,7 @@ def eval():
         )
 
         gnn_graph.set_select_sketch(sketch_loop_selection_mask)
-        gnn_graph.to_device(device)
+        gnn_graph.to_device_withPadding(device)
         extrude_selection_mask = extrude_selection_mask.to(device)
 
         graphs.append(gnn_graph)
@@ -391,4 +391,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

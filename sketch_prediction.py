@@ -25,12 +25,11 @@ graph_decoder.to(device)
 
 criterion = Encoders.gnn.gnn.FocalLoss(alpha=0.75, gamma=2.5)
 optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
-batch_size = 16
 
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction_test')
+save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -49,7 +48,7 @@ def save_models():
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_full')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -72,7 +71,7 @@ def train():
             else:
                 loop_chosen_mask.append(0)  # Loop is not chosen
         
-        loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1).to(device)
+        loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
         if not (loop_selection_mask == 1).any():
             continue
 
@@ -90,7 +89,6 @@ def train():
 
         gnn_graph.to_device(device)
         loop_selection_mask = loop_selection_mask.to(device)
-
         # Encoders.helper.vis_stroke_with_order(stroke_node_features)
         # Encoders.helper.vis_brep(final_brep_edges)
         # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
@@ -104,21 +102,6 @@ def train():
     split_index = int(0.8 * len(graphs))
     train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
     train_masks, val_masks = loop_selection_masks[:split_index], loop_selection_masks[split_index:]
-
-
-    # Convert train and validation graphs to HeteroData
-    hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]
-    padded_train_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in train_masks]
-
-    hetero_val_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in val_graphs]
-    padded_val_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in val_masks]
-
-    # Create DataLoaders for training and validation graphs/masks
-    graph_train_loader = DataLoader(hetero_train_graphs, batch_size=batch_size, shuffle=True)
-    mask_train_loader = DataLoader(padded_train_masks, batch_size=batch_size, shuffle=True)
-
-    graph_val_loader = DataLoader(hetero_val_graphs, batch_size=batch_size, shuffle=False)
-    mask_val_loader = DataLoader(padded_val_masks, batch_size=batch_size, shuffle=False)
 
 
 
@@ -209,7 +192,7 @@ def eval():
             else:
                 loop_chosen_mask.append(0)  # Loop is not chosen
         
-        loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1).to(device)
+        loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
         if not (loop_selection_mask == 1).any():
             continue
 

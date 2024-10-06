@@ -61,7 +61,7 @@ class SketchLoopGraph(HeteroData):
         self['stroke', 'perpendicular', 'stroke'].edge_index = torch.tensor(strokes_perpendicular_edges, dtype=torch.long)
 
 
-    def to_device(self, device):
+    def to_device_withPadding(self, device):
         # Target shape (200, 8)
         target_shape = (200, 8)
         
@@ -80,6 +80,16 @@ class SketchLoopGraph(HeteroData):
                     self[node_type].x = x  # No padding needed if already the correct size
 
                 # Move to the specified device
+                self[node_type].x = self[node_type].x.to(device)
+        
+        for edge_type in self.edge_types:
+            if 'edge_index' in self[edge_type]:
+                self[edge_type].edge_index = self[edge_type].edge_index.to(device)
+
+
+    def to_device(self, device):
+        for node_type in self.node_types:
+            if 'x' in self[node_type]:
                 self[node_type].x = self[node_type].x.to(device)
         
         for edge_type in self.edge_types:
