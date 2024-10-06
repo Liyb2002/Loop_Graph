@@ -23,8 +23,12 @@ class SketchLoopGraph(HeteroData):
     def __init__(self, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_to_brep, stroke_to_edge):
         super(SketchLoopGraph, self).__init__()
 
-        if stroke_to_edge.shape[0] == 0:
+        if stroke_node_features is None: 
+            return
+
+        if stroke_to_edge is None or stroke_to_edge.shape[0] == 0:
             stroke_to_edge = np.zeros((stroke_node_features.shape[0], 1))
+        
         # Use all 7 values of stroke_node_features + 1 feature of used or not
         self['stroke'].x = torch.cat([torch.tensor(stroke_node_features, dtype=torch.float), 
                                  torch.tensor(stroke_to_edge, dtype=torch.float)], dim=1)
@@ -61,8 +65,24 @@ class SketchLoopGraph(HeteroData):
 
 
     def to_device(self, device):
+        # Target shape (200, 8)
+        target_shape = (200, 8)
+        
         for node_type in self.node_types:
             if 'x' in self[node_type]:
+                x = self[node_type].x
+                current_shape = x.shape
+
+                # Check if padding is needed
+                if current_shape[0] < target_shape[0]:
+                    # Pad to (200, 8) with -1
+                    pad_size = (0, target_shape[1] - current_shape[1], 0, target_shape[0] - current_shape[0])  # (pad_last_dim, pad_first_dim, pad_dim_for_nodes)
+                    x_padded = torch.nn.functional.pad(x, pad_size, mode='constant', value=-1)
+                    self[node_type].x = x_padded
+                else:
+                    self[node_type].x = x  # No padding needed if already the correct size
+
+                # Move to the specified device
                 self[node_type].x = self[node_type].x.to(device)
         
         for edge_type in self.edge_types:
@@ -366,6 +386,8 @@ class SketchLoopGraph(HeteroData):
         return False
 
 
+
+
 def build_graph(stroke_dict, messy = False):
     num_strokes = len(stroke_dict)
     num_operations = 0
@@ -409,3 +431,25 @@ def build_graph(stroke_dict, messy = False):
     return node_features, operations_order_matrix
 
 
+
+
+def convert_to_hetero_data(sketch_graph):
+    # Create a new HeteroData instance
+    hetero_data = HeteroData()
+
+    # Copy over node features ('stroke' and 'loop')
+    hetero_data['stroke'].x = sketch_graph['stroke'].x.clone()
+    hetero_data['loop'].x = sketch_graph['loop'].x.clone()
+
+    # Copy over edge indices
+    hetero_data['stroke', 'represents', 'loop'].edge_index = sketch_graph['stroke', 'represents', 'loop'].edge_index.clone()
+    hetero_data['loop', 'represented_by', 'stroke'].edge_index = sketch_graph['loop', 'represented_by', 'stroke'].edge_index.clone()
+
+    # Copy over all other edges
+    hetero_data['loop', 'neighboring_vertical', 'loop'].edge_index = sketch_graph['loop', 'neighboring_vertical', 'loop'].edge_index.clone()
+    hetero_data['loop', 'neighboring_horizontal', 'loop'].edge_index = sketch_graph['loop', 'neighboring_horizontal', 'loop'].edge_index.clone()
+    hetero_data['loop', 'contains', 'loop'].edge_index = sketch_graph['loop', 'contains', 'loop'].edge_index.clone()
+    hetero_data['stroke', 'order', 'stroke'].edge_index = sketch_graph['stroke', 'order', 'stroke'].edge_index.clone()
+    hetero_data['stroke', 'perpendicular', 'stroke'].edge_index = sketch_graph['stroke', 'perpendicular', 'stroke'].edge_index.clone()
+
+    return hetero_data
