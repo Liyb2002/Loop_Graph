@@ -234,11 +234,42 @@ def find_triangle_to_cut(points, normal):
 
 
 def random_circle(points, normal):
+    """
+    Given four vertices of a rectangle, compute a random circle on the same plane.
+
+    Args:
+        points: List of 4 numpy arrays representing the vertices of the larger rectangle.
+        normal: The normal vector of the plane containing the points.
+
+    Returns:
+        center: The randomly selected center point for the circle.
+        radius: The randomly sampled radius for the circle.
+    """
+    
+    # Find the rectangle and the center
     four_pts = find_rectangle_on_plane(points, normal)
-
-    pt = random.choice(four_pts)
-
-    return pt
+    center = random.choice(four_pts)
+    
+    # Compute the distances to the x, y, z axes for each point
+    x_distances = [abs(point[0] - center[0]) for point in points]
+    y_distances = [abs(point[1] - center[1]) for point in points]
+    z_distances = [abs(point[2] - center[2]) for point in points]
+    
+    # Find the minimum distances for x, y, and z axes
+    min_x_dist = min(x_distances)
+    min_y_dist = min(y_distances)
+    min_z_dist = min(z_distances)
+    
+    # Ignore the zero distance (because the points are on the same plane)
+    distances = [d for d in [min_x_dist, min_y_dist, min_z_dist] if d > 0]
+    
+    # Find the second smallest distance, which will be the max radius
+    max_radius = sorted(distances)[0] if len(distances) >= 2 else distances[0]
+    
+    # Randomly sample a radius between 0 and max_radius
+    radius = random.uniform(max_radius * 0.5, max_radius)
+    
+    return radius, center
 
 
 

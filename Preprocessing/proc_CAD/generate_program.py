@@ -77,8 +77,7 @@ class Brep:
         cases = ['create_circle']
         selected_case = random.choice(cases)
         if selected_case == 'create_circle':
-            radius = Preprocessing.proc_CAD.random_gen.generate_random_cylinder_radius()
-            center = Preprocessing.proc_CAD.helper.random_circle(boundary_points, normal)
+            radius, center = Preprocessing.proc_CAD.helper.random_circle(boundary_points, normal)
             self.regular_sketch_circle(normal, radius, center)
             return 
 
