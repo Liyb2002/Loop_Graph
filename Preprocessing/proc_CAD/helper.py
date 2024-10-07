@@ -376,6 +376,7 @@ def expected_extrude_point(point, sketch_face_normal, extrude_amount):
     z_extruded = z - c * extrude_amount
     return [x_extruded, y_extruded, z_extruded]
 
+
 def canvas_has_point(canvas, point):
     edges = canvas.edges()    
     point = round_position(point)

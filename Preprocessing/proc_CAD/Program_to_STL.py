@@ -50,7 +50,6 @@ class parsed_program():
     def parse_sketch(self, Op):
         if 'radius' in Op['faces'][0]:
             self.parse_circle(Op)
-            self.Op_idx += 1
             return 
 
         point_list = [vert['coordinates'] for vert in Op['vertices']]
@@ -74,6 +73,8 @@ class parsed_program():
 
         self.prev_sketch = Preprocessing.proc_CAD.build123.protocol.build_circle(self.Op_idx, radius, center, normal, self.output, self.data_directory)
         self.Op_idx += 1
+
+        self.circle_center = center
         
     def parse_extrude(self, Op, sketch_Op):
 
@@ -82,7 +83,11 @@ class parsed_program():
         extrude_amount = Op['operation'][2]
         isSubtract = (extrude_amount < 0)
         
-        expected_point = Preprocessing.proc_CAD.helper.expected_extrude_point(sketch_point_list[0], sketch_face_normal, extrude_amount)
+        
+        if len(sketch_point_list) ==0:
+            expected_point = Preprocessing.proc_CAD.helper.expected_extrude_point(self.circle_center, sketch_face_normal, extrude_amount)
+        else:
+            expected_point = Preprocessing.proc_CAD.helper.expected_extrude_point(sketch_point_list[0], sketch_face_normal, extrude_amount)
         
         if not isSubtract: 
             canvas_1 = Preprocessing.proc_CAD.build123.protocol.test_extrude(self.prev_sketch, extrude_amount)

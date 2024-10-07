@@ -17,7 +17,7 @@ class Face:
     def face_fixed(self):
         self.future_sketch = False
 
-    def circle(self, radius, center):
+    def check_is_circle(self, radius, center):
         self.is_cirlce = True
         self.radius = radius
         self.center = center
@@ -49,7 +49,10 @@ class Edge:
         # print(f"An edge is created with ID: {id}")
         self.id = id
         self.vertices = vertices
+
+
         self.round = False
+        self.is_circle = False
 
         self.edge_type = 'maybe_feature_line'
 
@@ -60,6 +63,11 @@ class Edge:
     def fillet_edge(self):
         self.round = True
     
+    def check_is_circle(self, radius, center):
+        self.is_circle = True
+        self.radius = radius
+        self.center = center
+
     def set_Op(self, Op, index):
         self.Op.append(index)
     

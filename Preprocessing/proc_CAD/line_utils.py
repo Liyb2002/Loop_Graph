@@ -406,6 +406,9 @@ def whole_bounding_box_lines(all_edges):
 
     # Step 1: Find the min and max x, y, z values from all edges
     for other_edge_id, other_edge in all_edges.items():
+        if other_edge.is_circle:
+            continue
+
         for vertex in other_edge.vertices:
             pos = vertex.position
             min_x, max_x = min(min_x, pos[0]), max(max_x, pos[0])
@@ -430,6 +433,8 @@ def whole_bounding_box_lines(all_edges):
     # Convert the edges to a set of tuples for quick comparison
     existing_edges = set()
     for other_edge_id, other_edge in all_edges.items():
+        if other_edge.is_circle:
+            continue
         vertex_positions = tuple(sorted((tuple(other_edge.vertices[0].position), tuple(other_edge.vertices[1].position))))
         existing_edges.add(vertex_positions)
 
@@ -513,6 +518,8 @@ def remove_duplicate_lines(all_edges):
 
     # Iterate through each edge in all_edges
     for edge_id, edge in list(all_edges.items()):
+        if edge.is_circle:
+            continue
         # Get the rounded positions of the vertices
         p1 = round_point(edge.vertices[0].position)
         p2 = round_point(edge.vertices[1].position)
@@ -555,6 +562,9 @@ def remove_single_point(all_edges):
 
     # Iterate through each edge in all_edges
     for edge_id, edge in list(all_edges.items()):
+        if edge.is_circle:
+            continue
+
         # Get the rounded positions of the vertices
         p1 = round_point(edge.vertices[0].position)
         p2 = round_point(edge.vertices[1].position)

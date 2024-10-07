@@ -22,18 +22,19 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 0, start = 0)
-        self.generate_dataset('dataset/messy_order_full', number_data = 300, start = 0)
+        self.generate_dataset('dataset/test', number_data = 1, start = 0)
+        # self.generate_dataset('dataset/messy_order_full', number_data = -1, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
         successful_generations = start
 
-        while successful_generations < number_data:
-            if self.generate_single_data(successful_generations, dir):
-                successful_generations += 1
-            else:
-                print("Retrying...")
+        self.generate_single_data(successful_generations, dir)
+        # while successful_generations < number_data:
+        #     if self.generate_single_data(successful_generations, dir):
+        #         successful_generations += 1
+        #     else:
+        #         print("Retrying...")
 
 
     def generate_single_data(self, successful_generations, dir):
@@ -57,10 +58,12 @@ class dataset_generator():
             return False
         
         if not valid_parse:
+            print("not valid valid_parse")
             shutil.rmtree(data_directory)
             return False
         
         
+        print("----------------------")
         stroke_cloud_class = Preprocessing.proc_CAD.draw_all_lines.create_stroke_cloud_class(data_directory, False)
 
         brep_directory = os.path.join(data_directory, 'canvas')

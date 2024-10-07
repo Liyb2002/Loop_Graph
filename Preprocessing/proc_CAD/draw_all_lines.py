@@ -118,6 +118,30 @@ class create_stroke_cloud():
 
         for _, edge in self.edges.items():
             # Determine line color, alpha, and thickness based on edge type
+            if edge.is_circle:
+                # Do something
+                radius = edge.radius 
+                center = edge.center
+            
+                # Generate circle points in the XY plane
+                theta = np.linspace(0, 2 * np.pi, 100)
+                x_values = center[0] + radius * np.cos(theta)
+                y_values = center[1] + radius * np.sin(theta)
+                z_values = np.full_like(theta, center[2])  # Constant z for a circle in the XY plane
+
+                # Set random line thickness and alpha value
+                line_thickness = np.random.uniform(0.7, 0.9)
+                line_alpha_value = np.random.uniform(0.5, 0.8)
+
+                # Update min and max limits
+                x_min, x_max = min(x_min, x_values.min()), max(x_max, x_values.max())
+                y_min, y_max = min(y_min, y_values.min()), max(y_max, y_values.max())
+                z_min, z_max = min(z_min, z_values.min()), max(z_max, z_values.max())
+
+                # Plot the circle
+                ax.plot(x_values, y_values, z_values, color='black', alpha=line_alpha_value, linewidth=line_thickness)
+                continue
+
             if edge.edge_type == 'feature_line':
                 line_color = 'black'
                 line_alpha = edge.alpha_value
@@ -231,6 +255,11 @@ class create_stroke_cloud():
         if op == 'terminate':
             return
 
+        # parse circle
+        if len(Op['vertices']) == 0:
+            self.parse_circle(Op, index)
+            return
+
         for vertex_data in Op['vertices']:
             vertex = Vertex(id=vertex_data['id'], position=vertex_data['coordinates'])
             self.vertices[vertex.id] = vertex
@@ -251,7 +280,6 @@ class create_stroke_cloud():
             new_edges.append(edge)
 
             # self.edges[edge.order_count] = edge
-
 
         # Now add the new edges to self.edges
         self.add_new_edges(new_edges)
@@ -283,6 +311,35 @@ class create_stroke_cloud():
             normal = face_data['normal']
             face = Face(id=face_data['id'], vertices=vertices, normal=normal)
             self.faces[face.id] = face          
+
+
+    def parse_circle(self, Op, index):
+        if Op['operation'][0] == 'sketch':
+            # circle sketch
+            id = Op['faces'][0]['id']
+            radius = Op['faces'][0]['radius']
+            center = Op['faces'][0]['center']
+
+            # Create a circle face
+            circle_face = Face(id=id, vertices=[], normal=[])
+            circle_face.check_is_circle(radius, center)
+            self.faces[circle_face.id] = circle_face  
+
+
+            # Create a circle edge
+            edge_id = f"edge_{len(self.edges)}_{id}"
+            circle_edge = Edge(id=edge_id, vertices=None)
+            circle_edge.check_is_circle(radius, center)
+            circle_edge.set_order_count(self.order_count)
+            self.order_count += 1
+            self.edges[circle_edge.order_count] = circle_edge
+            circle_edge.set_Op(Op['operation'][0], index)
+
+
+        
+        if Op['operation'][0] == 'extrude':
+            # cylinder extrude
+            pass
 
 
     def adj_edges(self):
@@ -323,10 +380,17 @@ class create_stroke_cloud():
             return True
 
         for edge_id, edge in self.edges.items():
+            if edge.is_circle:
+                continue
+
             connected_edge_ids = set()  
 
             for vertex in edge.vertices:
                 for other_edge_id, other_edge in self.edges.items():
+
+                    if other_edge.is_circle:
+                        continue
+
                     if other_edge_id != edge_id and vert_on_line(vertex, other_edge):
                         connected_edge_ids.add(other_edge_id)
             
@@ -524,6 +588,10 @@ class create_stroke_cloud():
 
         # Step 1: Iterate through each edge in self.edges
         for edge in self.edges.values():
+            if edge.is_circle:
+                edge.set_edge_type('feature_line')
+                continue
+
             # Only process edges with type 'maybe_feature_line'
             if edge.edge_type == 'maybe_feature_line':
                 contained_in_brep = False
@@ -571,7 +639,7 @@ class create_stroke_cloud():
         
         self.adj_edges()
         self.map_id_to_count()
-        # self.vis_stroke_cloud(self.directory, True)
+        self.vis_stroke_cloud(self.directory, True)
         # self.vis_brep()
 
 
