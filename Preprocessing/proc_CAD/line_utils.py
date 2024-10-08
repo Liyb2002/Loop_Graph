@@ -590,3 +590,92 @@ def random_remove_construction_lines(all_edges):
 
     return all_edges
  
+
+ #----------------------------------------------------------------------------------#
+
+def find_circle_points(sketch_face_radius, sketch_face_center, sketch_face_normal):
+    center = sketch_face_center
+    normal = sketch_face_normal
+    
+    # Normalize the normal vector (though it's always [±1,0,0] or similar)
+    norm_magnitude = (normal[0]**2 + normal[1]**2 + normal[2]**2)**0.5
+    normal = [normal[0] / norm_magnitude, normal[1] / norm_magnitude, normal[2] / norm_magnitude]
+    
+    # Find the plane of the circle based on the normal
+    if normal == [1, 0, 0] or normal == [-1, 0, 0]:
+        # Circle lies in the yz-plane
+        point1 = [center[0], center[1], center[2] + sketch_face_radius]
+        point2 = [center[0], center[1], center[2] - sketch_face_radius]
+        point3 = [center[0], center[1] + sketch_face_radius, center[2]]
+        point4 = [center[0], center[1] - sketch_face_radius, center[2]]
+        
+    elif normal == [0, 1, 0] or normal == [0, -1, 0]:
+        # Circle lies in the xz-plane
+        point1 = [center[0] + sketch_face_radius, center[1], center[2]]
+        point2 = [center[0] - sketch_face_radius, center[1], center[2]]
+        point3 = [center[0], center[1], center[2] + sketch_face_radius]
+        point4 = [center[0], center[1], center[2] - sketch_face_radius]
+        
+    elif normal == [0, 0, 1] or normal == [0, 0, -1]:
+        # Circle lies in the xy-plane
+        point1 = [center[0] + sketch_face_radius, center[1], center[2]]
+        point2 = [center[0] - sketch_face_radius, center[1], center[2]]
+        point3 = [center[0], center[1] + sketch_face_radius, center[2]]
+        point4 = [center[0], center[1] - sketch_face_radius, center[2]]
+        
+    else:
+        raise ValueError("The normal vector must have two zeros and one ±1.")
+    
+    return point1, point2, point3, point4
+
+
+def create_vertex_nodes(sketch_face_radius, sketch_face_center, new_sketch_face_center, sketch_face_normal, base_id):
+    # Get 4 points for the "low" circle and 4 points for the "high" circle
+    v1_low, v2_low, v3_low, v4_low = find_circle_points(sketch_face_radius, sketch_face_center, sketch_face_normal)
+    v1_high, v2_high, v3_high, v4_high = find_circle_points(sketch_face_radius, new_sketch_face_center, sketch_face_normal)
+
+    # Generate unique IDs for each of the vertices
+    v1_low_id = f"edge_{base_id}_v1_low"
+    v2_low_id = f"edge_{base_id}_v2_low"
+    v3_low_id = f"edge_{base_id}_v3_low"
+    v4_low_id = f"edge_{base_id}_v4_low"
+    
+    v1_high_id = f"edge_{base_id}_v1_high"
+    v2_high_id = f"edge_{base_id}_v2_high"
+    v3_high_id = f"edge_{base_id}_v3_high"
+    v4_high_id = f"edge_{base_id}_v4_high"
+
+    # Create Vertex objects for each point
+    v1_low_vert = Vertex(id=v1_low_id, position=v1_low)
+    v2_low_vert = Vertex(id=v2_low_id, position=v2_low)
+    v3_low_vert = Vertex(id=v3_low_id, position=v3_low)
+    v4_low_vert = Vertex(id=v4_low_id, position=v4_low)
+
+    v1_high_vert = Vertex(id=v1_high_id, position=v1_high)
+    v2_high_vert = Vertex(id=v2_high_id, position=v2_high)
+    v3_high_vert = Vertex(id=v3_high_id, position=v3_high)
+    v4_high_vert = Vertex(id=v4_high_id, position=v4_high)
+
+    # Return the 8 vertices as a list (or a tuple, or another data structure if needed)
+    return [v1_low_vert, v2_low_vert, v3_low_vert, v4_low_vert,
+            v1_high_vert, v2_high_vert, v3_high_vert, v4_high_vert]
+
+
+
+def create_edge_nodes(base_id, verts):
+    # Assuming verts is a list of 8 vertices: [v1_low, v2_low, v3_low, v4_low, v1_high, v2_high, v3_high, v4_high]
+
+    # Generate unique IDs for each of the edges
+    e1_id = f"edge_{base_id}_e1"
+    e2_id = f"edge_{base_id}_e2"
+    e3_id = f"edge_{base_id}_e3"
+    e4_id = f"edge_{base_id}_e4"
+
+    # Create Edge objects for each pair of corresponding low and high vertices
+    e1 = Edge(id=e1_id, vertices=[verts[0], verts[4]])  # Connect v1_low to v1_high
+    e2 = Edge(id=e2_id, vertices=[verts[1], verts[5]])  # Connect v2_low to v2_high
+    e3 = Edge(id=e3_id, vertices=[verts[2], verts[6]])  # Connect v3_low to v3_high
+    e4 = Edge(id=e4_id, vertices=[verts[3], verts[7]])  # Connect v4_low to v4_high
+    
+    # Return the edges as a tuple
+    return e1, e2, e3, e4

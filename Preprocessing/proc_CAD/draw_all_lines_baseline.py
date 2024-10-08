@@ -374,20 +374,21 @@ class create_stroke_cloud():
             new_sketch_face_id = Op['faces'][0]['id']
 
 
-            # Create dummy extrude edge
-            v1_id = f"edge_{len(self.vertices)}_{new_sketch_face_id}_1"
-            v2_id = f"edge_{len(self.vertices)}_{new_sketch_face_id}_2"
+            # Create extrude edges
 
-            v1 = Vertex(id=v1_id, position=sketch_face_center)
-            v2 = Vertex(id=v2_id, position=new_sketch_face_center)
-            self.vertices[v1.id] = v1
-            self.vertices[v2.id] = v2
+            verts = Preprocessing.proc_CAD.line_utils.create_vertex_nodes(sketch_face_radius, sketch_face_center, new_sketch_face_center, sketch_face_normal, len(self.vertices))
+            for vert in verts:
+                self.vertices[vert.id] = vert
 
-            extrude_edge = Edge(id='NA', vertices=[v1, v2])
-            extrude_edge.set_order_count(self.order_count)
-            extrude_edge.set_Op(Op['operation'][0], index)
-            self.order_count += 1
-            self.edges[extrude_edge.order_count] = extrude_edge
+
+            edges = Preprocessing.proc_CAD.line_utils.create_edge_nodes(len(self.edges), verts)
+
+            for edge in edges:
+                edge.set_order_count(self.order_count)
+                edge.set_Op(Op['operation'][0], index)
+                edge.set_edge_type('feature_line')
+                self.order_count += 1
+                self.edges[edge.order_count] = edge
 
 
             # Create a circle edge

@@ -1249,3 +1249,5 @@ def vis_brep(brep):
 
     # Show plot
     plt.show()
+
+
