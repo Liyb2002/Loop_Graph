@@ -622,6 +622,18 @@ def face_aggregate_direct(stroke_matrix):
     return valid_groups
 
 
+def face_aggregate_circle(stroke_matrix):
+
+    circle_loops = []
+    for i in range(stroke_matrix.shape[0]):
+
+        # Is circle
+        if stroke_matrix[i, 7] != 0:
+            circle_loops.append(frozenset([i]))
+
+    return circle_loops
+
+
 
 #----------------------------------------------------------------------------------#
 def reorder_loops(loops):
@@ -694,7 +706,7 @@ def loop_neighboring_simple(loops):
     
 
 
-def loop_neighboring_complex(loops, stroke_node_features):
+def loop_neighboring_complex(loops, stroke_node_features, loop_neighboring_all):
     """
     Determine neighboring loops based on shared edges and different normals, and populate the matrix with the shared stroke index.
     
@@ -711,6 +723,9 @@ def loop_neighboring_complex(loops, stroke_node_features):
     
     # Function to compute the normal of a loop
     def compute_normal(loop_indices):
+        if len(loop_indices) < 3:
+            return [0,0,0]
+        
         # List to store edges, each with 6 useful values
         edges = []
         
@@ -761,7 +776,14 @@ def loop_neighboring_complex(loops, stroke_node_features):
 
     # Iterate over each pair of loops to check for shared edges and different normals
     for i in range(num_loops):
+
         for j in range(i + 1, num_loops):
+
+            if len(loops[i]) < 3 or len(loops[j]) < 3:
+                neighboring_matrix[i, j] = loop_neighboring_all[i, j]
+                neighboring_matrix[j, i] = loop_neighboring_all[i, j]
+                continue
+
             # Check if loops i and j share any edge (stroke)
             shared_strokes = set(loops[i]).intersection(set(loops[j]))
             if shared_strokes:
@@ -877,10 +899,21 @@ def loop_contained(loops, stroke_node_features):
         min_y, max_y = float('inf'), float('-inf')
         min_z, max_z = float('inf'), float('-inf')
         
+
+        # If circle
+        if len(loop) < 3:
+            circle_id = list(loop)[0]
+            center_x, center_y, center_z, normal_x, normal_y, normal_z, alpha_value, radius = stroke_coords = stroke_node_features[circle_id]
+            min_x = max_x = center_x
+            min_y = max_y = center_y
+            min_z = max_z = center_z
+            bounding_boxes.append((min_x, max_x, min_y, max_y, min_z, max_z))
+            continue
+
         # Process each stroke in the loop
         for stroke in loop:
             stroke_coords = stroke_node_features[stroke]  # Each stroke has exactly 6 values: [x1, y1, z1, x2, y2, z2]
-            x1, y1, z1, x2, y2, z2, _ = stroke_coords
+            x1, y1, z1, x2, y2, z2, _,  _ = stroke_coords
             
             # Update bounding box for the loop
             min_x, max_x = min(min_x, x1, x2), max(max_x, x1, x2)
