@@ -63,10 +63,11 @@ class Edge:
     def fillet_edge(self):
         self.round = True
     
-    def check_is_circle(self, radius, center):
+    def check_is_circle(self, radius, center, normal):
         self.is_circle = True
         self.radius = radius
         self.center = center
+        self.normal = normal
 
     def set_Op(self, Op, index):
         self.Op.append(index)

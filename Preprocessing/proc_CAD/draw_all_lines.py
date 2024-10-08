@@ -122,12 +122,45 @@ class create_stroke_cloud():
                 # Do something
                 radius = edge.radius 
                 center = edge.center
-            
+                normal = edge.normal
+
                 # Generate circle points in the XY plane
                 theta = np.linspace(0, 2 * np.pi, 100)
-                x_values = center[0] + radius * np.cos(theta)
-                y_values = center[1] + radius * np.sin(theta)
-                z_values = np.full_like(theta, center[2])  # Constant z for a circle in the XY plane
+                x_values = radius * np.cos(theta)
+                y_values = radius * np.sin(theta)
+                z_values = np.zeros_like(theta)  # Circle lies in the XY plane initially
+
+                # Combine the coordinates into a matrix of shape (3, 100)
+                circle_points = np.array([x_values, y_values, z_values])
+
+                # Normalize the normal vector
+                normal = normal / np.linalg.norm(normal)
+
+                # Find rotation axis and angle to rotate the XY plane to align with the normal vector
+                z_axis = np.array([0, 0, 1])  # Z-axis is the normal for the XY plane
+
+                # If the normal vector is not already along the Z-axis, we calculate the rotation
+                if not np.allclose(normal, z_axis):
+                    rotation_axis = np.cross(z_axis, normal)
+                    rotation_axis /= np.linalg.norm(rotation_axis)  # Normalize rotation axis
+                    angle = np.arccos(np.dot(z_axis, normal))
+
+                    # Create the rotation matrix using the rotation axis and angle (Rodrigues' rotation formula)
+                    K = np.array([[0, -rotation_axis[2], rotation_axis[1]],
+                                [rotation_axis[2], 0, -rotation_axis[0]],
+                                [-rotation_axis[1], rotation_axis[0], 0]])
+
+                    R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * np.dot(K, K)
+
+                    # Rotate the circle points
+                    rotated_circle_points = np.dot(R, circle_points)
+                else:
+                    rotated_circle_points = circle_points  # No rotation needed if normal is already along Z-axis
+
+                # Translate the circle to the center point
+                x_values = rotated_circle_points[0] + center[0]
+                y_values = rotated_circle_points[1] + center[1]
+                z_values = rotated_circle_points[2] + center[2]
 
                 # Set random line thickness and alpha value
                 line_thickness = np.random.uniform(0.7, 0.9)
@@ -319,6 +352,7 @@ class create_stroke_cloud():
             id = Op['faces'][0]['id']
             radius = Op['faces'][0]['radius']
             center = Op['faces'][0]['center']
+            normal = Op['faces'][0]['normal']
 
             # Create a circle face
             circle_face = Face(id=id, vertices=[], normal=[])
@@ -329,7 +363,7 @@ class create_stroke_cloud():
             # Create a circle edge
             edge_id = f"edge_{len(self.edges)}_{id}"
             circle_edge = Edge(id=edge_id, vertices=None)
-            circle_edge.check_is_circle(radius, center)
+            circle_edge.check_is_circle(radius, center, normal)
             circle_edge.set_order_count(self.order_count)
             self.order_count += 1
             self.edges[circle_edge.order_count] = circle_edge
@@ -410,6 +444,7 @@ class create_stroke_cloud():
     def map_id_to_count(self):
         for edge_id, edge in self.edges.items():
             self.id_to_count[edge_id] = edge.order_count
+
 
     def add_new_edges(self, new_edges):
         """
