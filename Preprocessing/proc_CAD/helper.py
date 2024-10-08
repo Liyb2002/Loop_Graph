@@ -995,10 +995,31 @@ def connected_strokes(stroke_node_features):
                 np.allclose(stroke_i_end, stroke_j_start) or np.allclose(stroke_i_end, stroke_j_end)):
                 
                 connected[i, j] = 1
-                connected[j, i] = 1  # Symmetric connection since it's undirected
+                connected[j, i] = 1
+
+    # Now consider the circles
+    for i in range(num_strokes):
+
+        # Is circle
+        if stroke_node_features[i, 7] != 0:
+            center = stroke_node_features[i, :3]
+            radius = stroke_node_features[i, 7]
+
+            for j in range(i + 1, num_strokes):
+                stroke_j_start = stroke_node_features[j, :3]  
+                stroke_j_end = stroke_node_features[j, 3:6]
+
+                if dist(center, stroke_j_start) == radius or dist(center, stroke_j_end) == radius:
+                    connected[i, j] = 1
+                    connected[j, i] = 1  
+
+
 
     return connected
  
+
+def dist(center, point):
+    return round(np.linalg.norm(center - point), 4)
 
 #----------------------------------------------------------------------------------#
 def stroke_to_edge(stroke_node_features, final_brep_edges):
