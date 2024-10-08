@@ -399,26 +399,33 @@ def build_graph(stroke_dict, messy = False):
     num_strokes = len(stroke_dict)
     num_operations = 0
 
-    # # find the total number of operations
-    # for i, (_, stroke) in enumerate(stroke_dict.items()):
-    #     for index in stroke.Op_orders:
-    #         if index > num_operation_counts:
-    #             num_operation_counts = index
-
-    # # a map that maps stroke_id (e.g 'edge_0_0' to 0)
-    # stroke_id_to_index = {}
-
     for i, key in enumerate(sorted(stroke_dict.keys())):
         stroke = stroke_dict[key]
         if len(stroke.Op) > 0 and num_operations < stroke.Op[0]:
             num_operations = stroke.Op[0]
 
-    node_features = np.zeros((num_strokes, 7))
+    node_features = np.zeros((num_strokes, 8))
     operations_order_matrix = np.zeros((num_strokes, num_operations+1))
 
 
     for i, key in enumerate(sorted(stroke_dict.keys())):
         stroke = stroke_dict[key]
+
+        # If it is a circle stroke
+        if stroke.is_circle:
+            radius = stroke.radius
+            center = stroke.center
+            normal = stroke.normal
+            alpha_value = stroke.alpha_value
+            node_features[i, :3] = center
+            node_features[i, 3:6] = normal
+            node_features[i, 6:7] = alpha_value
+            node_features[i, 7:] = radius
+
+            for stroke_op_count in stroke.Op:
+                operations_order_matrix[i, stroke_op_count] = 1
+
+            continue
 
         # build node_features
         # node_features has shape num_strokes x 6, which is the starting and ending point
@@ -427,7 +434,8 @@ def build_graph(stroke_dict, messy = False):
         alpha_value = stroke.alpha_value
         node_features[i, :3] = start_point
         node_features[i, 3:6] = end_point
-        node_features[i, 6:] = alpha_value
+        node_features[i, 6:7] = alpha_value
+        node_features[i, 7:] = 0
 
         # build operation_order_matrix
         # operation_order_matrix has shape num_strokes x num_ops

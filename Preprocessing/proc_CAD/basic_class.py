@@ -69,6 +69,7 @@ class Edge:
         self.radius = radius
         self.center = center
         self.normal = normal
+        self.alpha_value = np.random.uniform(0.5, 0.8)
 
     def set_Op(self, Op, index):
         self.Op.append(index)
