@@ -96,7 +96,7 @@ class Brep:
     def regular_sketch_circle(self, normal, radius, center):
         face_id = f"face_{self.idx}_{0}"
         face = Face(face_id, [], normal)
-        face.check_is_circle(radius, center)
+        face.check_is_circle(radius, center, normal)
         self.Faces.append(face)
         
         self.idx += 1

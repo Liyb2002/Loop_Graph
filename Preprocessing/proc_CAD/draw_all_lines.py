@@ -356,8 +356,9 @@ class create_stroke_cloud():
 
             # Create a circle face
             circle_face = Face(id=id, vertices=[], normal=[])
-            circle_face.check_is_circle(radius, center)
+            circle_face.check_is_circle(radius, center, normal)
             self.faces[circle_face.id] = circle_face  
+            print("circle_face.id", circle_face.id)
 
 
             # Create a circle edge
@@ -373,7 +374,34 @@ class create_stroke_cloud():
         
         if Op['operation'][0] == 'extrude':
             # cylinder extrude
-            pass
+            
+            sketch_face_id = Op['operation'][1]
+            extrude_amount = Op['operation'][2]
+            sketch_face = self.faces[sketch_face_id]
+
+            sketch_face_radius = sketch_face.radius
+            sketch_face_center = sketch_face.center
+            sketch_face_normal = sketch_face.normal
+
+            new_sketch_face_normal = [-x for x in sketch_face.normal]
+            extrusion = [x * extrude_amount for x in new_sketch_face_normal]
+            new_sketch_face_center = [a + b for a, b in zip(sketch_face_center, extrusion)]
+            new_sketch_face_id = Op['faces'][0]['id']
+
+            print("new_sketch_face_normal", new_sketch_face_normal)
+            print("sketch_face_center", sketch_face_center)
+            print("extrude_amount", extrude_amount)
+            print("new_sketch_face_center", new_sketch_face_center)
+
+
+            # Create a circle edge
+            edge_id = f"edge_{len(self.edges)}_{new_sketch_face_id}"
+            circle_edge = Edge(id=edge_id, vertices=None)
+            circle_edge.check_is_circle(sketch_face_radius, new_sketch_face_center, new_sketch_face_normal)
+            circle_edge.set_order_count(self.order_count)
+            self.order_count += 1
+            self.edges[circle_edge.order_count] = circle_edge
+            circle_edge.set_Op(Op['operation'][0], index)
 
 
     def adj_edges(self):

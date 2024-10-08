@@ -17,10 +17,11 @@ class Face:
     def face_fixed(self):
         self.future_sketch = False
 
-    def check_is_circle(self, radius, center):
+    def check_is_circle(self, radius, center, normal):
         self.is_cirlce = True
         self.radius = radius
         self.center = center
+        self.normal = normal
 
     def sketch_plane(self):
         # Ensure the sketch is on a plane
