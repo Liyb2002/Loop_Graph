@@ -116,6 +116,8 @@ class Brep:
             sketch_face_opposite_normal = [-x for x in sketch_face.normal]
             safe_amount = -self.safe_extrude_check()
 
+            print("safe_amount", safe_amount)
+
             if amount <0:
                 amount = max(amount, safe_amount)
 
@@ -347,6 +349,7 @@ class Brep:
         sketch_plane = sketch_face.plane  # tuple, e.g., (x, 0) or (y, 0) or (z, 0)
 
         extrude_directions = [x for x in sketch_face.normal]
+        print("extrude_directions", extrude_directions)
 
 
         extrude_direction = -1

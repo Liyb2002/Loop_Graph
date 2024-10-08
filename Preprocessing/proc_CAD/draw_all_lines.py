@@ -5,6 +5,7 @@ import Preprocessing.proc_CAD.line_utils
 import os
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import math
 
 import numpy as np
 from scipy.interpolate import CubicSpline
@@ -119,7 +120,6 @@ class create_stroke_cloud():
         for _, edge in self.edges.items():
             # Determine line color, alpha, and thickness based on edge type
             if edge.is_circle:
-                # Do something
                 radius = edge.radius 
                 center = edge.center
                 normal = edge.normal
@@ -158,6 +158,9 @@ class create_stroke_cloud():
                     rotated_circle_points = circle_points  # No rotation needed if normal is already along Z-axis
 
                 # Translate the circle to the center point
+                if math.isnan(rotated_circle_points[0][0]):
+                    rotated_circle_points = circle_points
+
                 x_values = rotated_circle_points[0] + center[0]
                 y_values = rotated_circle_points[1] + center[1]
                 z_values = rotated_circle_points[2] + center[2]
@@ -388,14 +391,24 @@ class create_stroke_cloud():
             new_sketch_face_center = [a + b for a, b in zip(sketch_face_center, extrusion)]
             new_sketch_face_id = Op['faces'][0]['id']
 
-            print("new_sketch_face_normal", new_sketch_face_normal)
-            print("sketch_face_center", sketch_face_center)
-            print("extrude_amount", extrude_amount)
-            print("new_sketch_face_center", new_sketch_face_center)
+
+            # Create dummy extrude edge
+            v1_id = f"edge_{len(self.vertices)}_{new_sketch_face_id}_1"
+            v2_id = f"edge_{len(self.vertices)}_{new_sketch_face_id}_2"
+
+            v1 = Vertex(id=v1_id, position=sketch_face_center)
+            v2 = Vertex(id=v2_id, position=new_sketch_face_center)
+            self.vertices[v1.id] = v1
+            self.vertices[v2.id] = v2
+
+            extrude_edge = Edge(id='NA', vertices=[v1, v2])
+            extrude_edge.set_order_count(self.order_count)
+            self.order_count += 1
+            self.edges[extrude_edge.order_count] = extrude_edge
 
 
             # Create a circle edge
-            edge_id = f"edge_{len(self.edges)}_{new_sketch_face_id}"
+            edge_id = f"edge_{len(self.edges)}_{new_sketch_face_id}_N"
             circle_edge = Edge(id=edge_id, vertices=None)
             circle_edge.check_is_circle(sketch_face_radius, new_sketch_face_center, new_sketch_face_normal)
             circle_edge.set_order_count(self.order_count)
