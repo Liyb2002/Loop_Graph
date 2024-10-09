@@ -116,14 +116,15 @@ class dataset_generator():
             # Preprocessing.proc_CAD.helper.vis_brep(np.array(edge_features_list))
 
             output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
-            print("output_brep_edges", output_brep_edges)
-            print("--------??-----------")
+            brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(final_brep_edges) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
+            # print("output_brep_edges", output_brep_edges)
+            # print("--------??-----------")
 
 
 
 
-        #         # 5) Stroke_Cloud - Brep Connection
-        #         stroke_to_loop = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges)
+        # 5) Stroke_Cloud - Brep Connection
+        stroke_to_loop = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges)
         #         stroke_to_edge = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, final_brep_edges)
 
         #     # 6) Update the next brep file to read
@@ -215,14 +216,15 @@ def find_new_features(prev_brep_edges, new_edge_features):
         relation_found = False
 
         edge_start, edge_end = np.array(new_edge_line[:3]), np.array(new_edge_line[3:])
-
+        
         for prev_brep_line in prev_brep_edges:
 
             brep_start, brep_end = np.array(prev_brep_line[:3]), np.array(prev_brep_line[3:])
 
             # Check if the lines are the same, either directly or in reverse order
             if (np.allclose(edge_start, brep_start) and np.allclose(edge_end, brep_end)) or \
-            (np.allclose(edge_start, brep_end) and np.allclose(edge_end, brep_start)):
+            (np.allclose(edge_start, brep_end) and np.allclose(edge_end, brep_start)) or \
+            (edge_start == edge_end).all():
                 # Relation 1: The two lines are exactly the same
                 relation_found = True
 

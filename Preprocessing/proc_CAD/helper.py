@@ -1187,8 +1187,21 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
     # Step 1: Find matching between stroke_node_features and final_brep_edges
     stroke_to_brep_map = {}
     for stroke_idx, stroke in enumerate(stroke_node_features):
+        
         stroke_points = set(map(tuple, [stroke[:3], stroke[3:6]]))
         for brep_idx, brep_edge in enumerate(final_brep_edges):
+            # if stroke[7] != 0 :
+            #     print("stroke", stroke)
+            if (brep_edge[3:6] == brep_edge[:3]).all():
+                print("(stroke[:3] == brep_edge[:3]).all()", brep_edge)
+            # circle stroke 
+            if stroke[7] != 0 and (stroke[:3] == brep_edge[:3]).all():
+
+                print("found center match")
+                if stroke_idx not in stroke_to_brep_map:
+                    stroke_to_brep_map[stroke_idx] = set()
+                stroke_to_brep_map[stroke_idx].add(brep_idx)
+
             brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))
             
             # Check if stroke is contained in brep or brep is contained in stroke
