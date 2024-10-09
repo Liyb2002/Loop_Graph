@@ -116,8 +116,6 @@ class Brep:
             sketch_face_opposite_normal = [-x for x in sketch_face.normal]
             safe_amount = -self.safe_extrude_check()
 
-            print("safe_amount", safe_amount)
-
             if amount <0:
                 amount = max(amount, safe_amount)
 

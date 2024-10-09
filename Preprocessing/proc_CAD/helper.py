@@ -408,8 +408,26 @@ def expected_extrude_point(point, sketch_face_normal, extrude_amount):
     return [x_extruded, y_extruded, z_extruded]
 
 
+def expected_lvl(point, sketch_face_normal, extrude_amount):
+    x, y, z = point
+    a, b, c = sketch_face_normal
+    
+    # Check for non-zero component in sketch_face_normal to determine the axis
+    if a != 0:
+        x_extruded = x - a * extrude_amount
+        return 'x', x_extruded
+    elif b != 0:
+        y_extruded = y - b * extrude_amount
+        return 'y', y_extruded
+    elif c != 0:
+        z_extruded = z - c * extrude_amount
+        return 'z', z_extruded
+    else:
+        raise ValueError("At least one component of the sketch_face_normal should be non-zero.")
+
+
 def canvas_has_point(canvas, point):
-    edges = canvas.edges()    
+    edges = canvas.edges()   
     point = round_position(point)
     
     for edge in edges:
@@ -424,6 +442,25 @@ def canvas_has_point(canvas, point):
                 return True
         
     return False
+
+
+def canvas_has_lvl(canvas, expected_axis, expected_value):
+    edges = canvas.edges()   
+    
+    for edge in edges:
+        verts = edge.vertices()
+
+        for vert in verts:
+            # Check if the vertex is on the same level as the expected axis and value
+            if expected_axis == 'x' and vert.X == expected_value:
+                return True
+            elif expected_axis == 'y' and vert.Y == expected_value:
+                return True
+            elif expected_axis == 'z' and vert.Z == expected_value:
+                return True
+        
+    return False
+
 
 def print_canvas_points(canvas):
     edges = canvas.edges()    
@@ -1303,6 +1340,9 @@ def vis_brep(brep):
     max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
 
     # Set the same limits for x, y, and z axes centered around the computed center
+    if max_diff == 0:
+        return
+    
     ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
     ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
     ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
