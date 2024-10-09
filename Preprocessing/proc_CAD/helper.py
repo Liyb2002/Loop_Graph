@@ -247,9 +247,17 @@ def random_circle(points, normal):
     """
     
     # Find the rectangle and the center
-    four_pts = find_rectangle_on_plane(points, normal)
-    center = random.choice(four_pts)
+    four_pts = np.array(find_rectangle_on_plane(points, normal))
+
+    min_x, min_y, min_z = np.min(four_pts, axis=0)
+    max_x, max_y, max_z = np.max(four_pts, axis=0)
     
+    random_x = random.uniform(min_x, max_x)
+    random_y = random.uniform(min_y, max_y)
+    random_z = random.uniform(min_z, max_z)
+
+    center = np.array([random_x, random_y, random_z])
+
     # Compute the distances to the x, y, z axes for each point
     x_distances = [abs(point[0] - center[0]) for point in points]
     y_distances = [abs(point[1] - center[1]) for point in points]
@@ -267,7 +275,7 @@ def random_circle(points, normal):
     max_radius = sorted(distances)[0] if len(distances) >= 2 else distances[0]
     
     # Randomly sample a radius between 0 and max_radius
-    radius = random.uniform(max_radius * 0.5, max_radius)
+    radius = random.uniform(max_radius * 0.5, max_radius * 0.8) 
     
     return radius, center
 

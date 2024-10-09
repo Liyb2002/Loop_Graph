@@ -46,22 +46,22 @@ class dataset_generator():
         os.makedirs(data_directory, exist_ok=True)
 
         # Generate a new program & save the brep
-        # try:
+        try:
             # Pass in the directory to the simple_gen function
-        Preprocessing.proc_CAD.proc_gen.random_program(data_directory)
+            Preprocessing.proc_CAD.proc_gen.random_program(data_directory)
             # Preprocessing.proc_CAD.proc_gen.simple_gen(data_directory)
 
             # Create brep for the new program and pass in the directory
-        valid_parse = Preprocessing.proc_CAD.Program_to_STL.run(data_directory)
-        # except Exception as e:
-        #     print(f"An error occurred: {e}")
-        #     shutil.rmtree(data_directory)
-        #     return False
+            valid_parse = Preprocessing.proc_CAD.Program_to_STL.run(data_directory)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            shutil.rmtree(data_directory)
+            return False
         
-        # if not valid_parse:
-        #     print("not valid valid_parse")
-        #     shutil.rmtree(data_directory)
-        #     return False
+        if not valid_parse:
+            print("not valid valid_parse")
+            shutil.rmtree(data_directory)
+            return False
         
         
         print("----------------------")
@@ -90,10 +90,10 @@ class dataset_generator():
 
 
         # 4) Load Brep
-        # brep_directory = os.path.join(data_directory, 'canvas')
-        # brep_files = [file_name for file_name in os.listdir(brep_directory)
-        #       if file_name.startswith('brep_') and file_name.endswith('.step')]
-        # brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+        brep_directory = os.path.join(data_directory, 'canvas')
+        brep_files = [file_name for file_name in os.listdir(brep_directory)
+              if file_name.startswith('brep_') and file_name.endswith('.step')]
+        brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
 
 
         # final_brep_edges = []
