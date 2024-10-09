@@ -73,7 +73,7 @@ def build_circle(count, radius, point, normal, output, data_dir):
 
     
     with BuildSketch(Plane(origin=(point[0], point[1], point[2]), z_dir=(normal[0], normal[1], normal[2])) )as perimeter:
-        Circle(radius = 0.2)
+        Circle(radius = radius)
     
     if output:
         _ = perimeter.sketch.export_stl(stl_dir)

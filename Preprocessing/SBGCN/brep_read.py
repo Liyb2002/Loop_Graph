@@ -7,6 +7,12 @@ from OCC.Core.BRep import BRep_Tool
 from OCC.Core.GProp import GProp_GProps
 from OCC.Core.BRepGProp import brepgprop
 
+from OCC.Core.Geom import Geom_CylindricalSurface
+from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
+from OCC.Core.GeomAbs import GeomAbs_SurfaceType
+from OCC.Core.gp import gp_Vec
+from OCC.Core.GeomAbs import GeomAbs_Cylinder
+
 from torch.utils.data import Dataset
 from itertools import combinations
 
@@ -78,6 +84,38 @@ def create_face_node(face):
 
 
 def create_face_node_gnn(face):
+    
+    adaptor_surface = BRepAdaptor_Surface(face)
+    cylinder_features = []
+    # cylinder surface
+    if adaptor_surface.GetType() == GeomAbs_Cylinder:
+        cylinder = adaptor_surface.Cylinder()
+        radius = cylinder.Radius()
+
+        axis = cylinder.Axis()
+        axis_direction = axis.Direction()
+        axis_location = axis.Location()
+        axis_direction = [axis_direction.X(), axis_direction.Y(), axis_direction.Z()]
+        axis_location = [axis_location.X(), axis_location.Y(), axis_location.Z()]
+
+        u_min = adaptor_surface.FirstUParameter()
+        u_max = adaptor_surface.LastUParameter()
+        v_min = adaptor_surface.FirstVParameter()
+        v_max = adaptor_surface.LastVParameter()
+
+        surface = BRep_Tool.Surface(face)
+        point_start = surface.Value(u_min, v_min)
+        point_end = surface.Value(u_min, v_max)
+
+        height_vector = gp_Vec(point_start, point_end)
+        height = height_vector.Magnitude()
+        cylinder_data = axis_location + axis_direction + [height, radius]
+        cylinder_features.append(cylinder_data)
+
+
+
+
+
     face_feature_gnn = []
     edge_explorer = TopExp_Explorer(face, TopAbs_EDGE)
     while edge_explorer.More():
@@ -86,7 +124,7 @@ def create_face_node_gnn(face):
         face_feature_gnn.append(edge_features)
         edge_explorer.Next()
 
-    return face_feature_gnn
+    return face_feature_gnn, cylinder_features
 
 
     
@@ -151,14 +189,13 @@ def create_graph_from_step_file(step_path):
 
     # each sublist in edge_coplanar_list is a face that has multiple edges
     # each sublist in edge_features_list is a edge with 6 values
-    edge_coplanar_list = []
     edge_features_list = []
+    cylinder_features = []
 
     face_explorer = TopExp_Explorer(shape, TopAbs_FACE)
     while face_explorer.More():
         face = topods.Face(face_explorer.Current())
-        face_feature_gnn = create_face_node_gnn(face)
-        edge_coplanar_list.append(face_feature_gnn)
+        _,  cylinders = create_face_node_gnn(face)
 
         # Explore edges of the face
         edge_explorer = TopExp_Explorer(face, TopAbs_EDGE)
@@ -176,10 +213,12 @@ def create_graph_from_step_file(step_path):
             
             edge_explorer.Next()
         
+        if len(cylinders) != 0:
+            cylinder_features += cylinders
         face_explorer.Next()
 
     
-    return edge_features_list, edge_coplanar_list
+    return edge_features_list, cylinder_features
 
 
 class BRep_Dataset(Dataset):

@@ -96,24 +96,25 @@ class dataset_generator():
         brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
 
 
-        # final_brep_edges = []
-        # new_features = []
-        # for file_name in brep_files:
-        #     brep_file_path = os.path.join(brep_directory, file_name)
-        #     edge_features_list, _= Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
+        final_brep_edges = []
+        new_features = []
+        for file_name in brep_files:
+            brep_file_path = os.path.join(brep_directory, file_name)
+            edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
 
-        #     # If this is the first brep
-        #     if len(final_brep_edges) == 0:
-        #         final_brep_edges = edge_features_list
-        #     else:
-        #         # We already have brep
-        #         new_features= find_new_features(final_brep_edges, edge_features_list) 
-        #         final_brep_edges += new_features
+            # If this is the first brep
+            if len(final_brep_edges) == 0:
+                final_brep_edges = edge_features_list
+            else:
+                # We already have brep
+                new_features= find_new_features(final_brep_edges, edge_features_list) 
+                final_brep_edges += new_features
             
-        #     print("file_name", file_name)
-        #     # Preprocessing.proc_CAD.helper.vis_brep(np.array(new_features))
-        #     # print("new_features", new_features)
-        #     print("--------??-----------")
+            print("file_name", file_name)
+            # Preprocessing.proc_CAD.helper.vis_brep(np.array(edge_features_list))
+            print("cylinder_features", cylinder_features)
+            print("new_features", np.array(edge_features_list))
+            print("--------??-----------")
 
 
 
