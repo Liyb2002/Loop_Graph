@@ -97,6 +97,7 @@ class dataset_generator():
 
 
         final_brep_edges = []
+        final_cylinder_features = []
         new_features = []
         for file_name in brep_files:
             brep_file_path = os.path.join(brep_directory, file_name)
@@ -105,29 +106,20 @@ class dataset_generator():
             # If this is the first brep
             if len(final_brep_edges) == 0:
                 final_brep_edges = edge_features_list
+                final_cylinder_features += cylinder_features
             else:
                 # We already have brep
                 new_features= find_new_features(final_brep_edges, edge_features_list) 
                 final_brep_edges += new_features
+                final_cylinder_features += cylinder_features
             
-            print("file_name", file_name)
             # Preprocessing.proc_CAD.helper.vis_brep(np.array(edge_features_list))
-            print("cylinder_features", cylinder_features)
-            print("new_features", np.array(edge_features_list))
+
+            output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
+            print("output_brep_edges", output_brep_edges)
             print("--------??-----------")
 
 
-
-
-
-
-            # brep_file_path = os.path.join(brep_directory, usable_brep_files[-1])
-            # final_brep_edges_list, _ = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
-
-            # final_brep_edges = np.array(final_brep_edges_list)
-            # final_brep_edges = np.round(final_brep_edges, 4)
-            # brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(final_brep_edges)
-            # brep_loop_neighboring = Preprocessing.proc_CAD.helper.loop_neighboring_simple(brep_loops)
 
 
         #         # 5) Stroke_Cloud - Brep Connection

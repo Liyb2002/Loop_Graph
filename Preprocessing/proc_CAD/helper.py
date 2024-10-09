@@ -1110,6 +1110,27 @@ def connected_strokes(stroke_node_features):
 def dist(center, point):
     return round(np.linalg.norm(center - point), 4)
 
+
+#----------------------------------------------------------------------------------#
+
+
+def pad_brep_features(final_brep_edges):
+    # Create an empty list to store the padded results
+    padded_edges = []
+
+    # Iterate through each sublist in final_brep_edges
+    for edge in final_brep_edges:
+        # If the sublist has 6 elements, pad it with two zeros
+        if len(edge) == 6:
+            padded_edge = edge + [0, 0]
+        else:
+            padded_edge = edge
+        padded_edges.append(padded_edge)
+
+    return np.round(np.array(padded_edges), 4)
+
+
+
 #----------------------------------------------------------------------------------#
 def stroke_to_edge(stroke_node_features, final_brep_edges):
     """
