@@ -685,7 +685,7 @@ def face_aggregate_circle_brep(brep_matrix):
     for i in range(brep_matrix.shape[0]):
 
         # Is circle
-        if (brep_matrix[i, :3] == brep_matrix[i, 3:6]).all():
+        if brep_matrix[i, 7] != 0 and brep_matrix[i, 6] != 0:
             circle_loops.append(frozenset([i]))
 
     return circle_loops
@@ -1176,6 +1176,31 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
     return stroke_used_matrix
 
 
+def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
+    num_strokes = stroke_node_features.shape[0]
+    stroke_used_matrix = np.zeros((num_strokes, 1), dtype=np.float32)
+    
+    for j, brep_edge in enumerate(final_brep_edges):
+        center = np.array(brep_edge[:3])  # First 3 values are the center
+        radius = brep_edge[7]  # The radius is at index 7
+
+        if brep_edge[6] != 0 and brep_edge[7] != 0:
+
+            for i, stroke in enumerate(stroke_node_features):
+                point1 = np.array(stroke[:3])  # First point of the stroke
+                point2 = np.array(stroke[3:6])  # Second point of the stroke
+
+                # Compute the distance from point1 and point2 to the center of the brep edge
+                dist1 = np.linalg.norm(point1 - center)
+                dist2 = np.linalg.norm(point2 - center)
+
+                # Check if either of the stroke points lies on the edge (distance == radius)
+                if np.isclose(dist1, radius) or np.isclose(dist2, radius):
+                    # print(f"Stroke {i} has a point on brep_edge {j}")
+                    stroke_used_matrix[i] = 1
+
+    return stroke_used_matrix
+
 
 def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges):
     """
@@ -1233,25 +1258,34 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
 
 def stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges):
     
+    num_stroke_cloud_loops = len(stroke_cloud_loops)
+    num_brep_loops = len(brep_loops)
+    correspondence_matrix = np.zeros((num_stroke_cloud_loops, num_brep_loops), dtype=np.float32)
+
     
-    for stroke_loop in stroke_cloud_loops:
-        for brep_loop in brep_loops:
+    for i, stroke_loop in enumerate(stroke_cloud_loops):
+        for j, brep_loop in enumerate(brep_loops):
 
 
             if len(stroke_loop) == 1 and len(brep_loop) ==1:
 
-                print("------")
-                print("stroke_loop", stroke_loop)
-                print("brep_loop", brep_loop)
-
-
                 stroke_circle_edge = stroke_node_features[stroke_loop[0]]
                 brep_circle_edge = final_brep_edges[brep_loop[0]]
 
-                print("stroke_circle_edge", stroke_circle_edge[:3] )
-                print("brep_circle_edge", brep_circle_edge[:3])
+                if (stroke_circle_edge[:3] == brep_circle_edge[:3]).all():
+                    correspondence_matrix[i, j] = 1.0
 
-                print("(stroke_circle_edge[:3] == brep_circle_edge[:3]).all()", (stroke_circle_edge[:3] == brep_circle_edge[:3]).all())
+    return correspondence_matrix
+
+
+def union_matrices(stroke_to_loop_lines, stroke_to_loop_circle):
+    # Ensure both matrices have the same shape
+    assert stroke_to_loop_lines.shape == stroke_to_loop_circle.shape, "Matrices must have the same shape."
+    
+    # Create a union matrix where each element is 1 if either matrix has a 1 at that position
+    union_matrix = np.where((stroke_to_loop_lines == 1) | (stroke_to_loop_circle == 1), 1, 0)
+    
+    return union_matrix
 
 
 
