@@ -422,8 +422,6 @@ def build_graph(stroke_dict, messy = False):
             node_features[i, 6:7] = alpha_value
             node_features[i, 7:] = radius
 
-            print("radius", radius)
-
             for stroke_op_count in stroke.Op:
                 operations_order_matrix[i, stroke_op_count] = 1
 

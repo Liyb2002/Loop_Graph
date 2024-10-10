@@ -11,7 +11,9 @@ from OCC.Core.Geom import Geom_CylindricalSurface
 from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
 from OCC.Core.GeomAbs import GeomAbs_SurfaceType
 from OCC.Core.gp import gp_Vec
-from OCC.Core.GeomAbs import GeomAbs_Cylinder
+from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane, GeomAbs_Circle
+from OCC.Core.Geom import Geom_Circle
+from OCC.Core.GeomAdaptor import GeomAdaptor_Curve
 
 from torch.utils.data import Dataset
 from itertools import combinations
@@ -83,10 +85,14 @@ def create_face_node(face):
     return flattened_vertices
 
 
+# What this code does:
+# 1)Circles: Center (3 value), normal (3 value), 0, radius
+# 2)Cylinder face: Center (3 value), normal (3 value), height, radius
 def create_face_node_gnn(face):
     
     adaptor_surface = BRepAdaptor_Surface(face)
-    cylinder_features = []
+    circle_features = []
+
     # cylinder surface
     if adaptor_surface.GetType() == GeomAbs_Cylinder:
         cylinder = adaptor_surface.Cylinder()
@@ -110,21 +116,38 @@ def create_face_node_gnn(face):
         height_vector = gp_Vec(point_start, point_end)
         height = height_vector.Magnitude()
         cylinder_data = axis_location + axis_direction + [height, radius]
-        cylinder_features.append(cylinder_data)
+        circle_features.append(cylinder_data)
 
 
+    if adaptor_surface.GetType() == GeomAbs_Plane:
 
+        edge_explorer = TopExp_Explorer(face, TopAbs_EDGE)
+        while edge_explorer.More():
+            edge = topods.Edge(edge_explorer.Current())
+            curve_handle, first, last = BRep_Tool.Curve(edge)
+            adaptor_curve = GeomAdaptor_Curve(curve_handle, first, last)
+            curve_type = adaptor_curve.GetType()
 
+            # Check if the curve is a circle
+            if curve_type == GeomAbs_Circle:
+                geom_circle = adaptor_curve.Circle()
 
-    face_feature_gnn = []
-    edge_explorer = TopExp_Explorer(face, TopAbs_EDGE)
-    while edge_explorer.More():
-        edge = topods.Edge(edge_explorer.Current())
-        edge_features = create_edge_node(edge)
-        face_feature_gnn.append(edge_features)
-        edge_explorer.Next()
+                # Extract circle parameters
+                circle_axis = geom_circle.Axis()
+                circle_center = geom_circle.Location()
+                circle_radius = geom_circle.Radius()
+                circle_normal = circle_axis.Direction()
 
-    return face_feature_gnn, cylinder_features
+                center_coords = [circle_center.X(), circle_center.Y(), circle_center.Z()]
+                normal_coords = [circle_normal.X(), circle_normal.Y(), circle_normal.Z()]
+                radius = circle_radius
+
+                cylinder_data = center_coords + normal_coords + [0, circle_radius]
+                circle_features.append(cylinder_data)
+            
+            edge_explorer.Next()
+
+    return circle_features
 
 
     
@@ -195,7 +218,7 @@ def create_graph_from_step_file(step_path):
     face_explorer = TopExp_Explorer(shape, TopAbs_FACE)
     while face_explorer.More():
         face = topods.Face(face_explorer.Current())
-        _,  cylinders = create_face_node_gnn(face)
+        cylinders = create_face_node_gnn(face)
 
         # Explore edges of the face
         edge_explorer = TopExp_Explorer(face, TopAbs_EDGE)

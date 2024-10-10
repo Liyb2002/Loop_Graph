@@ -679,6 +679,18 @@ def face_aggregate_circle(stroke_matrix):
     return circle_loops
 
 
+def face_aggregate_circle_brep(brep_matrix):
+
+    circle_loops = []
+    for i in range(brep_matrix.shape[0]):
+
+        # Is circle
+        if (brep_matrix[i, :3] == brep_matrix[i, 3:6]).all():
+            circle_loops.append(frozenset([i]))
+
+    return circle_loops
+
+
 
 #----------------------------------------------------------------------------------#
 def reorder_loops(loops):
@@ -1187,21 +1199,13 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
     # Step 1: Find matching between stroke_node_features and final_brep_edges
     stroke_to_brep_map = {}
     for stroke_idx, stroke in enumerate(stroke_node_features):
+
+        if stroke[7] != 0: 
+            continue
         
         stroke_points = set(map(tuple, [stroke[:3], stroke[3:6]]))
         for brep_idx, brep_edge in enumerate(final_brep_edges):
-            # if stroke[7] != 0 :
-            #     print("stroke", stroke)
-            if (brep_edge[3:6] == brep_edge[:3]).all():
-                print("(stroke[:3] == brep_edge[:3]).all()", brep_edge)
-            # circle stroke 
-            if stroke[7] != 0 and (stroke[:3] == brep_edge[:3]).all():
-
-                print("found center match")
-                if stroke_idx not in stroke_to_brep_map:
-                    stroke_to_brep_map[stroke_idx] = set()
-                stroke_to_brep_map[stroke_idx].add(brep_idx)
-
+            
             brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))
             
             # Check if stroke is contained in brep or brep is contained in stroke
@@ -1225,6 +1229,32 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
                 stroke_matched[i] = True
 
     return correspondence_matrix
+
+
+def stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges):
+    
+    
+    for stroke_loop in stroke_cloud_loops:
+        for brep_loop in brep_loops:
+
+
+            if len(stroke_loop) == 1 and len(brep_loop) ==1:
+
+                print("------")
+                print("stroke_loop", stroke_loop)
+                print("brep_loop", brep_loop)
+
+
+                stroke_circle_edge = stroke_node_features[stroke_loop[0]]
+                brep_circle_edge = final_brep_edges[brep_loop[0]]
+
+                print("stroke_circle_edge", stroke_circle_edge[:3] )
+                print("brep_circle_edge", brep_circle_edge[:3])
+
+                print("(stroke_circle_edge[:3] == brep_circle_edge[:3]).all()", (stroke_circle_edge[:3] == brep_circle_edge[:3]).all())
+
+
+
 
 
 def vis_specific_loop(loop, strokes):

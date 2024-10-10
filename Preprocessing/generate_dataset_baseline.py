@@ -80,6 +80,7 @@ class dataset_generator():
         # 2) Get the loops
         stroke_cloud_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
         stroke_cloud_loops = Preprocessing.proc_CAD.helper.reorder_loops(stroke_cloud_loops)
+        stroke_cloud_loops = [list(loop) for loop in stroke_cloud_loops]
 
 
         # 3) Compute Loop Neighboring Information
@@ -116,16 +117,19 @@ class dataset_generator():
             # Preprocessing.proc_CAD.helper.vis_brep(np.array(edge_features_list))
 
             output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
-            brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(final_brep_edges) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
-            # print("output_brep_edges", output_brep_edges)
-            # print("--------??-----------")
+            brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(output_brep_edges) + Preprocessing.proc_CAD.helper.face_aggregate_circle_brep(output_brep_edges)
+            brep_loops = [list(loop) for loop in brep_loops]
+            # print("new_features", new_features)
+            print("--------??-----------")
 
 
 
 
         # 5) Stroke_Cloud - Brep Connection
-        stroke_to_loop = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges)
-        #         stroke_to_edge = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, final_brep_edges)
+        # stroke_to_loop = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, output_brep_edges)
+        # stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, output_brep_edges)
+       
+       #         stroke_to_edge = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, final_brep_edges)
 
         #     # 6) Update the next brep file to read
         #     prev_stop_idx = next_stop_idx+1
@@ -221,13 +225,15 @@ def find_new_features(prev_brep_edges, new_edge_features):
 
             brep_start, brep_end = np.array(prev_brep_line[:3]), np.array(prev_brep_line[3:])
 
+            # This is a circle edge
+            if (edge_start == edge_end).all():
+                break
+
             # Check if the lines are the same, either directly or in reverse order
             if (np.allclose(edge_start, brep_start) and np.allclose(edge_end, brep_end)) or \
-            (np.allclose(edge_start, brep_end) and np.allclose(edge_end, brep_start)) or \
-            (edge_start == edge_end).all():
+            (np.allclose(edge_start, brep_end) and np.allclose(edge_end, brep_start)):
                 # Relation 1: The two lines are exactly the same
                 relation_found = True
-
                 break
             
             elif is_same_direction(new_edge_line, prev_brep_line) and is_line_contained(new_edge_line, prev_brep_line):
