@@ -23,19 +23,18 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/test', number_data = 1, start = 0)
+        self.generate_dataset('dataset/test', number_data = 5, start = 0)
         # self.generate_dataset('dataset/messy_order_full', number_data = -1, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
         successful_generations = start
 
-        self.generate_single_data(successful_generations, dir)
-        # while successful_generations < number_data:
-        #     if self.generate_single_data(successful_generations, dir):
-        #         successful_generations += 1
-        #     else:
-        #         print("Retrying...")
+        while successful_generations < number_data:
+            if self.generate_single_data(successful_generations, dir):
+                successful_generations += 1
+            else:
+                print("Retrying...")
 
 
     def generate_single_data(self, successful_generations, dir):
@@ -100,6 +99,7 @@ class dataset_generator():
         final_brep_edges = []
         final_cylinder_features = []
         new_features = []
+        file_count = 0
         for file_name in brep_files:
             brep_file_path = os.path.join(brep_directory, file_name)
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
@@ -107,7 +107,7 @@ class dataset_generator():
             # If this is the first brep
             if len(final_brep_edges) == 0:
                 final_brep_edges = edge_features_list
-                final_cylinder_features += cylinder_features
+                final_cylinder_features = cylinder_features
             else:
                 # We already have brep
                 new_features= find_new_features(final_brep_edges, edge_features_list) 
@@ -119,50 +119,42 @@ class dataset_generator():
             output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
             brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(output_brep_edges) + Preprocessing.proc_CAD.helper.face_aggregate_circle_brep(output_brep_edges)
             brep_loops = [list(loop) for loop in brep_loops]
-            print("--------??-----------")
 
 
-
-
-        # 5) Stroke_Cloud - Brep Connection
-        stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, output_brep_edges)
-        stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, output_brep_edges)
-        stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
-        
-        stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
-        stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, output_brep_edges)
-        stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
-
-        #     # 6) Update the next brep file to read
-        #     prev_stop_idx = next_stop_idx+1
-
-        #     # 7) Write the data to file
-        #     os.makedirs(os.path.join(data_directory, 'shape_info'), exist_ok=True)
-        #     output_file_path = os.path.join(data_directory, 'shape_info', f'shape_info_{file_count}.pkl')
-        #     with open(output_file_path, 'wb') as f:
-        #         pickle.dump({
-        #             'stroke_cloud_loops': stroke_cloud_loops, 
-        #             'brep_loops': brep_loops,
-
-        #             'stroke_node_features': stroke_node_features,
-        #             'strokes_perpendicular': strokes_perpendicular,
-        #             'final_brep_edges': final_brep_edges,
-        #             'stroke_operations_order_matrix': stroke_operations_order_matrix, 
-
-        #             'loop_neighboring_vertical': loop_neighboring_vertical,
-        #             'loop_neighboring_horizontal': loop_neighboring_horizontal,
-        #             'loop_neighboring_contained': loop_neighboring_contained,
-        #             'loop_neighboring_coplanar':loop_neighboring_coplanar,
-
-        #             'brep_loop_neighboring': brep_loop_neighboring,
-
-        #             'stroke_to_loop': stroke_to_loop,
-        #             'stroke_to_edge': stroke_to_edge
-        #         }, f)
+            # 5) Stroke_Cloud - Brep Connection
+            stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, output_brep_edges)
+            stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, output_brep_edges)
+            stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
             
-        #     file_count += 1
+            stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
+            stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, output_brep_edges)
+            stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
 
-        # return True
+
+            # 7) Write the data to file
+            os.makedirs(os.path.join(data_directory, 'shape_info'), exist_ok=True)
+            output_file_path = os.path.join(data_directory, 'shape_info', f'shape_info_{file_count}.pkl')
+            with open(output_file_path, 'wb') as f:
+                pickle.dump({
+                    'stroke_cloud_loops': stroke_cloud_loops, 
+                    'brep_loops': brep_loops,
+
+                    'stroke_node_features': stroke_node_features,
+                    'strokes_perpendicular': strokes_perpendicular,
+                    'final_brep_edges': final_brep_edges,
+                    'stroke_operations_order_matrix': stroke_operations_order_matrix, 
+
+                    'loop_neighboring_vertical': loop_neighboring_vertical,
+                    'loop_neighboring_horizontal': loop_neighboring_horizontal,
+                    'loop_neighboring_contained': loop_neighboring_contained,
+
+                    'stroke_to_loop': stroke_to_loop,
+                    'stroke_to_edge': stroke_to_edge
+                }, f)
+            
+            file_count += 1
+
+        return True
 
 
 

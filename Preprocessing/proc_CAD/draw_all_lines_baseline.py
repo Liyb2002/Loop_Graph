@@ -482,6 +482,9 @@ class create_stroke_cloud():
 
         # Helper function to determine if one edge is contained within another
         def is_contained(edge1, edge2):
+            if (edge1.vertices is None) or (edge2.vertices is None): 
+                return False
+            
             """Check if edge2 (q1->q2) is contained within edge1 (p1->p2)."""
             p1, p2 = edge1.vertices[0].position, edge1.vertices[1].position
             q1, q2 = edge2.vertices[0].position, edge2.vertices[1].position
@@ -547,6 +550,10 @@ class create_stroke_cloud():
 
             # Check if the new edge is contained within any existing edge
             for _, prev_edge in list(self.edges.items()):
+
+                if (prev_edge is None )or (new_edge is None):
+                    continue
+                    
                 if is_contained(prev_edge, new_edge):
                     # The new edge is contained within the previous edge
                     is_edge_contained = True
