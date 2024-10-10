@@ -340,55 +340,9 @@ def vis_brep(brep):
 
         elif stroke[6] == 0 and stroke[7] != 0:
             # Circle face (same rotation logic as shared)
-            center = stroke[:3]
-            normal = stroke[3:6]
-            radius = stroke[7]
+            x_values, y_values, z_values = plot_circle(stroke)
 
-            # Generate circle points in the XY plane
-            theta = np.linspace(0, 2 * np.pi, 100)
-            x_values = radius * np.cos(theta)
-            y_values = radius * np.sin(theta)
-            z_values = np.zeros_like(theta)
-
-            # Combine the coordinates into a matrix (3, 100)
-            circle_points = np.array([x_values, y_values, z_values])
-
-            # Normalize the normal vector
-            normal = normal / np.linalg.norm(normal)
-
-            # Rotation logic using Rodrigues' formula
-            z_axis = np.array([0, 0, 1])  # Z-axis is the default normal for the circle
-
-            if not np.allclose(normal, z_axis):
-                rotation_axis = np.cross(z_axis, normal)
-                rotation_axis /= np.linalg.norm(rotation_axis)  # Normalize rotation axis
-                angle = np.arccos(np.dot(z_axis, normal))
-
-                # Create the rotation matrix using the rotation axis and angle (Rodrigues' rotation formula)
-                K = np.array([[0, -rotation_axis[2], rotation_axis[1]],
-                              [rotation_axis[2], 0, -rotation_axis[0]],
-                              [-rotation_axis[1], rotation_axis[0], 0]])
-
-                R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * np.dot(K, K)
-
-                # Rotate the circle points
-                rotated_circle_points = np.dot(R, circle_points)
-            else:
-                rotated_circle_points = circle_points
-
-            # Translate the circle to the center point
-            x_values = rotated_circle_points[0] + center[0]
-            y_values = rotated_circle_points[1] + center[1]
-            z_values = rotated_circle_points[2] + center[2]
-
-            # Plot the circle
             ax.plot(x_values, y_values, z_values, color='blue')
-
-            # Update axis limits for the circle points
-            x_min, x_max = min(x_min, x_values.min()), max(x_max, x_values.max())
-            y_min, y_max = min(y_min, y_values.min()), max(y_max, y_values.max())
-            z_min, z_max = min(z_min, z_values.min()), max(z_max, z_values.max())
-
         else:
             # Plot the stroke
             start, end = stroke[:3], stroke[3:6]
@@ -456,53 +410,34 @@ def vis_selected_loops(graph, selected_loop_idx):
         
         if stroke[7] != 0:
             # Circle face
-            center = stroke[:3]
-            normal = stroke[3:6]
-            radius = stroke[7]
+            x_values, y_values, z_values = plot_circle(stroke)
 
-            # Generate circle points in the XY plane
-            theta = np.linspace(0, 2 * np.pi, 30)  # Less dense with 30 points
-            x_values = radius * np.cos(theta)
-            y_values = radius * np.sin(theta)
-            z_values = np.zeros_like(theta)
-
-            # Combine the coordinates into a matrix (3, 30)
-            circle_points = np.array([x_values, y_values, z_values])
-
-            # Normalize the normal vector
-            normal = normal / np.linalg.norm(normal)
-
-            # Rotation logic using Rodrigues' formula
-            z_axis = np.array([0, 0, 1])  # Z-axis is the default normal for the circle
-
-            rotation_axis = np.cross(z_axis, normal)
-            if np.linalg.norm(rotation_axis) > 0:  # Check if rotation is needed
-                rotation_axis /= np.linalg.norm(rotation_axis)
-                angle = np.arccos(np.clip(np.dot(z_axis, normal), -1.0, 1.0))
-
-                # Create the rotation matrix using the rotation axis and angle (Rodrigues' rotation formula)
-                K = np.array([[0, -rotation_axis[2], rotation_axis[1]],
-                              [rotation_axis[2], 0, -rotation_axis[0]],
-                              [-rotation_axis[1], rotation_axis[0], 0]])
-
-                R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * np.dot(K, K)
-
-                # Rotate the circle points
-                rotated_circle_points = np.dot(R, circle_points)
-            else:
-                rotated_circle_points = circle_points
-
-            # Translate the circle to the center point
-            x_values = rotated_circle_points[0] + center[0]
-            y_values = rotated_circle_points[1] + center[1]
-            z_values = rotated_circle_points[2] + center[2]
-
-            # Plot the circle
             ax.plot(x_values, y_values, z_values, color='blue')
 
         else:
             # Plot the stroke
             ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+
+
+    # Plot the chosen loop in red
+    strokes_to_loops = graph['stroke', 'represents', 'loop'].edge_index
+    stroke_to_loops = {}
+    for stroke_idx, loop_idx in zip(strokes_to_loops[0], strokes_to_loops[1]):
+        if loop_idx.item() not in stroke_to_loops:
+            stroke_to_loops[loop_idx.item()] = []
+        stroke_to_loops[loop_idx.item()].append(stroke_idx.item())
+
+    for loop_idx, stroke_indices in stroke_to_loops.items():
+        if loop_idx == selected_loop_idx:  # Plot only the selected loop
+            for idx in stroke_indices:
+                stroke = stroke_node_features[idx]
+                if stroke[7] != 0:
+                    x_values, y_values, z_values = plot_circle(stroke)
+                    ax.plot(x_values, y_values, z_values, color='red')
+                else:
+                    start, end = stroke[:3], stroke[3:6]
+                    ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='red', linewidth=1)
+
 
     # Compute the center of the shape based on the strokes only (ignoring circles)
     x_center = (x_min + x_max) / 2
@@ -595,4 +530,50 @@ def feature_depad(feature_matrix):
     
     # If no row is full of -1, return the full matrix
     return feature_matrix
-    
+
+
+def plot_circle(stroke):
+    center = stroke[:3]
+    normal = stroke[3:6]
+    radius = stroke[7]
+
+    # Generate circle points in the XY plane
+    theta = np.linspace(0, 2 * np.pi, 30)  # Less dense with 30 points
+    x_values = radius * np.cos(theta)
+    y_values = radius * np.sin(theta)
+    z_values = np.zeros_like(theta)
+
+    # Combine the coordinates into a matrix (3, 30)
+    circle_points = np.array([x_values, y_values, z_values])
+
+    # Normalize the normal vector
+    normal = normal / np.linalg.norm(normal)
+
+    # Rotation logic using Rodrigues' formula
+    z_axis = np.array([0, 0, 1])  # Z-axis is the default normal for the circle
+
+    rotation_axis = np.cross(z_axis, normal)
+    if np.linalg.norm(rotation_axis) > 0:  # Check if rotation is needed
+        rotation_axis /= np.linalg.norm(rotation_axis)
+        angle = np.arccos(np.clip(np.dot(z_axis, normal), -1.0, 1.0))
+
+        # Create the rotation matrix using the rotation axis and angle (Rodrigues' rotation formula)
+        K = np.array([[0, -rotation_axis[2], rotation_axis[1]],
+                        [rotation_axis[2], 0, -rotation_axis[0]],
+                        [-rotation_axis[1], rotation_axis[0], 0]])
+
+        R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * np.dot(K, K)
+
+        # Rotate the circle points
+        rotated_circle_points = np.dot(R, circle_points)
+    else:
+        rotated_circle_points = circle_points
+
+    # Translate the circle to the center point
+    x_values = rotated_circle_points[0] + center[0]
+    y_values = rotated_circle_points[1] + center[1]
+    z_values = rotated_circle_points[2] + center[2]
+
+
+    return x_values, y_values, z_values
+

@@ -84,10 +84,14 @@ def train():
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        program, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
-        second_last_column = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
-        chosen_strokes = (second_last_column == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        if program[-1] != 'sketch':
+            continue
+
+        kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
+        chosen_strokes = (kth_operation == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        
         loop_chosen_mask = []
         for loop in stroke_cloud_loops:
             if all(stroke in chosen_strokes for stroke in loop):
@@ -98,6 +102,7 @@ def train():
         loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
         if not (loop_selection_mask == 1).any():
             continue
+        
 
         # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
@@ -111,12 +116,11 @@ def train():
             stroke_to_edge
         )
 
-        print("loop_selection_mask", torch.argmax(loop_selection_mask))
         gnn_graph.to_device_withPadding(device)
         loop_selection_mask = loop_selection_mask.to(device)
         # Encoders.helper.vis_stroke_with_order(stroke_node_features)
         # Encoders.helper.vis_brep(output_brep_edges)
-        Encoders.helper.vis_selected_loops(gnn_graph, torch.argmax(loop_selection_mask))
+        # Encoders.helper.vis_selected_loops(gnn_graph, torch.argmax(loop_selection_mask))
 
         # Prepare the pair
         graphs.append(gnn_graph)
