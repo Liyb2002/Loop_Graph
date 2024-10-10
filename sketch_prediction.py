@@ -113,9 +113,11 @@ def train():
 
         gnn_graph.to_device_withPadding(device)
         loop_selection_mask = loop_selection_mask.to(device)
+        print("stroke_node_features", stroke_node_features.shape)
+        print("gnn_graph", gnn_graph['stroke'].x.shape)
         # Encoders.helper.vis_stroke_with_order(stroke_node_features)
         Encoders.helper.vis_brep(output_brep_edges)
-        # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+        # Encoders.helper.vis_selected_loops(gnn_graph, torch.argmax(loop_selection_mask))
 
         # Prepare the pair
         graphs.append(gnn_graph)
