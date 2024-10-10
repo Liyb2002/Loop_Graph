@@ -421,17 +421,18 @@ def vis_brep(brep):
     plt.show()
 
 
-def vis_selected_loops(graph, selected_loop):
+def vis_selected_loops(graph, selected_loop_idx):
     """
     Visualize the graph with loops and strokes in 3D space, including circles for strokes where stroke[7] != 0.
     
     Parameters:
     graph (SketchLoopGraph): A single graph object containing loops and strokes.
+    selected_loop_idx (int): The index of the loop that is chosen to be highlighted (not used yet).
     """
 
     # Extract stroke features
-    stroke_node_features = graph['stroke'].x.numpy()
-    print("stroke_node_features", stroke_node_features)
+    stroke_node_features = graph['stroke'].x.cpu().numpy()
+    stroke_node_features = feature_depad(stroke_node_features)
 
     # Initialize the 3D plot
     fig = plt.figure()
@@ -446,14 +447,14 @@ def vis_selected_loops(graph, selected_loop):
     # Plot all strokes in blue
     for stroke in stroke_node_features:
         start, end = stroke[:3], stroke[3:6]
-        
-        # Update the min and max limits for each axis
-        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+        # Update the min and max limits for rescaling based only on strokes (ignoring circles)
+        if stroke[7] == 0:
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
         
         if stroke[7] != 0:
-            print("stroke", stroke)
             # Circle face
             center = stroke[:3]
             normal = stroke[3:6]
@@ -499,21 +500,11 @@ def vis_selected_loops(graph, selected_loop):
             # Plot the circle
             ax.plot(x_values, y_values, z_values, color='blue')
 
-            # Update axis limits for the circle points
-            x_min, x_max = min(x_min, x_values.min()), max(x_max, x_values.max())
-            y_min, y_max = min(y_min, y_values.min()), max(y_max, y_values.max())
-            z_min, z_max = min(z_min, z_values.min()), max(z_max, z_values.max())
-
         else:
             # Plot the stroke
             ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
 
-            # Update axis limits for the stroke points
-            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-
-    # Compute the center of the shape
+    # Compute the center of the shape based on the strokes only (ignoring circles)
     x_center = (x_min + x_max) / 2
     y_center = (y_min + y_max) / 2
     z_center = (z_min + z_max) / 2
@@ -594,3 +585,14 @@ def vis_selected_strokes(graph, stroke_selection_mask):
 
     # Show plot
     plt.show()
+
+
+def feature_depad(feature_matrix):
+    # Loop through each row and check if it's all -1
+    for i, row in enumerate(feature_matrix):
+        if np.all(row == -1):  # If all elements of the row are -1
+            return feature_matrix[:i, :]  # Return the sub-matrix up to this row
+    
+    # If no row is full of -1, return the full matrix
+    return feature_matrix
+    
