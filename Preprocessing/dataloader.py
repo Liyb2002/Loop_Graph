@@ -52,25 +52,22 @@ class Program_Graph_Dataset(Dataset):
             shape_data = pickle.load(f)
         
         stroke_cloud_loops = [list(fset) for fset in shape_data['stroke_cloud_loops']]
+
         stroke_node_features = shape_data['stroke_node_features']
         strokes_perpendicular = shape_data['strokes_perpendicular']
+        output_brep_edges = torch.tensor(shape_data['output_brep_edges'], dtype=torch.float32)
+        stroke_operations_order_matrix = torch.tensor(shape_data['stroke_operations_order_matrix'], dtype=torch.float32)
 
         # Convert remaining numpy arrays to tensors
         
         loop_neighboring_vertical = torch.tensor(shape_data['loop_neighboring_vertical'], dtype=torch.long)
         loop_neighboring_horizontal = torch.tensor(shape_data['loop_neighboring_horizontal'], dtype=torch.long)
         loop_neighboring_contained = torch.tensor(shape_data['loop_neighboring_contained'], dtype=torch.long)
-        loop_neighboring_coplanar = torch.tensor(shape_data['loop_neighboring_coplanar'], dtype=torch.long)
 
         stroke_to_loop = torch.tensor(shape_data['stroke_to_loop'], dtype=torch.long)
         stroke_to_edge = torch.tensor(shape_data['stroke_to_edge'], dtype=torch.long)
 
-        # final_brep_edges = torch.tensor(shape_data['final_brep_edges'], dtype=torch.float32)
-
-        # Load stroke_operations_order_matrix and convert to tensor
-        stroke_operations_order_matrix = torch.tensor(shape_data['stroke_operations_order_matrix'], dtype=torch.float32)
-
-        return stroke_cloud_loops, stroke_node_features, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_loop, stroke_to_edge ,stroke_operations_order_matrix
+        return stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge
 
 
 

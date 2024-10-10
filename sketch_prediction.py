@@ -72,7 +72,7 @@ def compute_accuracy(valid_output, valid_batch_masks):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_full')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -84,7 +84,7 @@ def train():
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_loop, stroke_to_edge ,stroke_operations_order_matrix = data
+        stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
         second_last_column = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
         chosen_strokes = (second_last_column == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
@@ -114,7 +114,7 @@ def train():
         gnn_graph.to_device_withPadding(device)
         loop_selection_mask = loop_selection_mask.to(device)
         # Encoders.helper.vis_stroke_with_order(stroke_node_features)
-        # Encoders.helper.vis_brep(final_brep_edges)
+        Encoders.helper.vis_brep(output_brep_edges)
         # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
 
         # Prepare the pair
@@ -336,4 +336,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

@@ -243,16 +243,18 @@ def vis_left_graph(graph):
     plt.show()
 
 
+
+
 def vis_brep(brep):
     """
-    Visualize the brep strokes in 3D space if brep is not empty.
+    Visualize the brep strokes and circular/cylindrical faces in 3D space if brep is not empty.
     
     Parameters:
-    brep (np.ndarray): A matrix with shape (num_strokes, 6) representing strokes.
+    brep (np.ndarray or torch.Tensor): A matrix with shape (num_strokes, 6) representing strokes.
                        Each row contains two 3D points representing the start and end of a stroke.
                        If brep.shape[0] == 0, the function returns without plotting.
     """
-    # Check if brep is empty
+    # Initialize the 3D plot
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.grid(False)
@@ -262,23 +264,140 @@ def vis_brep(brep):
         plt.title('Empty Plot')
         plt.show()
         return
-    
+
+    # Convert brep to numpy if it's a tensor
+    if not isinstance(brep, np.ndarray):
+        brep = brep.numpy()
 
     # Initialize min and max limits
     x_min, x_max = float('inf'), float('-inf')
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
-    # Plot all brep strokes in blue with line width 1
+    # Plot all brep strokes and circle/cylinder faces in blue
     for stroke in brep:
-        start, end = stroke[:3], stroke[3:6]
-        
-        # Update the min and max limits for each axis
-        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-        
-        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+        if stroke[6] != 0 and stroke[7] != 0:
+            # Cylinder face
+            center = stroke[:3]
+            normal = stroke[3:6]
+            height = stroke[6]
+            radius = stroke[7]
+
+            # Generate points for the cylinder's base circle (less dense)
+            theta = np.linspace(0, 2 * np.pi, 30)  # Less dense with 30 points
+            x_values = radius * np.cos(theta)
+            y_values = radius * np.sin(theta)
+            z_values = np.zeros_like(theta)
+
+            # Combine the coordinates into a matrix (3, 30)
+            base_circle_points = np.array([x_values, y_values, z_values])
+
+            # Normalize the normal vector
+            normal = normal / np.linalg.norm(normal)
+
+            # Rotation logic using Rodrigues' formula
+            z_axis = np.array([0, 0, 1])  # Z-axis is the default normal for the cylinder
+
+            # Rotate the base circle points to align with the normal vector (even if normal is aligned)
+            rotation_axis = np.cross(z_axis, normal)
+            if np.linalg.norm(rotation_axis) > 0:  # Check if rotation is needed
+                rotation_axis /= np.linalg.norm(rotation_axis)
+                angle = np.arccos(np.clip(np.dot(z_axis, normal), -1.0, 1.0))
+
+                # Create the rotation matrix using the rotation axis and angle (Rodrigues' rotation formula)
+                K = np.array([[0, -rotation_axis[2], rotation_axis[1]],
+                              [rotation_axis[2], 0, -rotation_axis[0]],
+                              [-rotation_axis[1], rotation_axis[0], 0]])
+
+                R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * np.dot(K, K)
+
+                # Rotate the base circle points
+                rotated_base_circle_points = np.dot(R, base_circle_points)
+            else:
+                rotated_base_circle_points = base_circle_points
+
+            # Translate the base circle to the center point
+            x_base = rotated_base_circle_points[0] + center[0]
+            y_base = rotated_base_circle_points[1] + center[1]
+            z_base = rotated_base_circle_points[2] + center[2]
+
+            # Plot the base circle
+            ax.plot(x_base, y_base, z_base, color='blue')
+
+            # Plot vertical lines to create the "cylinder" (but without filling the body)
+            x_top = x_base - normal[0] * height
+            y_top = y_base - normal[1] * height
+            z_top = z_base - normal[2] * height
+
+            # Plot lines connecting the base and top circle with reduced density
+            for i in range(0, len(x_base), 5):  # Fewer lines by skipping points
+                ax.plot([x_base[i], x_top[i]], [y_base[i], y_top[i]], [z_base[i], z_top[i]], color='blue')
+
+            # Update axis limits for the cylinder points
+            x_min, x_max = min(x_min, x_base.min(), x_top.min()), max(x_max, x_base.max(), x_top.max())
+            y_min, y_max = min(y_min, y_base.min(), y_top.min()), max(y_max, y_base.max(), y_top.max())
+            z_min, z_max = min(z_min, z_base.min(), z_top.min()), max(z_max, z_base.max(), z_top.max())
+
+        elif stroke[6] == 0 and stroke[7] != 0:
+            # Circle face (same rotation logic as shared)
+            center = stroke[:3]
+            normal = stroke[3:6]
+            radius = stroke[7]
+
+            # Generate circle points in the XY plane
+            theta = np.linspace(0, 2 * np.pi, 100)
+            x_values = radius * np.cos(theta)
+            y_values = radius * np.sin(theta)
+            z_values = np.zeros_like(theta)
+
+            # Combine the coordinates into a matrix (3, 100)
+            circle_points = np.array([x_values, y_values, z_values])
+
+            # Normalize the normal vector
+            normal = normal / np.linalg.norm(normal)
+
+            # Rotation logic using Rodrigues' formula
+            z_axis = np.array([0, 0, 1])  # Z-axis is the default normal for the circle
+
+            if not np.allclose(normal, z_axis):
+                rotation_axis = np.cross(z_axis, normal)
+                rotation_axis /= np.linalg.norm(rotation_axis)  # Normalize rotation axis
+                angle = np.arccos(np.dot(z_axis, normal))
+
+                # Create the rotation matrix using the rotation axis and angle (Rodrigues' rotation formula)
+                K = np.array([[0, -rotation_axis[2], rotation_axis[1]],
+                              [rotation_axis[2], 0, -rotation_axis[0]],
+                              [-rotation_axis[1], rotation_axis[0], 0]])
+
+                R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * np.dot(K, K)
+
+                # Rotate the circle points
+                rotated_circle_points = np.dot(R, circle_points)
+            else:
+                rotated_circle_points = circle_points
+
+            # Translate the circle to the center point
+            x_values = rotated_circle_points[0] + center[0]
+            y_values = rotated_circle_points[1] + center[1]
+            z_values = rotated_circle_points[2] + center[2]
+
+            # Plot the circle
+            ax.plot(x_values, y_values, z_values, color='blue')
+
+            # Update axis limits for the circle points
+            x_min, x_max = min(x_min, x_values.min()), max(x_max, x_values.max())
+            y_min, y_max = min(y_min, y_values.min()), max(y_max, y_values.max())
+            z_min, z_max = min(z_min, z_values.min()), max(z_max, z_values.max())
+
+        else:
+            # Plot the stroke
+            start, end = stroke[:3], stroke[3:6]
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+
+            # Update axis limits for the stroke points
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
 
     # Compute the center of the shape
     x_center = (x_min + x_max) / 2

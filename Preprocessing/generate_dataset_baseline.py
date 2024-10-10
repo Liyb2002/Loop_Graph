@@ -130,18 +130,16 @@ class dataset_generator():
             stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, output_brep_edges)
             stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
 
-
             # 7) Write the data to file
             os.makedirs(os.path.join(data_directory, 'shape_info'), exist_ok=True)
             output_file_path = os.path.join(data_directory, 'shape_info', f'shape_info_{file_count}.pkl')
             with open(output_file_path, 'wb') as f:
                 pickle.dump({
                     'stroke_cloud_loops': stroke_cloud_loops, 
-                    'brep_loops': brep_loops,
 
                     'stroke_node_features': stroke_node_features,
                     'strokes_perpendicular': strokes_perpendicular,
-                    'final_brep_edges': final_brep_edges,
+                    'output_brep_edges': output_brep_edges,
                     'stroke_operations_order_matrix': stroke_operations_order_matrix, 
 
                     'loop_neighboring_vertical': loop_neighboring_vertical,

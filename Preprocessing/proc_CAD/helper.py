@@ -685,7 +685,7 @@ def face_aggregate_circle_brep(brep_matrix):
     for i in range(brep_matrix.shape[0]):
 
         # Is circle
-        if brep_matrix[i, 7] != 0 and brep_matrix[i, 6] != 0:
+        if brep_matrix[i, 7] != 0 and brep_matrix[i, 6] == 0:
             circle_loops.append(frozenset([i]))
 
     return circle_loops
