@@ -175,8 +175,6 @@ def train():
         gnn_graph.to_device_withPadding(device)
         loop_selection_mask = loop_selection_mask.to(device)
 
-        if (len(graphs) > 200):
-            break
         # Encoders.helper.vis_stroke_with_order(stroke_node_features)
         # Encoders.helper.vis_brep(output_brep_edges)
         # Encoders.helper.vis_selected_loops(graph['stroke'].x.cpu().numpy(), graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(loop_selection_mask)])
@@ -287,7 +285,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_eval')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -356,9 +354,6 @@ def eval():
         eval_loop_selection_masks.append(loop_selection_mask)
         eval_all_loop_selection_masks.append(all_loop_selection_mask)
 
-        if len(eval_graphs) > 100:
-            break
-
 
     print(f"Total number of preprocessed graphs: {len(eval_graphs)}")
 
@@ -413,6 +408,9 @@ def eval():
 
 
     print("Category-wise Accuracy:")
+    total_correct = 0
+    total_samples = 0
+
     for i in range(4):
         if total_category_count[i] > 0:
             accuracy = total_correct_count[i] / total_category_count[i] * 100
@@ -424,10 +422,14 @@ def eval():
     average_eval_loss = eval_loss / total_iterations_eval
     print(f"Average Evaluation Loss: {average_eval_loss:.4f}")
 
+    # Calculate and print overall average accuracy
+    overall_accuracy = total_correct / total_samples * 100
+    print(f"Overall Average Accuracy: {overall_accuracy:.2f}%")
+
 
 
 
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

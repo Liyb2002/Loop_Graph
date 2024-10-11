@@ -5,8 +5,6 @@ import Preprocessing.gnn_graph_stroke
 import Encoders.gnn.gnn
 import Encoders.helper
 
-import Preprocessing.proc_CAD
-import Preprocessing.proc_CAD.helper
 from torch_geometric.loader import DataLoader
 
 from tqdm import tqdm
@@ -20,18 +18,18 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
-graph_decoder = Encoders.gnn.gnn.Extrude_Decoder()
+graph_decoder = Encoders.gnn.gnn.Program_Decoder()
 
 graph_encoder.to(device)
 graph_decoder.to(device)
 
-criterion = nn.BCELoss()
+criterion = Encoders.gnn.gnn.FocalLoss(alpha=0.75, gamma=2.5)
 optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
-batch_size = 16
+
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction')
+save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -45,6 +43,29 @@ def save_models():
 
 
 # ------------------------------------------------------------------------------# 
+
+
+def compute_accuracy(valid_output, valid_batch_masks):
+    batch_size = valid_output.shape[0] // 200
+    correct = 0
+
+    for i in range(batch_size):
+        output_slice = valid_output[i * 200:(i + 1) * 200]
+        mask_slice = valid_batch_masks[i * 200:(i + 1) * 200]
+
+        max_output_value, max_output_index = torch.max(output_slice, dim=0)
+        max_mask_value, max_mask_index = torch.max(mask_slice, dim=0)
+
+        values_where_mask_is_1 = output_slice[mask_slice == 1]
+        indices_where_mask_is_1 = torch.nonzero(mask_slice == 1).squeeze()
+
+        # print(f"Graph {i}: Values where mask is 1: {values_where_mask_is_1.tolist()}, Indices: {indices_where_mask_is_1.tolist()}")
+        # print(f"Graph {i}: max_output_index={max_output_index.item()}, max_mask_index={max_mask_index.item()}")
+
+        if max_output_index == max_mask_index:
+            correct += 1
+
+    return correct
 
 
 def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
@@ -88,11 +109,11 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
         category_count[category_idx] += 1
 
         # Get the index of the maximum value for both the output and mask
-        condition_1 = (mask_slice == 1) & (output_slice > 0.5)
-        condition_2 = (mask_slice == 0) & (output_slice < 0.5)
+        _, max_output_index = torch.max(output_slice, dim=0)
+        gt_indices = torch.nonzero(mask_slice > 0)[:, 0].tolist()
 
         # Check if the prediction is correct and increment the correct counter for the category
-        if torch.all(condition_1 | condition_2):
+        if max_output_index.item() in gt_indices:
             correct_count[category_idx] += 1
         else:
             pass
@@ -102,111 +123,44 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
     return category_count, correct_count
 
 
-
-def compute_accuracy(valid_output, valid_batch_masks):
-    # Initialize the counter for correct predictions
-    correct = 0
-    total_loops = loop_selection_mask.shape[0] // padded_size  # Determine how many (200,1) matrices there are
-
-    # Loop through each matrix of size (200, 1)
-    for i in range(total_loops):
-        start_idx = i * padded_size
-        end_idx = start_idx + padded_size
-
-        # Extract the (200, 1) slice for both output and loop_selection_mask
-        output_slice = output[start_idx:end_idx]
-        mask_slice = loop_selection_mask[start_idx:end_idx]
-
-        # Evaluate conditions for this slice
-        condition_1 = (mask_slice == 1) & (output_slice > 0.5)
-        condition_2 = (mask_slice == 0) & (output_slice < 0.5)
-
-        # If all conditions are satisfied, increment the correct count
-        if torch.all(condition_1 | condition_2):
-            correct += 1
-
-    return correct
-
-
-
-def compute_accuracy_eval(output, loop_selection_mask, padded_size=200):
-    correct = 0
-    total_loops = loop_selection_mask.shape[0] // padded_size  # Determine how many (200,1) matrices there are
-
-    # Loop through each matrix of size (200, 1)
-    for i in range(total_loops):
-        start_idx = i * padded_size
-        end_idx = start_idx + padded_size
-
-        # Extract the (200, 1) slice for both output and loop_selection_mask
-        output_slice = output[start_idx:end_idx]
-        mask_slice = loop_selection_mask[start_idx:end_idx]
-
-        # Evaluate conditions for this slice
-        condition_1 = (mask_slice == 1) & (output_slice > 0.5)
-        condition_2 = (mask_slice == 0) & (output_slice < 0.5)
-
-        # Print output values where loop_selection_mask == 1 for the current slice
-        mask_1_indices = (mask_slice == 1).nonzero(as_tuple=True)
-        if mask_1_indices[0].numel() > 0:
-            print(f"Output values where loop_selection_mask == 1 for slice {i}:")
-            print(output_slice[mask_1_indices])
-
-        # Check if all conditions are met for this slice
-        if torch.all(condition_1 | condition_2):
-            correct += 1
-
-    return correct
-
-
 # ------------------------------------------------------------------------------# 
-
 
 
 def train():
     # Load the dataset
     dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
     print(f"Total number of shape data: {len(dataset)}")
-
+    
     best_val_accuracy = 0
     epochs = 30
-
+    
     graphs = []
-    stroke_selection_masks = []
+    loop_selection_masks = []
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
-        if program[-1] != 'extrude'or len(program) > stroke_operations_order_matrix.shape[1]:
+        if program[-1] != 'sketch':
             continue
-        
+
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
-
-        sketch_operation_mask = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-2)
-        sketch_stroke_idx = (sketch_operation_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-
-        extrude_selection_mask = Encoders.helper.choose_extrude_strokes(kth_operation, sketch_operation_mask, stroke_node_features)
-        extrude_stroke_idx = (extrude_selection_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-
-
-        # Find the sketch_loops
+        chosen_strokes = (kth_operation == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        
         loop_chosen_mask = []
         for loop in stroke_cloud_loops:
-            if all(stroke in sketch_stroke_idx for stroke in loop):
+            if all(stroke in chosen_strokes for stroke in loop):
                 loop_chosen_mask.append(1)  # Loop is chosen
             else:
                 loop_chosen_mask.append(0)  # Loop is not chosen
         
-        sketch_loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
-
-        if not (extrude_selection_mask == 1).any() and not (sketch_loop_selection_mask == 1).any():
+        loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
+        if not (loop_selection_mask == 1).any():
             continue
+        
 
-
-
-
+        # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
             stroke_node_features, 
@@ -218,23 +172,23 @@ def train():
             stroke_to_edge
         )
 
-        gnn_graph.set_select_sketch(sketch_loop_selection_mask)
         gnn_graph.to_device_withPadding(device)
-        extrude_selection_mask = extrude_selection_mask.to(device)
+        loop_selection_mask = loop_selection_mask.to(device)
 
+        # Encoders.helper.vis_stroke_with_order(stroke_node_features)
+        # Encoders.helper.vis_brep(output_brep_edges)
+        # Encoders.helper.vis_selected_loops(graph['stroke'].x.cpu().numpy(), graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(loop_selection_mask)])
+
+        # Prepare the pair
         graphs.append(gnn_graph)
-        stroke_selection_masks.append(extrude_selection_mask)
-    
-        # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(sketch_loop_selection_mask)])
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
-
+        loop_selection_masks.append(loop_selection_mask)
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
-
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
     train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
-    train_masks, val_masks = stroke_selection_masks[:split_index], stroke_selection_masks[split_index:]
+    train_masks, val_masks = loop_selection_masks[:split_index], loop_selection_masks[split_index:]
+
 
     # Convert train and validation graphs to HeteroData
     hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]
@@ -250,62 +204,51 @@ def train():
     graph_val_loader = DataLoader(hetero_val_graphs, batch_size=16, shuffle=False)
     mask_val_loader = DataLoader(padded_val_masks, batch_size=16, shuffle=False)
 
-    # Training and validation loop
-    epochs = 30  # Number of epochs
-    best_accuracy = 0.0
 
+
+    # Training loop
     for epoch in range(epochs):
         train_loss = 0.0
-        correct = 0
-        total = 0
-
         graph_encoder.train()
         graph_decoder.train()
+        train_correct = 0
+        train_total = 0
 
-        # Get total number of iterations for progress bar
+
         total_iterations = min(len(graph_train_loader), len(mask_train_loader))
-
-        # Training loop with progress bar
         for hetero_batch, batch_masks in tqdm(zip(graph_train_loader, mask_train_loader), 
                                               desc=f"Epoch {epoch+1}/{epochs} - Training", 
                                               dynamic_ncols=True, 
                                               total=total_iterations):
 
             optimizer.zero_grad()
+
             x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
             output = graph_decoder(x_dict)
 
-            # Ensure masks are on the correct device and reshape them to match the output
             batch_masks = batch_masks.to(output.device).view(-1, 1)
-            valid_mask = (batch_masks != -1).float()  
-
-            # Apply the valid mask to output and batch_masks
+            valid_mask = (batch_masks != -1).float()
             valid_output = output * valid_mask
             valid_batch_masks = batch_masks * valid_mask
-
-            # Compute the loss only on valid (non-padded) values
             loss = criterion(valid_output, valid_batch_masks)
 
-            # Backward pass and optimization
+            train_correct += compute_accuracy(valid_output, valid_batch_masks)
+            train_total += 16
+
+
             loss.backward()
             optimizer.step()
 
             train_loss += loss.item()
 
-            # Accuracy computation using the preferred method (only on valid values)
-            correct += compute_accuracy(valid_output, valid_batch_masks)
-            total += batch_size 
-
-        train_accuracy = correct / total
-        print(f"Epoch {epoch+1}/{epochs}, Training Loss: {train_loss / total_iterations}, Training Accuracy: {train_accuracy:.4f}")
-
-        # Validation loop
+        train_accuracy = train_correct / train_total if train_total > 0 else 0
+        train_loss /= len(train_graphs)
         val_loss = 0.0
         correct = 0
         total = 0
+
         graph_encoder.eval()
         graph_decoder.eval()
-
         with torch.no_grad():
             total_iterations_val = min(len(graph_val_loader), len(mask_val_loader))
 
@@ -313,89 +256,80 @@ def train():
                                                   desc="Validation", 
                                                   dynamic_ncols=True, 
                                                   total=total_iterations_val):
-                # Forward pass through the graph encoder
                 x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-
-                # Forward pass through the graph decoder
                 output = graph_decoder(x_dict)
 
-                # Ensure masks are on the correct device and reshape them
                 batch_masks = batch_masks.to(output.device).view(-1, 1)
-
-                # Apply the valid mask to output and batch_masks
                 valid_mask = (batch_masks != -1).float()
                 valid_output = output * valid_mask
                 valid_batch_masks = batch_masks * valid_mask
-
-                # Compute the validation loss
                 loss = criterion(valid_output, valid_batch_masks)
-                val_loss += loss.item()
 
-                # Accuracy computation using the preferred method (only on valid values)
                 correct += compute_accuracy(valid_output, valid_batch_masks)
-                total += batch_size
+                total += 16
 
-        val_accuracy = correct / total
-        print(f"Validation Loss: {val_loss / total_iterations_val}, Validation Accuracy: {val_accuracy:.4f}")
+        
+        val_loss /= len(val_graphs)
+        
 
-        # Save the model if validation accuracy improves
-        if val_accuracy > best_accuracy:
-            best_accuracy = val_accuracy
-            print(f"New best accuracy: {best_accuracy:.4f}, saved model")
+        accuracy = correct / total if total > 0 else 0
+        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.7f} - Validation Loss: {val_loss:.7f} - Train Accuracy: {train_accuracy:.5f} - Validation Accuracy: {accuracy:.5f}")
+
+        if accuracy > best_val_accuracy:
+            best_val_accuracy = accuracy
             save_models()
-
-
+            print(f"Models saved at epoch {epoch+1} with validation accuracy: {accuracy:.5f}")
 
 
 
 def eval():
-    # Load the saved models
-    load_models()  
-    graph_encoder.eval()
-    graph_decoder.eval()
-
-    batch_size = 16
-
+    load_models()
     # Load the dataset
     dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_eval')
     print(f"Total number of shape data: {len(dataset)}")
 
-    graphs = []
-    stroke_selection_masks = []
 
-    # Preprocess and build the graphs (same as in training)
+    eval_graphs = []
+    eval_loop_selection_masks = []
+    eval_all_loop_selection_masks = []
+
+    # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
-        if program[-1] != 'extrude':
+        if program[-1] != 'sketch':
             continue
-        
+
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
+        all_sketch_strokes = Encoders.helper.get_all_operation_strokes(stroke_operations_order_matrix, program_whole, 'sketch')
 
-        sketch_operation_mask = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-2)
-        sketch_stroke_idx = (sketch_operation_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-
-        extrude_selection_mask = Encoders.helper.choose_extrude_strokes(kth_operation, sketch_operation_mask, stroke_node_features)
-        extrude_stroke_idx = (extrude_selection_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-
-
-        # Find the sketch_loops
+        # Gets the strokes for the current sketch Operation
+        chosen_strokes = (kth_operation == 1).nonzero(as_tuple=True)[0]  # Indices of chosen stroke
         loop_chosen_mask = []
         for loop in stroke_cloud_loops:
-            if all(stroke in sketch_stroke_idx for stroke in loop):
+            if all(stroke in chosen_strokes for stroke in loop):
                 loop_chosen_mask.append(1)  # Loop is chosen
             else:
                 loop_chosen_mask.append(0)  # Loop is not chosen
         
-        sketch_loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
-
-        if not (extrude_selection_mask == 1).any() and not (sketch_loop_selection_mask == 1).any():
+        loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
+        if not (loop_selection_mask == 1).any():
             continue
 
+        
+        # Gets the strokes for all sketch Operation
+        all_chosen_strokes = (all_sketch_strokes == 1).nonzero(as_tuple=True)[0]  # Indices of chosen stroke
+        all_loop_chosen_mask = []
+        for loop in stroke_cloud_loops:
+            if all(stroke in all_chosen_strokes for stroke in loop):
+                all_loop_chosen_mask.append(1)  # Loop is chosen
+            else:
+                all_loop_chosen_mask.append(0)  # Loop is not chosen
+        all_loop_selection_mask = torch.tensor(all_loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
 
-
-
+        
+        # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
             stroke_node_features, 
@@ -407,47 +341,56 @@ def eval():
             stroke_to_edge
         )
 
-        gnn_graph.set_select_sketch(sketch_loop_selection_mask)
+        # Encoders.helper.vis_brep(final_brep_edges)
+        all_selected_loops_idx = [idx for idx, value in enumerate(all_loop_chosen_mask) if value != 0]
+
+        # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, all_selected_loops_idx )
+
+        # Prepare the pair
         gnn_graph.to_device_withPadding(device)
-        extrude_selection_mask = extrude_selection_mask.to(device)
+        loop_selection_mask = loop_selection_mask.to(device)
 
-        graphs.append(gnn_graph)
-        stroke_selection_masks.append(extrude_selection_mask)
-    
-        # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(sketch_loop_selection_mask)])
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+        eval_graphs.append(gnn_graph)
+        eval_loop_selection_masks.append(loop_selection_mask)
+        eval_all_loop_selection_masks.append(all_loop_selection_mask)
 
-        
-    print(f"Total number of preprocessed graphs: {len(graphs)}")
 
-    # Convert to HeteroData and pad the masks
-    hetero_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in graphs]
-    padded_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in stroke_selection_masks]
+    print(f"Total number of preprocessed graphs: {len(eval_graphs)}")
 
-    # Create DataLoader for evaluation
-    graph_eval_loader = DataLoader(hetero_graphs, batch_size=batch_size, shuffle=False)
-    mask_eval_loader = DataLoader(padded_masks, batch_size=batch_size, shuffle=False)
+
+    # Convert train and validation graphs to HeteroData
+    hetero_eval_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in eval_graphs]
+    padded_eval_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in eval_loop_selection_masks]
+    padded_eval_all_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in eval_all_loop_selection_masks]
+
+    # Create DataLoaders for training and validation graphs/masks
+    graph_eval_loader = DataLoader(hetero_eval_graphs, batch_size=16, shuffle=False)
+    mask_eval_loader = DataLoader(padded_eval_masks, batch_size=16, shuffle=False)
+    mask_eval_all_loader = DataLoader(padded_eval_all_masks, batch_size=16, shuffle=False)
+
+
+
+    # Eval
+    graph_encoder.eval()
+    graph_decoder.eval()
 
     eval_loss = 0.0
     total_category_count = [0, 0, 0, 0]
     total_correct_count = [0, 0, 0, 0] 
 
-    criterion = torch.nn.BCELoss()  # Assuming BCELoss is used in the training
-
     with torch.no_grad():
-        total_iterations_eval = min(len(graph_eval_loader), len(mask_eval_loader))
+        total_iterations_eval = min(len(graph_eval_loader), len(mask_eval_all_loader))
 
-        for hetero_batch, batch_masks in tqdm(zip(graph_eval_loader, mask_eval_loader), desc="Evaluation", dynamic_ncols=True, total=total_iterations_eval):
-            # Forward pass through the graph encoder
+        for hetero_batch, batch_masks, in tqdm(zip(graph_eval_loader, mask_eval_all_loader), 
+                                                desc="Evaluation", 
+                                                dynamic_ncols=True, 
+                                                total=total_iterations_eval):
+                        
+
             x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-
-            # Forward pass through the graph decoder
             output = graph_decoder(x_dict)
 
-            # Ensure masks are on the correct device and reshape them
             batch_masks = batch_masks.to(output.device).view(-1, 1)
-
-            # Create a valid mask for non-zero values (padding values are -1)
             valid_mask = (batch_masks != -1).float()
             valid_output = output * valid_mask
             valid_batch_masks = batch_masks * valid_mask
@@ -471,8 +414,6 @@ def eval():
     for i in range(4):
         if total_category_count[i] > 0:
             accuracy = total_correct_count[i] / total_category_count[i] * 100
-            total_correct += total_correct_count[i]
-            total_samples += total_category_count[i]
             print(f"Category {i+1}: {accuracy:.2f}% (Correct: {total_correct_count[i]}/{total_category_count[i]})")
         else:
             print(f"Category {i+1}: No samples")
@@ -484,6 +425,8 @@ def eval():
     # Calculate and print overall average accuracy
     overall_accuracy = total_correct / total_samples * 100
     print(f"Overall Average Accuracy: {overall_accuracy:.2f}%")
+
+
 
 
 #---------------------------------- Public Functions ----------------------------------#
