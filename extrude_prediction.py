@@ -109,26 +109,36 @@ def compute_accuracy_eval(output, loop_selection_mask, padded_size=200):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_full')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
     print(f"Total number of shape data: {len(dataset)}")
-        
+
+    best_val_accuracy = 0
+    epochs = 30
+
     graphs = []
     stroke_selection_masks = []
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_loop, stroke_to_edge ,stroke_operations_order_matrix = data
+        program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
-        stroke_selection_mask = stroke_operations_order_matrix[:, -1].reshape(-1, 1)
-        sketch_selection_mask = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
-        extrude_selection_mask = Encoders.helper.choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features)
+        if program[-1] != 'extrude':
+            continue
+        
+        kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
+
+        sketch_operation_mask = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-2)
+        sketch_stroke_idx = (sketch_operation_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+
+        extrude_selection_mask = Encoders.helper.choose_extrude_strokes(kth_operation, sketch_operation_mask, stroke_node_features)
+        extrude_stroke_idx = (extrude_selection_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+
 
         # Find the sketch_loops
-        chosen_strokes = (sketch_selection_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
         loop_chosen_mask = []
         for loop in stroke_cloud_loops:
-            if all(stroke in chosen_strokes for stroke in loop):
+            if all(stroke in sketch_stroke_idx for stroke in loop):
                 loop_chosen_mask.append(1)  # Loop is chosen
             else:
                 loop_chosen_mask.append(0)  # Loop is not chosen
@@ -138,7 +148,8 @@ def train():
         if not (extrude_selection_mask == 1).any() and not (sketch_loop_selection_mask == 1).any():
             continue
 
-        stroke_node_features = torch.tensor(stroke_node_features, dtype=torch.float32)
+
+
 
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
@@ -157,6 +168,14 @@ def train():
 
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
+    
+        Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(sketch_loop_selection_mask)])
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+
+        
+        if (len(graphs) > 200):
+            break
+
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
 

@@ -526,19 +526,22 @@ def vis_selected_loops(stroke_node_features, strokes_to_loops, selected_loop_idx
     plt.show()
 
 
-def vis_selected_strokes(graph, stroke_selection_mask):
-    """
-    Visualize all strokes in the graph in 3D space. Strokes are colored based on stroke_selection_mask.
-    
-    Parameters:
-    graph (SketchHeteroData): A single graph object containing strokes.
-    stroke_selection_mask (np.ndarray or torch.Tensor): A binary mask of shape (num_strokes, 1), where 1 indicates a chosen stroke (red), and 0 indicates an unchosen stroke (blue).
-    """
 
+def vis_selected_strokes(stroke_node_features, selected_stroke_idx):
+    """
+    Visualizes selected strokes in 3D space.
+
+    Parameters:
+    - stroke_node_features: A numpy array or list containing the features of each stroke.
+      Each stroke should contain its start and end coordinates, and potentially a flag indicating if it's a circle.
+    - selected_stroke_idx: A list or array of indices of the strokes that should be highlighted in the visualization.
     
-    # Extract stroke features from the graph
-    stroke_node_features = graph['stroke'].x.numpy()
-    stroke_selection_mask = stroke_selection_mask.numpy()
+    This function visualizes all strokes but highlights the selected strokes.
+    """
+    
+    # Extract stroke features
+    # stroke_node_features = graph['stroke'].x.cpu().numpy()
+    stroke_node_features = feature_depad(stroke_node_features)
 
     # Initialize the 3D plot
     fig = plt.figure()
@@ -550,21 +553,40 @@ def vis_selected_strokes(graph, stroke_selection_mask):
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
-    # Plot all strokes, using red for selected strokes and blue for unchosen ones
-    for idx, stroke in enumerate(stroke_node_features):
+    # Plot all strokes in blue
+    for stroke in stroke_node_features:
         start, end = stroke[:3], stroke[3:6]
-        color = 'red' if stroke_selection_mask[idx] > 0.5 else 'blue'
+
+        # Update the min and max limits for rescaling based only on strokes (ignoring circles)
+        if stroke[7] == 0:
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
         
-        # Update the min and max limits for each axis
-        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-        
-        # Plot the stroke
-        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color=color, linewidth=1, alpha=1)
+        if stroke[7] != 0:
+            # Circle face
+            x_values, y_values, z_values = plot_circle(stroke)
+
+            ax.plot(x_values, y_values, z_values, color='blue')
+
+        else:
+            # Plot the stroke
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
 
 
-    # Compute the center of the shape
+    # Plot the chosen loop in red
+    for idx, stroke in enumerate(stroke_node_features):
+        if idx in selected_stroke_idx:
+            stroke = stroke_node_features[idx]
+            if stroke[7] != 0:
+                x_values, y_values, z_values = plot_circle(stroke)
+                ax.plot(x_values, y_values, z_values, color='red')
+            else:
+                start, end = stroke[:3], stroke[3:6]
+                ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='red', linewidth=1)
+
+
+    # Compute the center of the shape based on the strokes only (ignoring circles)
     x_center = (x_min + x_max) / 2
     y_center = (y_min + y_max) / 2
     z_center = (z_min + z_max) / 2
@@ -582,9 +604,9 @@ def vis_selected_strokes(graph, stroke_selection_mask):
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
 
-
     # Show plot
     plt.show()
+
 
 
 def feature_depad(feature_matrix):
