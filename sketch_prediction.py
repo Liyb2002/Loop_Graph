@@ -68,7 +68,7 @@ def compute_accuracy(valid_output, valid_batch_masks):
     return correct
 
 
-def compute_accuracy_with_lvl(valid_output, valid_batch_masks, node_features):
+def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
     # Infer batch size and sequence length from the shapes
     batch_size = valid_output.shape[0] // 200
 
@@ -81,22 +81,26 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, node_features):
 
         output_slice = valid_output[i * 200:(i + 1) * 200]
         mask_slice = valid_batch_masks[i * 200:(i + 1) * 200]
-        node_slice = node_features[i * 200: (i + 1) * 200]  # Each slice is 200 rows
+        
+        stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 200:(i + 1) * 200]
+        edge_features = hetero_batch.edge_index_dict['stroke', 'represents', 'loop']
+        edge_features_slice = Encoders.helper.find_edge_features_slice(edge_features, i)
+
 
         # Find k: the number of rows where all elements are not -1
         k = 0
-        for row in node_slice:
+        for row in stroke_node_features_slice:
             if not torch.all(row == -1):
                 k += 1
             else:
                 break
 
         # Determine category based on k
-        if k < 20:
+        if k < 30:
             category_idx = 0  # Category 1
-        elif 20 <= k < 40:
+        elif 30 <= k < 50:
             category_idx = 1  # Category 2
-        elif 40 <= k < 60:
+        elif 50 <= k < 80:
             category_idx = 2  # Category 3
         else:
             category_idx = 3  # Category 4
@@ -108,13 +112,12 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, node_features):
         _, max_output_index = torch.max(output_slice, dim=0)
         _, max_mask_index = torch.max(mask_slice, dim=0)
 
-        print("mask_slice", mask_slice)
-        print("max_output_index", max_output_index)
-        print("max_mask_index", max_mask_index)
-
         # Check if the prediction is correct and increment the correct counter for the category
         if max_output_index.item() == max_mask_index.item():
             correct_count[category_idx] += 1
+        else:
+            Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, max_output_index.item())
+            Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, max_mask_index.item())
 
     return category_count, correct_count
 
@@ -172,7 +175,7 @@ def train():
         loop_selection_mask = loop_selection_mask.to(device)
         # Encoders.helper.vis_stroke_with_order(stroke_node_features)
         # Encoders.helper.vis_brep(output_brep_edges)
-        # Encoders.helper.vis_selected_loops(gnn_graph, torch.argmax(loop_selection_mask))
+        # Encoders.helper.vis_selected_loops(graph['stroke'].x.cpu().numpy(), graph['stroke', 'represents', 'loop'].edge_index, torch.argmax(loop_selection_mask))
 
         # Prepare the pair
         graphs.append(gnn_graph)
@@ -374,7 +377,7 @@ def eval():
 
             # Encoders.helper.vis_selected_loops(gnn_graph, torch.argmax(valid_output))
 
-            category_count, correct_count = compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch.x_dict['loop'])           
+            category_count, correct_count = compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch)           
 
             for i in range(4):
                 total_category_count[i] += category_count[i]

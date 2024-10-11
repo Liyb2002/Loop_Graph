@@ -65,6 +65,41 @@ def stroke_to_face(kth_operation, face_to_stroke):
     return face_chosen
 
 
+
+#------------------------------------------------------------------------------------------------------#
+
+def find_edge_features_slice(tensor, i):
+    """
+    Extract edges from the tensor where both nodes are within the range
+    [i * 200, (i + 1) * 200), and adjust the values using modulo 200.
+
+    Args:
+    tensor (torch.Tensor): Input tensor of shape (2, n), where each column represents an edge between two nodes.
+    i (int): The batch index.
+
+    Returns:
+    torch.Tensor: Filtered and adjusted tensor of shape (2, k) where both nodes in each edge are within [i * 200, (i + 1) * 200),
+                  adjusted to range [0, 199] via modulo operation.
+    """
+    # Define the start and end of the range based on i
+    start = i * 200
+    end = (i + 1) * 200
+    
+    # Get the two rows representing the edges
+    edges = tensor
+    
+    # Create a mask where both nodes in each edge are within the range [start, end)
+    mask = (edges[0] >= start) & (edges[0] < end) & (edges[1] >= start) & (edges[1] < end)
+    
+    # Apply the mask to filter the edges
+    filtered_edges = edges[:, mask]
+    
+    # Adjust the values to range [0, 199] using modulo 200
+    adjusted_edges = filtered_edges % 200
+    
+    return adjusted_edges
+
+
 #------------------------------------------------------------------------------------------------------#
 
 def face_is_not_in_brep(matrix, face_to_stroke, node_features, edge_features):
@@ -375,7 +410,7 @@ def vis_brep(brep):
     plt.show()
 
 
-def vis_selected_loops(graph, selected_loop_idx):
+def vis_selected_loops(stroke_node_features, strokes_to_loops, selected_loop_idx):
     """
     Visualize the graph with loops and strokes in 3D space, including circles for strokes where stroke[7] != 0.
     
@@ -385,7 +420,7 @@ def vis_selected_loops(graph, selected_loop_idx):
     """
 
     # Extract stroke features
-    stroke_node_features = graph['stroke'].x.cpu().numpy()
+    # stroke_node_features = graph['stroke'].x.cpu().numpy()
     stroke_node_features = feature_depad(stroke_node_features)
 
     # Initialize the 3D plot
@@ -420,7 +455,7 @@ def vis_selected_loops(graph, selected_loop_idx):
 
 
     # Plot the chosen loop in red
-    strokes_to_loops = graph['stroke', 'represents', 'loop'].edge_index
+    # strokes_to_loops = graph['stroke', 'represents', 'loop'].edge_index
     stroke_to_loops = {}
     for stroke_idx, loop_idx in zip(strokes_to_loops[0], strokes_to_loops[1]):
         if loop_idx.item() not in stroke_to_loops:
