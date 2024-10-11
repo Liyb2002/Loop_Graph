@@ -7,7 +7,7 @@ from torch_geometric.data import HeteroData
 import Encoders.gnn.basic
 
 class SemanticModule(nn.Module):
-    def __init__(self, in_channels=8):
+    def __init__(self, in_channels=9):
         super(SemanticModule, self).__init__()
         self.local_head = Encoders.gnn.basic.GeneralHeteroConv(['represents_sum', 'represented_by_sum', 'neighboring_vertical_mean', 'neighboring_horizontal_mean', 'contains_sum', 'order_add', 'perpendicular_mean'], in_channels, 16)
 

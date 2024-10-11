@@ -67,12 +67,64 @@ def compute_accuracy(valid_output, valid_batch_masks):
 
     return correct
 
+
+def compute_accuracy_with_lvl(valid_output, valid_batch_masks, node_features):
+    # Infer batch size and sequence length from the shapes
+    batch_size = valid_output.shape[0] // 200
+
+    # Initialize counters for each category
+    category_count = [0, 0, 0, 0]  # Tracks the number of batches in each category
+    correct_count = [0, 0, 0, 0]   # Tracks the correct predictions in each category
+
+    for i in range(batch_size):
+        # Slice for each example in the batch
+
+        output_slice = valid_output[i * 200:(i + 1) * 200]
+        mask_slice = valid_batch_masks[i * 200:(i + 1) * 200]
+        node_slice = node_features[i * 200: (i + 1) * 200]  # Each slice is 200 rows
+
+        # Find k: the number of rows where all elements are not -1
+        k = 0
+        for row in node_slice:
+            if not torch.all(row == -1):
+                k += 1
+            else:
+                break
+
+        # Determine category based on k
+        if k < 20:
+            category_idx = 0  # Category 1
+        elif 20 <= k < 40:
+            category_idx = 1  # Category 2
+        elif 40 <= k < 60:
+            category_idx = 2  # Category 3
+        else:
+            category_idx = 3  # Category 4
+
+        # Increment the batch count for the category
+        category_count[category_idx] += 1
+
+        # Get the index of the maximum value for both the output and mask
+        _, max_output_index = torch.max(output_slice, dim=0)
+        _, max_mask_index = torch.max(mask_slice, dim=0)
+
+        print("mask_slice", mask_slice)
+        print("max_output_index", max_output_index)
+        print("max_mask_index", max_mask_index)
+
+        # Check if the prediction is correct and increment the correct counter for the category
+        if max_output_index.item() == max_mask_index.item():
+            correct_count[category_idx] += 1
+
+    return category_count, correct_count
+
+
 # ------------------------------------------------------------------------------# 
 
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -232,16 +284,20 @@ def eval():
     print(f"Total number of shape data: {len(dataset)}")
 
 
-    graphs = []
-    loop_selection_masks = []
+    eval_graphs = []
+    eval_loop_selection_masks = []
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
-        stroke_cloud_loops, stroke_node_features, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_neighboring_coplanar, stroke_to_loop, stroke_to_edge ,stroke_operations_order_matrix = data
+        program, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
-        second_last_column = stroke_operations_order_matrix[:, -2].reshape(-1, 1)
-        chosen_strokes = (second_last_column == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        if program[-1] != 'sketch':
+            continue
+
+        kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
+        chosen_strokes = (kth_operation == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        
         loop_chosen_mask = []
         for loop in stroke_cloud_loops:
             if all(stroke in chosen_strokes for stroke in loop):
@@ -268,77 +324,85 @@ def eval():
         # Encoders.helper.vis_brep(final_brep_edges)
 
         # Prepare the pair
-        graphs.append(gnn_graph)
-        loop_selection_masks.append(loop_selection_mask)
+        gnn_graph.to_device_withPadding(device)
+        loop_selection_mask = loop_selection_mask.to(device)
+
+        eval_graphs.append(gnn_graph)
+        eval_loop_selection_masks.append(loop_selection_mask)
+
+        if len(eval_graphs) > 100:
+            break
+
+
+    print(f"Total number of preprocessed graphs: {len(eval_graphs)}")
+
+
+    # Convert train and validation graphs to HeteroData
+    hetero_eval_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in eval_graphs]
+    padded_eval_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in eval_loop_selection_masks]
+
+    # Create DataLoaders for training and validation graphs/masks
+    graph_eval_loader = DataLoader(hetero_eval_graphs, batch_size=16, shuffle=False)
+    mask_eval_loader = DataLoader(padded_eval_masks, batch_size=16, shuffle=False)
+
 
 
     # Eval
     graph_encoder.eval()
     graph_decoder.eval()
-    lv1_correct = 0
-    lv1_total = 0
-    lv2_correct = 0
-    lv2_total = 0
-    lv3_correct = 0
-    lv3_total = 0
-    lv4_correct = 0
-    lv4_total = 0
 
     eval_loss = 0.0
+    total_category_count = [0, 0, 0, 0]
+    total_correct_count = [0, 0, 0, 0] 
 
     with torch.no_grad():
-        for gnn_graph, loop_selection_mask in tqdm(zip(graphs, loop_selection_masks), desc=f"Evaluation"):
-            x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+        total_iterations_eval = min(len(graph_eval_loader), len(mask_eval_loader))
+
+        for hetero_batch, batch_masks in tqdm(zip(graph_eval_loader, mask_eval_loader), 
+                                                desc="Evaluation", 
+                                                dynamic_ncols=True, 
+                                                total=total_iterations_eval):
+                        
+
+            x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
             output = graph_decoder(x_dict)
-            
-            # Encoders.helper.vis_selected_loops(gnn_graph, torch.argmax(output))
-            # Encoders.helper.vis_selected_loops(gnn_graph, torch.argmax(loop_selection_mask))
 
+            batch_masks = batch_masks.to(output.device).view(-1, 1)
+            valid_mask = (batch_masks != -1).float()
+            valid_output = output * valid_mask
+            valid_batch_masks = batch_masks * valid_mask
 
-            if x_dict['loop'].shape[0] < 15: 
-                lv1_total += 1
-            elif x_dict['loop'].shape[0] < 40: 
-                lv2_total += 1
-            elif x_dict['loop'].shape[0] < 60: 
-                lv3_total += 1
-            elif x_dict['loop'].shape[0] < 200: 
-                lv4_total += 1
+            # Encoders.helper.vis_selected_loops(gnn_graph, torch.argmax(valid_output))
 
-            # Check if the selected loop is correct
-            if torch.argmax(output) == torch.argmax(loop_selection_mask):
-                if x_dict['loop'].shape[0] < 15: 
-                    lv1_correct += 1
-                elif x_dict['loop'].shape[0] < 40: 
-                    lv2_correct += 1
-                elif x_dict['loop'].shape[0] < 60: 
-                    lv3_correct += 1
-                elif x_dict['loop'].shape[0] < 200: 
-                    lv4_correct += 1
+            category_count, correct_count = compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch.x_dict['loop'])           
 
-            # else:
-                # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(output))
-                # Encoders.helper.vis_whole_graph(gnn_graph, torch.argmax(loop_selection_mask))
+            for i in range(4):
+                total_category_count[i] += category_count[i]
+                total_correct_count[i] += correct_count[i]
 
-
-            loss = criterion(output, loop_selection_mask)
+            # Compute loss
+            # print("valid_output", valid_output[:20])
+            # print("valid_batch_masks", valid_batch_masks[:20])
+            loss = criterion(valid_output, valid_batch_masks)
             eval_loss += loss.item()
-        
-        eval_loss /= len(graphs)
-
-    lv1_accuracy = lv1_correct / lv1_total if lv1_total > 0 else 0 
-    lv2_accuracy = lv2_correct / lv2_total if lv2_total > 0 else 0 
-    lv3_accuracy = lv3_correct / lv3_total if lv3_total > 0 else 0 
-    lv4_accuracy = lv4_correct / lv4_total if lv4_total > 0 else 0 
 
 
-    print(f"lv1_accuracy: {lv1_accuracy:.5f}")
-    print(f"lv2_accuracy: {lv2_accuracy:.5f}")
-    print(f"lv3_accuracy: {lv3_accuracy:.5f}")
-    print(f"lv4_accuracy: {lv4_accuracy:.5f}")
+    print("Category-wise Accuracy:")
+    for i in range(4):
+        if total_category_count[i] > 0:
+            accuracy = total_correct_count[i] / total_category_count[i] * 100
+            print(f"Category {i+1}: {accuracy:.2f}% (Correct: {total_correct_count[i]}/{total_category_count[i]})")
+        else:
+            print(f"Category {i+1}: No samples")
+
+    # Calculate and print average evaluation loss
+    average_eval_loss = eval_loss / total_iterations_eval
+    print(f"Average Evaluation Loss: {average_eval_loss:.4f}")
+
 
 
 
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()
