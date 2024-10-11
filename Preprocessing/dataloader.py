@@ -67,7 +67,7 @@ class Program_Graph_Dataset(Dataset):
         stroke_to_loop = torch.tensor(shape_data['stroke_to_loop'], dtype=torch.long)
         stroke_to_edge = torch.tensor(shape_data['stroke_to_edge'], dtype=torch.long)
 
-        return program, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge
+        return program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge
 
 
 

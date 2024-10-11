@@ -11,6 +11,36 @@ def get_kth_operation(op_to_index_matrix, k):
     return kth_operation
 
 
+
+def get_all_operation_strokes(stroke_operations_order_matrix, program_whole, operation):
+    # Find the indices in program_whole where the operation occurs
+    ks = [i for i, op in enumerate(program_whole) if op == operation]
+
+    # Check if we found any valid indices
+    if len(ks) == 0:
+        raise ValueError(f"Operation '{operation}' not found in program_whole.")
+
+    # Squeeze the matrix to remove any singleton dimensions at the 0-th axis
+    squeezed_matrix = stroke_operations_order_matrix.squeeze(0)
+
+    # Initialize an empty list to collect all columns corresponding to ks
+    operation_strokes_list = []
+
+    # Collect the k-th columns and stack them into a new matrix
+    for k in ks:
+        kth_operation = squeezed_matrix[:, k].unsqueeze(1)  # Extract and unsqueeze the k-th column
+        operation_strokes_list.append(kth_operation)
+
+    # Stack all the k-th columns into a matrix of shape (op_to_index.shape[0], n)
+    all_operation_strokes = torch.cat(operation_strokes_list, dim=1)
+
+    # Perform a logical OR (any row that has a 1 in any column will have 1 in the result)
+    result_strokes = (all_operation_strokes > 0).any(dim=1).float().unsqueeze(1)
+
+    # Return the result as a column vector of shape (op_to_index.shape[0], 1)
+    return result_strokes
+
+
 def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features):
     """
     Given stroke_selection_mask and sketch_selection_mask, find if a stroke in stroke_selection_mask
@@ -463,7 +493,7 @@ def vis_selected_loops(stroke_node_features, strokes_to_loops, selected_loop_idx
         stroke_to_loops[loop_idx.item()].append(stroke_idx.item())
 
     for loop_idx, stroke_indices in stroke_to_loops.items():
-        if loop_idx == selected_loop_idx:  # Plot only the selected loop
+        if loop_idx in selected_loop_idx:  # Plot only the selected loop
             for idx in stroke_indices:
                 stroke = stroke_node_features[idx]
                 if stroke[7] != 0:
