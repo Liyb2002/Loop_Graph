@@ -271,7 +271,7 @@ def train():
         
 
         accuracy = correct / total if total > 0 else 0
-        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.5f} - Validation Loss: {val_loss:.5f} - Train Accuracy: {train_accuracy:.5f} - Validation Accuracy: {accuracy:.5f}")
+        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.7f} - Validation Loss: {val_loss:.7f} - Train Accuracy: {train_accuracy:.5f} - Validation Accuracy: {accuracy:.5f}")
 
         if accuracy > best_val_accuracy:
             best_val_accuracy = accuracy
@@ -408,4 +408,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()
