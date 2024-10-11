@@ -96,11 +96,11 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
                 break
 
         # Determine category based on k
-        if k < 30:
+        if k < 50:
             category_idx = 0  # Category 1
-        elif 30 <= k < 50:
+        elif 50 <= k < 70:
             category_idx = 1  # Category 2
-        elif 50 <= k < 80:
+        elif 70 <= k < 90:
             category_idx = 2  # Category 3
         else:
             category_idx = 3  # Category 4
@@ -110,14 +110,15 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
 
         # Get the index of the maximum value for both the output and mask
         _, max_output_index = torch.max(output_slice, dim=0)
-        _, max_mask_index = torch.max(mask_slice, dim=0)
+        gt_indices = torch.nonzero(mask_slice > 0)[:, 0].tolist()
 
         # Check if the prediction is correct and increment the correct counter for the category
-        if max_output_index.item() == max_mask_index.item():
+        if max_output_index.item() in gt_indices:
             correct_count[category_idx] += 1
         else:
-            Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_output_index.item()])
-            Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_mask_index.item()])
+            pass
+            # Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_output_index.item()])
+            # Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_mask_index.item()])
 
     return category_count, correct_count
 
@@ -345,7 +346,7 @@ def eval():
         # Encoders.helper.vis_brep(final_brep_edges)
         all_selected_loops_idx = [idx for idx, value in enumerate(all_loop_chosen_mask) if value != 0]
 
-        Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, all_selected_loops_idx )
+        # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, all_selected_loops_idx )
 
         # Prepare the pair
         gnn_graph.to_device_withPadding(device)
@@ -365,10 +366,12 @@ def eval():
     # Convert train and validation graphs to HeteroData
     hetero_eval_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in eval_graphs]
     padded_eval_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in eval_loop_selection_masks]
+    padded_eval_all_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in eval_all_loop_selection_masks]
 
     # Create DataLoaders for training and validation graphs/masks
     graph_eval_loader = DataLoader(hetero_eval_graphs, batch_size=16, shuffle=False)
     mask_eval_loader = DataLoader(padded_eval_masks, batch_size=16, shuffle=False)
+    mask_eval_all_loader = DataLoader(padded_eval_all_masks, batch_size=16, shuffle=False)
 
 
 
@@ -381,9 +384,9 @@ def eval():
     total_correct_count = [0, 0, 0, 0] 
 
     with torch.no_grad():
-        total_iterations_eval = min(len(graph_eval_loader), len(mask_eval_loader))
+        total_iterations_eval = min(len(graph_eval_loader), len(mask_eval_all_loader))
 
-        for hetero_batch, batch_masks in tqdm(zip(graph_eval_loader, mask_eval_loader), 
+        for hetero_batch, batch_masks, in tqdm(zip(graph_eval_loader, mask_eval_all_loader), 
                                                 desc="Evaluation", 
                                                 dynamic_ncols=True, 
                                                 total=total_iterations_eval):
