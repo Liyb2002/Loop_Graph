@@ -95,6 +95,20 @@ def stroke_to_face(kth_operation, face_to_stroke):
     return face_chosen
 
 
+def program_mapping(program):
+    operation_map = {
+        'sketch': 1,
+        'extrude': 2,
+        'terminate': 0,
+        'padding': 10
+    }
+    
+    # Map each operation in the program list to its corresponding value
+    mapped_program = [operation_map.get(op, -1) for op in program]  # -1 for unknown operations
+    
+    mapped_program += [10] * (20 - len(mapped_program))
+    
+    return mapped_program[:20]
 
 #------------------------------------------------------------------------------------------------------#
 

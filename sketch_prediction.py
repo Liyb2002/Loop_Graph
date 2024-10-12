@@ -413,8 +413,10 @@ def eval():
 
     for i in range(4):
         if total_category_count[i] > 0:
-            accuracy = total_correct_count[i] / total_category_count[i] * 100
-            print(f"Category {i+1}: {accuracy:.2f}% (Correct: {total_correct_count[i]}/{total_category_count[i]})")
+            accuracy = total_correct_count[i] / total_category_count[i]
+            total_correct += total_correct_count[i]
+            total_samples += total_category_count[i]
+            print(f"Category {i+1}: {accuracy:.4f}% (Correct: {total_correct_count[i]}/{total_category_count[i]})")
         else:
             print(f"Category {i+1}: No samples")
 
@@ -423,8 +425,8 @@ def eval():
     print(f"Average Evaluation Loss: {average_eval_loss:.4f}")
 
     # Calculate and print overall average accuracy
-    overall_accuracy = total_correct / total_samples * 100
-    print(f"Overall Average Accuracy: {overall_accuracy:.2f}%")
+    overall_accuracy = total_correct / total_samples 
+    print(f"Overall Average Accuracy: {overall_accuracy:.4f}%")
 
 
 
@@ -432,4 +434,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

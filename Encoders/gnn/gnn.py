@@ -75,6 +75,38 @@ class Extrude_Decoder(nn.Module):
         return torch.sigmoid(self.decoder(x_dict['stroke']))
 
 
+class Program_Decoder(nn.Module):
+    def __init__(self, embed_dim=128, num_heads=8, ff_dim=256, num_classes=10, dropout=0.1):
+        super(Program_Decoder, self).__init__()
+        self.cross_attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout)
+        self.ff = nn.Sequential(
+            nn.Linear(embed_dim, ff_dim),
+            nn.ReLU(),
+            nn.Linear(ff_dim, embed_dim)
+        )
+        self.norm = nn.LayerNorm(embed_dim)
+        self.dropout = nn.Dropout(dropout)
+        self.classifier = nn.Linear(embed_dim, num_classes)
+
+        self.program_encoder = ProgramEncoder()
+    
+    def forward(self, x_dict, program_tokens):
+
+        if len(program_tokens) == 0:
+            program_embedding = torch.zeros(1, 128)
+        else:
+            program_embedding = self.program_encoder(program_tokens)
+        
+        attn_output, _ = self.cross_attn(program_embedding, x_dict['stroke'], x_dict['stroke'])
+        out = self.norm(program_embedding + attn_output)
+
+        ff_output = self.ff(out)        
+        out_mean = ff_output.mean(dim=0)
+        
+        logits = self.classifier(out_mean)
+        return logits
+
+
 #---------------------------------- Loss Function ----------------------------------#
 
 class FocalLoss(nn.Module):
@@ -91,3 +123,17 @@ class FocalLoss(nn.Module):
         focal_loss = self.alpha * ((1 - pt) ** self.gamma) * BCE_loss
 
         return focal_loss.mean()
+
+
+class ProgramEncoder(nn.Module):
+    def __init__(self, vocab_size=20, embedding_dim=16, hidden_dim=128):
+        super(ProgramEncoder, self).__init__()
+        # Set padding_idx to -1 to ignore -1 in embeddings
+        self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=-1)
+        self.lstm = nn.LSTM(embedding_dim, hidden_dim, batch_first=True)
+        self.fc = nn.Linear(hidden_dim, hidden_dim)
+        
+    def forward(self, x):
+        embedded = self.embedding(x)
+        lstm_out, _ = self.lstm(embedded)
+        return lstm_out

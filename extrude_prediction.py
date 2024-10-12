@@ -104,24 +104,16 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
 
 
 def compute_accuracy(valid_output, valid_batch_masks):
-    # Initialize the counter for correct predictions
+    batch_size = valid_output.shape[0] // 200
     correct = 0
-    total_loops = loop_selection_mask.shape[0] // padded_size  # Determine how many (200,1) matrices there are
 
-    # Loop through each matrix of size (200, 1)
-    for i in range(total_loops):
-        start_idx = i * padded_size
-        end_idx = start_idx + padded_size
+    for i in range(batch_size):
+        output_slice = valid_output[i * 200:(i + 1) * 200]
+        mask_slice = valid_batch_masks[i * 200:(i + 1) * 200]
 
-        # Extract the (200, 1) slice for both output and loop_selection_mask
-        output_slice = output[start_idx:end_idx]
-        mask_slice = loop_selection_mask[start_idx:end_idx]
-
-        # Evaluate conditions for this slice
         condition_1 = (mask_slice == 1) & (output_slice > 0.5)
         condition_2 = (mask_slice == 0) & (output_slice < 0.5)
 
-        # If all conditions are satisfied, increment the correct count
         if torch.all(condition_1 | condition_2):
             correct += 1
 
@@ -297,7 +289,7 @@ def train():
             total += batch_size 
 
         train_accuracy = correct / total
-        print(f"Epoch {epoch+1}/{epochs}, Training Loss: {train_loss / total_iterations}, Training Accuracy: {train_accuracy:.4f}")
+        print(f"Epoch {epoch+1}/{epochs}, Training Loss: {train_loss / total_iterations:.5f}, Training Accuracy: {train_accuracy:.4f}")
 
         # Validation loop
         val_loss = 0.0
@@ -336,7 +328,7 @@ def train():
                 total += batch_size
 
         val_accuracy = correct / total
-        print(f"Validation Loss: {val_loss / total_iterations_val}, Validation Accuracy: {val_accuracy:.4f}")
+        print(f"Validation Loss: {val_loss / total_iterations_val:.5f}, Validation Accuracy: {val_accuracy:.4f}")
 
         # Save the model if validation accuracy improves
         if val_accuracy > best_accuracy:
