@@ -159,12 +159,12 @@ def train():
 
             optimizer.zero_grad()
 
-            program_embedding = program_encoder(program_batch.long())
             x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
+            output = graph_decoder(x_dict, program_batch.long())
 
 
 
-            output = graph_decoder(x_dict)
+            print("output", output.shape)
 
             batch_masks = batch_masks.to(output.device).view(-1, 1)
             valid_mask = (batch_masks != -1).float()

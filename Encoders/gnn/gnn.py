@@ -84,26 +84,43 @@ class Program_Decoder(nn.Module):
             nn.ReLU(),
             nn.Linear(ff_dim, embed_dim)
         )
-        self.norm = nn.LayerNorm(embed_dim)
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.norm2 = nn.LayerNorm(embed_dim)
         self.dropout = nn.Dropout(dropout)
         self.classifier = nn.Linear(embed_dim, num_classes)
 
         self.program_encoder = ProgramEncoder()
-    
+
     def forward(self, x_dict, program_tokens):
+        # Encode the program tokens to get their embeddings
+        program_embedding = self.program_encoder(program_tokens)  # (batch_size, seq_len, embed_dim)
 
-        if len(program_tokens) == 0:
-            program_embedding = torch.zeros(1, 128)
-        else:
-            program_embedding = self.program_encoder(program_tokens)
-        
-        attn_output, _ = self.cross_attn(program_embedding, x_dict['stroke'], x_dict['stroke'])
-        out = self.norm(program_embedding + attn_output)
+        # Reshape x_dict['stroke'] to (batch_size, num_strokes, embed_dim) -> (16, 200, 128)
+        stroke_features = x_dict['stroke'].view(16, 200, 128)
 
-        ff_output = self.ff(out)        
-        out_mean = ff_output.mean(dim=0)
-        
+        # Transpose for MultiheadAttention: (seq_len, batch_size, embed_dim)
+        program_embedding = program_embedding.transpose(0, 1)  # (20, 16, 128)
+        stroke_features = stroke_features.transpose(0, 1)  # (200, 16, 128)
+
+        # Perform cross-attention between program_embedding (query) and stroke_features (key, value)
+        attn_output, _ = self.cross_attn(program_embedding, stroke_features, stroke_features)
+
+        # Add residual connection and normalize
+        out = self.norm1(program_embedding + attn_output)
+
+        # Apply feed-forward layer with residual connection and normalization
+        ff_output = self.ff(out)
+        out = self.norm2(out + ff_output)
+
+        # Apply dropout for regularization
+        out = self.dropout(out)
+
+        # Pool the output (e.g., mean over the sequence) before classification
+        out_mean = out.mean(dim=0)  # Mean over the sequence dimension (seq_len)
+
+        # Final classification logits
         logits = self.classifier(out_mean)
+
         return logits
 
 
