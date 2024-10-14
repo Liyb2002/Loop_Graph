@@ -55,13 +55,14 @@ def save_models():
 
 
 
-def compute_accuracy(output, program_gt_batch):
-    predicted_classes = torch.argmax(output, dim=1)
-    program_gt_batch = program_gt_batch.view(-1)
-    correct_predictions = (predicted_classes == program_gt_batch).sum().item()
-    accuracy = correct_predictions / output.size(0)
-    
-    return accuracy
+def compute_accuracy(output_stroke, output_loop, gt_token):
+    combined_logits = output_stroke + output_loop
+    predicted_class = torch.argmax(combined_logits)
+
+    if predicted_class == gt_token:
+        return 1
+
+    return 0
 
 
 # ------------------------------------------------------------------------------# 
@@ -77,7 +78,7 @@ def train():
     
     graphs = []
     existing_programs = []
-    gt_programs = []
+    gt_tokens = []
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
@@ -96,16 +97,14 @@ def train():
             stroke_to_edge
         )
 
-        gnn_graph.to_device_withPadding(device)
-
+        gnn_graph.to_device(device)
         graphs.append(gnn_graph)
         
-        existing_programs.append(Encoders.helper.program_mapping(program[:-1]))
-        gt_programs.append(Encoders.helper.program_gt_mapping([program[-1]]))
-
+        existing_program = torch.tensor(Encoders.helper.program_mapping(program[:-1]), dtype=torch.long).to(device)
+        gt_token = torch.tensor(Encoders.helper.program_gt_mapping([program[-1]]))
+        existing_programs.append(existing_program)
+        gt_tokens.append(gt_token)
         
-
-
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -113,30 +112,8 @@ def train():
     split_index = int(0.8 * len(graphs))
     train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
     train_existing_programs, val_existing_programs = existing_programs[:split_index], existing_programs[split_index:]
-    train_gt_programs, val_gt_programs = gt_programs[:split_index], gt_programs[split_index:]
+    train_gt_programs, val_gt_programs = gt_tokens[:split_index], gt_tokens[split_index:]
 
-
-    # Convert train and validation graphs to HeteroData
-    hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]
-    hetero_val_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in val_graphs]
-    graph_train_loader = GraphDataLoader(hetero_train_graphs, batch_size=16, shuffle=False)
-    graph_val_loader = GraphDataLoader(hetero_val_graphs, batch_size=16, shuffle=False)
-
-
-    train_existing_programs_tensor = torch.tensor(train_existing_programs, dtype=torch.float32)
-    val_existing_programs_tensor = torch.tensor(val_existing_programs, dtype=torch.float32)
-    train_existing_dataset = TensorDataset(train_existing_programs_tensor)
-    val__existing_dataset = TensorDataset(val_existing_programs_tensor)
-    program_train_existing_loader = DataLoader(train_existing_dataset, batch_size=16, shuffle=False)
-    program_val_existing_loader = DataLoader(val__existing_dataset, batch_size=16, shuffle=False)
-
-
-    train_gt_programs_tensor = torch.tensor(train_gt_programs, dtype=torch.float32)
-    val_gt_programs_tensor = torch.tensor(val_gt_programs, dtype=torch.float32)
-    train_gt_dataset = TensorDataset(train_gt_programs_tensor)
-    val__gt_dataset = TensorDataset(val_gt_programs_tensor)
-    program_train_gt_loader = DataLoader(train_gt_dataset, batch_size=16, shuffle=False)
-    program_val_gt_loader = DataLoader(val__gt_dataset, batch_size=16, shuffle=False)
 
 
     # Training loop
@@ -152,22 +129,22 @@ def train():
         train_total = 0
 
 
-        total_iterations = min(len(graph_train_loader), len(program_train_existing_loader))
-        for hetero_batch, (program_existing_batch,),  (program_gt_batch,) in tqdm(zip(graph_train_loader, program_train_existing_loader, program_train_gt_loader), 
+        total_iterations = len(train_existing_programs)
+        for graph, program_existing, gt_token in tqdm(zip(train_graphs, train_existing_programs, train_gt_programs), 
                                               desc=f"Epoch {epoch+1}/{epochs} - Training", 
                                               dynamic_ncols=True, 
                                               total=total_iterations):
 
             optimizer.zero_grad()
 
-            x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-            output_loop = graph_decoder_loop(x_dict, program_existing_batch.long())
-            output_stroke = graph_decoder_loop(x_dict, program_existing_batch.long())
+            x_dict = graph_encoder(graph.x_dict, graph.edge_index_dict)
+            output_loop = graph_decoder_loop(x_dict, program_existing)
+            output_stroke = graph_decoder_loop(x_dict, program_existing)
 
-            loss = criterion(output_loop, program_gt_batch.squeeze(1).long()) + criterion(output_stroke, program_gt_batch.squeeze(1).long())
+            loss = criterion(output_loop.unsqueeze(0), gt_token) + criterion(output_stroke.unsqueeze(0), gt_token)
 
-            train_correct += compute_accuracy(output_stroke, output_loop, program_gt_batch)
-            train_total += 16
+            train_correct += compute_accuracy(output_stroke, output_loop, gt_token)
+            train_total += 1
 
 
             loss.backward()
@@ -178,41 +155,41 @@ def train():
         train_accuracy = train_correct / train_total if train_total > 0 else 0
         train_loss /= len(train_graphs)
         val_loss = 0.0
-        correct = 0
-        total = 0
+        val_correct = 0
+        val_total = 0
 
         program_encoder.eval()
         graph_encoder.eval()
         graph_decoder_stroke.eval()
         graph_decoder_loop.eval()
         with torch.no_grad():
-            total_iterations_val = min(len(graph_val_loader), len(program_val_existing_loader))
+            total_iterations_val = len(val_existing_programs)
 
-            for hetero_batch, (program_existing_batch,),  (program_gt_batch,) in tqdm(zip(graph_val_loader, program_val_existing_loader, program_val_gt_loader), 
+            for graph, program_existing, gt_token in tqdm(zip(val_graphs, val_existing_programs, val_gt_programs), 
                                                 desc=f"Epoch {epoch+1}/{epochs} - Validation", 
                                                 dynamic_ncols=True, 
                                               total=total_iterations_val):
                 
-                x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-                output_loop = graph_decoder_loop(x_dict, program_existing_batch.long())
-                output_stroke = graph_decoder_loop(x_dict, program_existing_batch.long())
+                x_dict = graph_encoder(graph.x_dict, graph.edge_index_dict)
+                output_loop = graph_decoder_loop(x_dict, program_existing)
+                output_stroke = graph_decoder_loop(x_dict, program_existing)
 
-                loss = criterion(output_loop, program_gt_batch.squeeze(1).long()) + criterion(output_stroke, program_gt_batch.squeeze(1).long())
+                loss = criterion(output_loop.unsqueeze(0), gt_token) + criterion(output_stroke.unsqueeze(0), gt_token)
 
-                train_correct += compute_accuracy(output_stroke, output_loop, program_gt_batch)
-                train_total += 16
+                val_correct += compute_accuracy(output_stroke, output_loop, gt_token)
+                val_total += 1
 
         
         val_loss /= len(val_graphs)
         
 
-        accuracy = correct / total if total > 0 else 0
-        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.7f} - Validation Loss: {val_loss:.7f} - Train Accuracy: {train_accuracy:.5f} - Validation Accuracy: {accuracy:.5f}")
+        val_accuracy = val_correct / val_total if val_total > 0 else 0
+        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.7f} - Validation Loss: {val_loss:.7f} - Train Accuracy: {train_accuracy:.5f} - Validation Accuracy: {val_accuracy:.5f}")
 
-        if accuracy > best_val_accuracy:
-            best_val_accuracy = accuracy
+        if val_accuracy > best_val_accuracy:
+            best_val_accuracy = val_accuracy
             save_models()
-            print(f"Models saved at epoch {epoch+1} with validation accuracy: {accuracy:.5f}")
+            print(f"Models saved at epoch {epoch+1} with validation accuracy: {val_accuracy:.5f}")
 
 
 

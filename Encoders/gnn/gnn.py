@@ -99,20 +99,13 @@ class Program_Decoder(nn.Module):
         # Reshape x_dict['stroke'] to (batch_size, num_strokes, embed_dim) -> (batch_size, 200, 128)
 
         if self.method_type == 'stroke':
-            batch_size = x_dict['stroke'].shape[0] // 200
-            node_features = x_dict['stroke'].view(batch_size, 200, 128)
+            node_features = x_dict['stroke']
         
         elif self.method_type == 'loop':
-            batch_size = x_dict['loop'].shape[0] // 200
-            node_features = x_dict['loop'].view(batch_size, 200, 128)
- 
-
-        # Transpose for MultiheadAttention: (seq_len, batch_size, embed_dim)
-        program_embedding = program_embedding.transpose(0, 1)  # (20, 16, 128)
-        node_features = node_features.transpose(0, 1)  # (200, 16, 128)
+            node_features = x_dict['loop']
 
         # Perform cross-attention between program_embedding (query) and stroke_features (key, value)
-        attn_output, _ = self.cross_attn(program_embedding, node_features, node_features)
+        attn_output, _ = self.cross_attn(query=program_embedding, key=node_features, value=node_features)
 
         # Add residual connection and normalize
         out = self.norm1(program_embedding + attn_output)

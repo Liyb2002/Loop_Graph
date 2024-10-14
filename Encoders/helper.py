@@ -118,8 +118,8 @@ def program_mapping(program):
     # Map each operation in the program list to its corresponding value
     mapped_program = [operation_map.get(op, -1) for op in program] 
     
-    for i in range (20 - len(mapped_program)):
-        mapped_program.append(10)
+    # for i in range (20 - len(mapped_program)):
+    #     mapped_program.append(10)
     
     return mapped_program
 
