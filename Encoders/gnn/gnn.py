@@ -96,8 +96,6 @@ class Program_Decoder(nn.Module):
         # Encode the program tokens to get their embeddings
         program_embedding = self.program_encoder(program_tokens)  # (batch_size, seq_len, embed_dim)
 
-        # Reshape x_dict['stroke'] to (batch_size, num_strokes, embed_dim) -> (batch_size, 200, 128)
-
         if self.method_type == 'stroke':
             batch_size = x_dict['stroke'].shape[0] // 200
             node_features = x_dict['stroke'].view(batch_size, 200, 128)

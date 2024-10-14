@@ -259,17 +259,25 @@ def eval():
             stroke_to_edge
         )
 
-        gnn_graph.to_device(device)
+        gnn_graph.to_device_withPadding(device)
         graphs.append(gnn_graph)
         
-        existing_program = torch.tensor(Encoders.helper.program_mapping(program[:-1]), dtype=torch.long).to(device)
-        gt_token = torch.tensor(Encoders.helper.program_gt_mapping([program[-1]]))
-        existing_programs.append(existing_program)
-        gt_tokens.append(gt_token)
+        existing_programs.append(Encoders.helper.program_mapping(program[:-1]))
+        gt_tokens.append(Encoders.helper.program_gt_mapping([program[-1]]))
+
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
+    hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in graphs]
+    graph_train_loader = GraphDataLoader(hetero_train_graphs, batch_size=16, shuffle=False)
 
+    train_existing_programs_tensor = torch.tensor(existing_programs, dtype=torch.float32)
+    train_existing_dataset = TensorDataset(train_existing_programs_tensor)
+    program_train_existing_loader = DataLoader(train_existing_dataset, batch_size=16, shuffle=False)
+
+    train_gt_programs_tensor = torch.tensor(gt_tokens, dtype=torch.float32)
+    train_gt_dataset = TensorDataset(train_gt_programs_tensor)
+    program_train_gt_loader = DataLoader(train_gt_dataset, batch_size=16, shuffle=False)
 
 
     # Eval
@@ -282,25 +290,20 @@ def eval():
     eval_total = 0
 
     with torch.no_grad():
-        total_iterations_eval = len(gt_tokens)
-
-        for graph, program_existing, gt_token in tqdm(zip(graphs, existing_programs, gt_tokens), 
-                                                desc="Evaluation", 
-                                                dynamic_ncols=True, 
-                                                total=total_iterations_eval):
+        total_iterations = min(len(graph_train_loader), len(program_train_existing_loader))
+        for hetero_batch, (program_existing_batch,),  (program_gt_batch,) in tqdm(zip(graph_train_loader, program_train_existing_loader, program_train_gt_loader), 
+                                              desc=f"Evaluating", 
+                                              dynamic_ncols=True, 
+                                              total=total_iterations):
                         
 
-            if gt_token != 0:
-                continue
+            x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
+            output_loop = graph_decoder_loop(x_dict, program_existing_batch.long())
+            output_stroke = graph_decoder_loop(x_dict, program_existing_batch.long())
 
-            x_dict = graph_encoder(graph.x_dict, graph.edge_index_dict)
-            output_loop = graph_decoder_loop(x_dict, program_existing)
-            output_stroke = graph_decoder_loop(x_dict, program_existing)
+            loss = criterion(output_loop, program_gt_batch.squeeze(1).long()) + criterion(output_stroke, program_gt_batch.squeeze(1).long())
 
-            # Compute Accuracy
-            print("-----")
-            print('program_existing', program_existing)
-            tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, gt_token)
+            tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, program_gt_batch)
             eval_correct += tempt_correct
             eval_total += tempt_total
 
@@ -316,4 +319,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()
