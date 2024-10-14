@@ -34,7 +34,7 @@ optimizer = optim.Adam(list(program_encoder.parameters()) + list(graph_encoder.p
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'program_prediction')
+save_dir = os.path.join(current_dir, 'checkpoints', 'program_prediction_2')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -55,20 +55,28 @@ def save_models():
 
 
 
-def compute_accuracy(output_stroke, output_loop, gt_token):
+def compute_accuracy(output_stroke, output_loop, program_gt_batch):
+    # Get the predicted classes from the output
+    predicted_classes = torch.argmax(output_stroke + output_loop, dim=1)
     
-    # first value is the total (0 if not terminate)
-    # second value is the correctness, 1 if terminate + correct prediction
-    if gt_token != 0:
-        return 0,0
-
-    combined_logits = output_stroke + output_loop
-    predicted_class = torch.argmax(combined_logits)
+    # Flatten the ground truth labels for comparison
+    program_gt_batch = program_gt_batch.view(-1)
     
-    if predicted_class == gt_token:
-        return 1,1
-
-    return 1,0
+    # Create a mask to ignore cases where the ground truth is 2
+    valid_mask = program_gt_batch != 2
+    
+    # Apply the mask to both the predicted and ground truth tensors
+    filtered_predicted_classes = predicted_classes[valid_mask]
+    filtered_program_gt_batch = program_gt_batch[valid_mask]
+    
+    # Calculate the number of correct predictions
+    correct_predictions = (filtered_predicted_classes == filtered_program_gt_batch).sum().item()
+    
+    # Calculate the total number of valid cases
+    total = filtered_program_gt_batch.shape[0]
+    
+    # Output the total and the correct number of predictions
+    return total, correct_predictions
 
 
 # ------------------------------------------------------------------------------# 
@@ -84,13 +92,13 @@ def train():
     
     graphs = []
     existing_programs = []
-    gt_tokens = []
+    gt_programs = []
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
-                
+        
         # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
@@ -103,22 +111,44 @@ def train():
             stroke_to_edge
         )
 
-        gnn_graph.to_device(device)
+        gnn_graph.to_device_withPadding(device)
+
         graphs.append(gnn_graph)
         
-        existing_program = torch.tensor(Encoders.helper.program_mapping(program[:-1]), dtype=torch.long).to(device)
-        gt_token = torch.tensor(Encoders.helper.program_gt_mapping([program[-1]]))
-        existing_programs.append(existing_program)
-        gt_tokens.append(gt_token)
-        
+        existing_programs.append(Encoders.helper.program_mapping(program[:-1]))
+        gt_programs.append(Encoders.helper.program_gt_mapping([program[-1]]))
+
+
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
     train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
     train_existing_programs, val_existing_programs = existing_programs[:split_index], existing_programs[split_index:]
-    train_gt_programs, val_gt_programs = gt_tokens[:split_index], gt_tokens[split_index:]
+    train_gt_programs, val_gt_programs = gt_programs[:split_index], gt_programs[split_index:]
 
+
+    # Convert train and validation graphs to HeteroData
+    hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]
+    hetero_val_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in val_graphs]
+    graph_train_loader = GraphDataLoader(hetero_train_graphs, batch_size=16, shuffle=False)
+    graph_val_loader = GraphDataLoader(hetero_val_graphs, batch_size=16, shuffle=False)
+
+
+    train_existing_programs_tensor = torch.tensor(train_existing_programs, dtype=torch.float32)
+    val_existing_programs_tensor = torch.tensor(val_existing_programs, dtype=torch.float32)
+    train_existing_dataset = TensorDataset(train_existing_programs_tensor)
+    val__existing_dataset = TensorDataset(val_existing_programs_tensor)
+    program_train_existing_loader = DataLoader(train_existing_dataset, batch_size=16, shuffle=False)
+    program_val_existing_loader = DataLoader(val__existing_dataset, batch_size=16, shuffle=False)
+
+
+    train_gt_programs_tensor = torch.tensor(train_gt_programs, dtype=torch.float32)
+    val_gt_programs_tensor = torch.tensor(val_gt_programs, dtype=torch.float32)
+    train_gt_dataset = TensorDataset(train_gt_programs_tensor)
+    val__gt_dataset = TensorDataset(val_gt_programs_tensor)
+    program_train_gt_loader = DataLoader(train_gt_dataset, batch_size=16, shuffle=False)
+    program_val_gt_loader = DataLoader(val__gt_dataset, batch_size=16, shuffle=False)
 
 
     # Training loop
@@ -134,23 +164,24 @@ def train():
         train_total = 0
 
 
-        total_iterations = len(train_existing_programs)
-        for graph, program_existing, gt_token in tqdm(zip(train_graphs, train_existing_programs, train_gt_programs), 
+        total_iterations = min(len(graph_train_loader), len(program_train_existing_loader))
+        for hetero_batch, (program_existing_batch,),  (program_gt_batch,) in tqdm(zip(graph_train_loader, program_train_existing_loader, program_train_gt_loader), 
                                               desc=f"Epoch {epoch+1}/{epochs} - Training", 
                                               dynamic_ncols=True, 
                                               total=total_iterations):
 
             optimizer.zero_grad()
 
-            x_dict = graph_encoder(graph.x_dict, graph.edge_index_dict)
-            output_loop = graph_decoder_loop(x_dict, program_existing)
-            output_stroke = graph_decoder_loop(x_dict, program_existing)
+            x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
+            output_loop = graph_decoder_loop(x_dict, program_existing_batch.long())
+            output_stroke = graph_decoder_loop(x_dict, program_existing_batch.long())
 
-            loss = criterion(output_loop.unsqueeze(0), gt_token) + criterion(output_stroke.unsqueeze(0), gt_token)
+            loss = criterion(output_loop, program_gt_batch.squeeze(1).long()) + criterion(output_stroke, program_gt_batch.squeeze(1).long())
 
-            tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, gt_token)
+            tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, program_gt_batch)
             train_correct += tempt_correct
             train_total += tempt_total
+
 
             loss.backward()
             optimizer.step()
@@ -168,20 +199,20 @@ def train():
         graph_decoder_stroke.eval()
         graph_decoder_loop.eval()
         with torch.no_grad():
-            total_iterations_val = len(val_existing_programs)
+            total_iterations_val = min(len(graph_val_loader), len(program_val_existing_loader))
 
-            for graph, program_existing, gt_token in tqdm(zip(val_graphs, val_existing_programs, val_gt_programs), 
+            for hetero_batch, (program_existing_batch,),  (program_gt_batch,) in tqdm(zip(graph_val_loader, program_val_existing_loader, program_val_gt_loader), 
                                                 desc=f"Epoch {epoch+1}/{epochs} - Validation", 
                                                 dynamic_ncols=True, 
                                               total=total_iterations_val):
                 
-                x_dict = graph_encoder(graph.x_dict, graph.edge_index_dict)
-                output_loop = graph_decoder_loop(x_dict, program_existing)
-                output_stroke = graph_decoder_loop(x_dict, program_existing)
+                x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
+                output_loop = graph_decoder_loop(x_dict, program_existing_batch.long())
+                output_stroke = graph_decoder_loop(x_dict, program_existing_batch.long())
 
-                loss = criterion(output_loop.unsqueeze(0), gt_token) + criterion(output_stroke.unsqueeze(0), gt_token)
+                loss = criterion(output_loop, program_gt_batch.squeeze(1).long()) + criterion(output_stroke, program_gt_batch.squeeze(1).long())
 
-                tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, gt_token)
+                tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, program_gt_batch)
                 val_correct += tempt_correct
                 val_total += tempt_total
 
