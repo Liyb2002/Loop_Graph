@@ -56,13 +56,19 @@ def save_models():
 
 
 def compute_accuracy(output_stroke, output_loop, gt_token):
+    
+    # first value is the total (0 if not terminate)
+    # second value is the correctness, 1 if terminate + correct prediction
+    if gt_token != 0:
+        return 0,0
+
     combined_logits = output_stroke + output_loop
     predicted_class = torch.argmax(combined_logits)
-
+    
     if predicted_class == gt_token:
-        return 1
+        return 1,1
 
-    return 0
+    return 1,0
 
 
 # ------------------------------------------------------------------------------# 
@@ -84,7 +90,7 @@ def train():
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
-        
+                
         # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
@@ -105,7 +111,6 @@ def train():
         existing_programs.append(existing_program)
         gt_tokens.append(gt_token)
         
-
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
     # Split the dataset into training and validation sets (80-20 split)
@@ -143,9 +148,9 @@ def train():
 
             loss = criterion(output_loop.unsqueeze(0), gt_token) + criterion(output_stroke.unsqueeze(0), gt_token)
 
-            train_correct += compute_accuracy(output_stroke, output_loop, gt_token)
-            train_total += 1
-
+            tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, gt_token)
+            train_correct += tempt_correct
+            train_total += tempt_total
 
             loss.backward()
             optimizer.step()
@@ -176,8 +181,9 @@ def train():
 
                 loss = criterion(output_loop.unsqueeze(0), gt_token) + criterion(output_stroke.unsqueeze(0), gt_token)
 
-                val_correct += compute_accuracy(output_stroke, output_loop, gt_token)
-                val_total += 1
+                tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, gt_token)
+                val_correct += tempt_correct
+                val_total += tempt_total
 
         
         val_loss /= len(val_graphs)
@@ -200,46 +206,16 @@ def eval():
     print(f"Total number of shape data: {len(dataset)}")
 
 
-    eval_graphs = []
-    eval_loop_selection_masks = []
-    eval_all_loop_selection_masks = []
+    graphs = []
+    existing_programs = []
+    gt_tokens = []
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
-        if program[-1] != 'sketch':
-            continue
 
-        kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
-        all_sketch_strokes = Encoders.helper.get_all_operation_strokes(stroke_operations_order_matrix, program_whole, 'sketch')
-
-        # Gets the strokes for the current sketch Operation
-        chosen_strokes = (kth_operation == 1).nonzero(as_tuple=True)[0]  # Indices of chosen stroke
-        loop_chosen_mask = []
-        for loop in stroke_cloud_loops:
-            if all(stroke in chosen_strokes for stroke in loop):
-                loop_chosen_mask.append(1)  # Loop is chosen
-            else:
-                loop_chosen_mask.append(0)  # Loop is not chosen
-        
-        loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
-        if not (loop_selection_mask == 1).any():
-            continue
-
-        
-        # Gets the strokes for all sketch Operation
-        all_chosen_strokes = (all_sketch_strokes == 1).nonzero(as_tuple=True)[0]  # Indices of chosen stroke
-        all_loop_chosen_mask = []
-        for loop in stroke_cloud_loops:
-            if all(stroke in all_chosen_strokes for stroke in loop):
-                all_loop_chosen_mask.append(1)  # Loop is chosen
-            else:
-                all_loop_chosen_mask.append(0)  # Loop is not chosen
-        all_loop_selection_mask = torch.tensor(all_loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
-
-        
         # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
@@ -252,90 +228,56 @@ def eval():
             stroke_to_edge
         )
 
-        # Encoders.helper.vis_brep(final_brep_edges)
-        all_selected_loops_idx = [idx for idx, value in enumerate(all_loop_chosen_mask) if value != 0]
-
-        # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, all_selected_loops_idx )
-
-        # Prepare the pair
-        gnn_graph.to_device_withPadding(device)
-        loop_selection_mask = loop_selection_mask.to(device)
-
-        eval_graphs.append(gnn_graph)
-        eval_loop_selection_masks.append(loop_selection_mask)
-        eval_all_loop_selection_masks.append(all_loop_selection_mask)
+        gnn_graph.to_device(device)
+        graphs.append(gnn_graph)
+        
+        existing_program = torch.tensor(Encoders.helper.program_mapping(program[:-1]), dtype=torch.long).to(device)
+        gt_token = torch.tensor(Encoders.helper.program_gt_mapping([program[-1]]))
+        existing_programs.append(existing_program)
+        gt_tokens.append(gt_token)
 
 
-    print(f"Total number of preprocessed graphs: {len(eval_graphs)}")
-
-
-    # Convert train and validation graphs to HeteroData
-    hetero_eval_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in eval_graphs]
-    padded_eval_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in eval_loop_selection_masks]
-    padded_eval_all_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in eval_all_loop_selection_masks]
-
-    # Create DataLoaders for training and validation graphs/masks
-    graph_eval_loader = DataLoader(hetero_eval_graphs, batch_size=16, shuffle=False)
-    mask_eval_loader = DataLoader(padded_eval_masks, batch_size=16, shuffle=False)
-    mask_eval_all_loader = DataLoader(padded_eval_all_masks, batch_size=16, shuffle=False)
+    print(f"Total number of preprocessed graphs: {len(graphs)}")
 
 
 
     # Eval
+    program_encoder.eval()
     graph_encoder.eval()
-    graph_decoder.eval()
+    graph_decoder_stroke.eval()
+    graph_decoder_loop.eval()
 
-    eval_loss = 0.0
-    total_category_count = [0, 0, 0, 0]
-    total_correct_count = [0, 0, 0, 0] 
+    eval_correct = 0
+    eval_total = 0
 
     with torch.no_grad():
-        total_iterations_eval = min(len(graph_eval_loader), len(mask_eval_all_loader))
+        total_iterations_eval = len(gt_tokens)
 
-        for hetero_batch, batch_masks, in tqdm(zip(graph_eval_loader, mask_eval_all_loader), 
+        for graph, program_existing, gt_token in tqdm(zip(graphs, existing_programs, gt_tokens), 
                                                 desc="Evaluation", 
                                                 dynamic_ncols=True, 
                                                 total=total_iterations_eval):
                         
 
-            x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-            output = graph_decoder(x_dict)
+            if gt_token != 0:
+                continue
 
-            batch_masks = batch_masks.to(output.device).view(-1, 1)
-            valid_mask = (batch_masks != -1).float()
-            valid_output = output * valid_mask
-            valid_batch_masks = batch_masks * valid_mask
+            x_dict = graph_encoder(graph.x_dict, graph.edge_index_dict)
+            output_loop = graph_decoder_loop(x_dict, program_existing)
+            output_stroke = graph_decoder_loop(x_dict, program_existing)
 
-
-            category_count, correct_count = compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch)           
-
-            for i in range(4):
-                total_category_count[i] += category_count[i]
-                total_correct_count[i] += correct_count[i]
-
-            # Compute loss
-            loss = criterion(valid_output, valid_batch_masks)
-            eval_loss += loss.item()
+            # Compute Accuracy
+            print("-----")
+            print('program_existing', program_existing)
+            tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, gt_token)
+            eval_correct += tempt_correct
+            eval_total += tempt_total
 
 
-    print("Category-wise Accuracy:")
-    total_correct = 0
-    total_samples = 0
-
-    for i in range(4):
-        if total_category_count[i] > 0:
-            accuracy = total_correct_count[i] / total_category_count[i] * 100
-            print(f"Category {i+1}: {accuracy:.2f}% (Correct: {total_correct_count[i]}/{total_category_count[i]})")
-        else:
-            print(f"Category {i+1}: No samples")
-
-    # Calculate and print average evaluation loss
-    average_eval_loss = eval_loss / total_iterations_eval
-    print(f"Average Evaluation Loss: {average_eval_loss:.4f}")
 
     # Calculate and print overall average accuracy
-    overall_accuracy = total_correct / total_samples * 100
-    print(f"Overall Average Accuracy: {overall_accuracy:.2f}%")
+    overall_accuracy = eval_correct / eval_total
+    print(f"Overall Average Accuracy: {overall_accuracy:.4f}")
 
 
 
