@@ -44,7 +44,7 @@ class Program_Graph_Dataset(Dataset):
         # 1) Load Program
         program_file_path = os.path.join(data_path, 'Program.json')
         program_whole = Preprocessing.proc_CAD.helper.program_to_string(program_file_path)
-        program = program_whole[:int(index)+1]
+        program = program_whole[:int(index)+2]
 
         # 2) Load shape data
         shape_file_path = os.path.join(self.data_path, data_dir, 'shape_info', shape_file_path_relative)

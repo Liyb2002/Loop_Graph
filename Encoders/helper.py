@@ -54,6 +54,10 @@ def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_
     Returns:
     extrude_strokes (np.ndarray): A binary mask of shape (num_strokes, 1), indicating which extrude strokes are chosen.
     """
+    def is_on_circle(point, center, radius, tolerance=0.05):
+        distance = np.linalg.norm(point - center)
+        return abs(distance - radius) < tolerance
+
     num_strokes = stroke_selection_mask.shape[0]
     
     # Initialize the output matrix with zeros
@@ -70,6 +74,14 @@ def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_
             for j in range(num_strokes):
                 if sketch_selection_mask[j] == 1:
                     sketch_points = stroke_node_features[j]  # Get the 3D points of the sketch stroke
+
+                    if sketch_points[-1] != 0:
+                        # the sketch is a circle:
+                        center = sketch_points[:3]
+                        radius = sketch_points[-1]
+                        if is_on_circle(stroke_points[:3], center, radius) or is_on_circle(stroke_points[3:6], center, radius):
+                            chosen = True
+                            break
 
                     # Compare points of the stroke with the points of the sketch stroke using np.allclose
                     if (np.allclose(stroke_points[:3], sketch_points[:3]) or np.allclose(stroke_points[:3], sketch_points[3:6]) or
@@ -104,11 +116,26 @@ def program_mapping(program):
     }
     
     # Map each operation in the program list to its corresponding value
-    mapped_program = [operation_map.get(op, -1) for op in program]  # -1 for unknown operations
+    mapped_program = [operation_map.get(op, -1) for op in program] 
     
-    mapped_program += [10] * (20 - len(mapped_program))
+    for i in range (20 - len(mapped_program)):
+        mapped_program.append(10)
     
-    return mapped_program[:20]
+    return mapped_program
+
+
+def program_gt_mapping(program):
+    operation_map = {
+        'sketch': 1,
+        'extrude': 2,
+        'terminate': 0,
+        'padding': 10
+    }
+    
+    # Map each operation in the program list to its corresponding value
+    mapped_program = [operation_map.get(op, -1) for op in program]
+    
+    return mapped_program
 
 #------------------------------------------------------------------------------------------------------#
 
@@ -409,7 +436,7 @@ def vis_brep(brep):
             z_top = z_base - normal[2] * height
 
             # Plot lines connecting the base and top circle with reduced density
-            for i in range(0, len(x_base), 5):  # Fewer lines by skipping points
+            for i in range(0, len(x_base), 3):  # Fewer lines by skipping points
                 ax.plot([x_base[i], x_top[i]], [y_base[i], y_top[i]], [z_base[i], z_top[i]], color='blue')
 
             # Update axis limits for the cylinder points

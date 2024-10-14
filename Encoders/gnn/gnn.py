@@ -76,7 +76,7 @@ class Extrude_Decoder(nn.Module):
 
 
 class Program_Decoder(nn.Module):
-    def __init__(self, embed_dim=128, num_heads=8, ff_dim=256, num_classes=10, dropout=0.1):
+    def __init__(self, method_type, embed_dim=128, num_heads=8, ff_dim=256, num_classes=10, dropout=0.1):
         super(Program_Decoder, self).__init__()
         self.cross_attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout)
         self.ff = nn.Sequential(
@@ -90,20 +90,29 @@ class Program_Decoder(nn.Module):
         self.classifier = nn.Linear(embed_dim, num_classes)
 
         self.program_encoder = ProgramEncoder()
+        self.method_type = method_type
 
     def forward(self, x_dict, program_tokens):
         # Encode the program tokens to get their embeddings
         program_embedding = self.program_encoder(program_tokens)  # (batch_size, seq_len, embed_dim)
 
-        # Reshape x_dict['stroke'] to (batch_size, num_strokes, embed_dim) -> (16, 200, 128)
-        stroke_features = x_dict['stroke'].view(16, 200, 128)
+        # Reshape x_dict['stroke'] to (batch_size, num_strokes, embed_dim) -> (batch_size, 200, 128)
+
+        if self.method_type == 'stroke':
+            batch_size = x_dict['stroke'].shape[0] // 200
+            node_features = x_dict['stroke'].view(batch_size, 200, 128)
+        
+        elif self.method_type == 'loop':
+            batch_size = x_dict['loop'].shape[0] // 200
+            node_features = x_dict['loop'].view(batch_size, 200, 128)
+ 
 
         # Transpose for MultiheadAttention: (seq_len, batch_size, embed_dim)
         program_embedding = program_embedding.transpose(0, 1)  # (20, 16, 128)
-        stroke_features = stroke_features.transpose(0, 1)  # (200, 16, 128)
+        node_features = node_features.transpose(0, 1)  # (200, 16, 128)
 
         # Perform cross-attention between program_embedding (query) and stroke_features (key, value)
-        attn_output, _ = self.cross_attn(program_embedding, stroke_features, stroke_features)
+        attn_output, _ = self.cross_attn(program_embedding, node_features, node_features)
 
         # Add residual connection and normalize
         out = self.norm1(program_embedding + attn_output)

@@ -20,14 +20,16 @@ from mpl_toolkits.mplot3d import Axes3D
 
 program_encoder = Encoders.gnn.gnn.ProgramEncoder()
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
-graph_decoder = Encoders.gnn.gnn.Program_Decoder()
+graph_decoder_stroke = Encoders.gnn.gnn.Program_Decoder('stroke')
+graph_decoder_loop = Encoders.gnn.gnn.Program_Decoder('loop')
 
 program_encoder.to(device)
 graph_encoder.to(device)
-graph_decoder.to(device)
+graph_decoder_stroke.to(device)
+graph_decoder_loop.to(device)
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(list(program_encoder.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
+optimizer = optim.Adam(list(program_encoder.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder_stroke.parameters()) + list(graph_decoder_loop.parameters()), lr=0.0004)
 
 # ------------------------------------------------------------------------------# 
 
@@ -38,40 +40,28 @@ os.makedirs(save_dir, exist_ok=True)
 def load_models():
     program_encoder.load_state_dict(torch.load(os.path.join(save_dir, 'program_encoder.pth')))
     graph_encoder.load_state_dict(torch.load(os.path.join(save_dir, 'graph_encoder.pth')))
-    graph_decoder.load_state_dict(torch.load(os.path.join(save_dir, 'graph_decoder.pth')))
+    graph_decoder_stroke.load_state_dict(torch.load(os.path.join(save_dir, 'graph_decoder.pth')))
+    graph_decoder_loop.load_state_dict(torch.load(os.path.join(save_dir, 'graph_decoder.pth')))
 
 
 def save_models():
     torch.save(program_encoder.state_dict(), os.path.join(save_dir, 'program_encoder.pth'))
     torch.save(graph_encoder.state_dict(), os.path.join(save_dir, 'graph_encoder.pth'))
-    torch.save(graph_decoder.state_dict(), os.path.join(save_dir, 'graph_decoder.pth'))
+    torch.save(graph_decoder_stroke.state_dict(), os.path.join(save_dir, 'graph_decoder.pth'))
+    torch.save(graph_decoder_loop.state_dict(), os.path.join(save_dir, 'graph_decoder.pth'))
 
 
 # ------------------------------------------------------------------------------# 
 
 
-def compute_accuracy(valid_output, valid_batch_masks):
-    batch_size = valid_output.shape[0] // 200
-    correct = 0
 
-    for i in range(batch_size):
-        output_slice = valid_output[i * 200:(i + 1) * 200]
-        mask_slice = valid_batch_masks[i * 200:(i + 1) * 200]
-
-        max_output_value, max_output_index = torch.max(output_slice, dim=0)
-        max_mask_value, max_mask_index = torch.max(mask_slice, dim=0)
-
-        values_where_mask_is_1 = output_slice[mask_slice == 1]
-        indices_where_mask_is_1 = torch.nonzero(mask_slice == 1).squeeze()
-
-        # print(f"Graph {i}: Values where mask is 1: {values_where_mask_is_1.tolist()}, Indices: {indices_where_mask_is_1.tolist()}")
-        # print(f"Graph {i}: max_output_index={max_output_index.item()}, max_mask_index={max_mask_index.item()}")
-
-        if max_output_index == max_mask_index:
-            correct += 1
-
-    return correct
-
+def compute_accuracy(output, program_gt_batch):
+    predicted_classes = torch.argmax(output, dim=1)
+    program_gt_batch = program_gt_batch.view(-1)
+    correct_predictions = (predicted_classes == program_gt_batch).sum().item()
+    accuracy = correct_predictions / output.size(0)
+    
+    return accuracy
 
 
 # ------------------------------------------------------------------------------# 
@@ -86,7 +76,8 @@ def train():
     epochs = 30
     
     graphs = []
-    programs = []
+    existing_programs = []
+    gt_programs = []
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
@@ -107,13 +98,12 @@ def train():
 
         gnn_graph.to_device_withPadding(device)
 
-        program = Encoders.helper.program_mapping(program)
-
-        if len(programs) > 20:
-            break
-
         graphs.append(gnn_graph)
-        programs.append(program)
+        
+        existing_programs.append(Encoders.helper.program_mapping(program[:-1]))
+        gt_programs.append(Encoders.helper.program_gt_mapping([program[-1]]))
+
+        
 
 
 
@@ -122,7 +112,8 @@ def train():
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
     train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
-    train_programs, val_programs = programs[:split_index], programs[split_index:]
+    train_existing_programs, val_existing_programs = existing_programs[:split_index], existing_programs[split_index:]
+    train_gt_programs, val_gt_programs = gt_programs[:split_index], gt_programs[split_index:]
 
 
     # Convert train and validation graphs to HeteroData
@@ -132,27 +123,37 @@ def train():
     graph_val_loader = GraphDataLoader(hetero_val_graphs, batch_size=16, shuffle=False)
 
 
-    train_programs_tensor = torch.tensor(train_programs, dtype=torch.float32)
-    val_programs_tensor = torch.tensor(val_programs, dtype=torch.float32)
-    train_dataset = TensorDataset(train_programs_tensor)
-    val_dataset = TensorDataset(val_programs_tensor)
-    program_train_loader = DataLoader(train_dataset, batch_size=16, shuffle=False)
-    program_val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False)
+    train_existing_programs_tensor = torch.tensor(train_existing_programs, dtype=torch.float32)
+    val_existing_programs_tensor = torch.tensor(val_existing_programs, dtype=torch.float32)
+    train_existing_dataset = TensorDataset(train_existing_programs_tensor)
+    val__existing_dataset = TensorDataset(val_existing_programs_tensor)
+    program_train_existing_loader = DataLoader(train_existing_dataset, batch_size=16, shuffle=False)
+    program_val_existing_loader = DataLoader(val__existing_dataset, batch_size=16, shuffle=False)
 
+
+    train_gt_programs_tensor = torch.tensor(train_gt_programs, dtype=torch.float32)
+    val_gt_programs_tensor = torch.tensor(val_gt_programs, dtype=torch.float32)
+    train_gt_dataset = TensorDataset(train_gt_programs_tensor)
+    val__gt_dataset = TensorDataset(val_gt_programs_tensor)
+    program_train_gt_loader = DataLoader(train_gt_dataset, batch_size=16, shuffle=False)
+    program_val_gt_loader = DataLoader(val__gt_dataset, batch_size=16, shuffle=False)
 
 
     # Training loop
     for epoch in range(epochs):
         train_loss = 0.0
+
         program_encoder.train()
         graph_encoder.train()
-        graph_decoder.train()
+        graph_decoder_stroke.train()
+        graph_decoder_loop.train()
+
         train_correct = 0
         train_total = 0
 
 
-        total_iterations = min(len(graph_train_loader), len(program_train_loader))
-        for hetero_batch, (program_batch,) in tqdm(zip(graph_train_loader, program_train_loader), 
+        total_iterations = min(len(graph_train_loader), len(program_train_existing_loader))
+        for hetero_batch, (program_existing_batch,),  (program_gt_batch,) in tqdm(zip(graph_train_loader, program_train_existing_loader, program_train_gt_loader), 
                                               desc=f"Epoch {epoch+1}/{epochs} - Training", 
                                               dynamic_ncols=True, 
                                               total=total_iterations):
@@ -160,19 +161,12 @@ def train():
             optimizer.zero_grad()
 
             x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-            output = graph_decoder(x_dict, program_batch.long())
+            output_loop = graph_decoder_loop(x_dict, program_existing_batch.long())
+            output_stroke = graph_decoder_loop(x_dict, program_existing_batch.long())
 
+            loss = criterion(output_loop, program_gt_batch.squeeze(1).long()) + criterion(output_stroke, program_gt_batch.squeeze(1).long())
 
-
-            print("output", output.shape)
-
-            batch_masks = batch_masks.to(output.device).view(-1, 1)
-            valid_mask = (batch_masks != -1).float()
-            valid_output = output * valid_mask
-            valid_batch_masks = batch_masks * valid_mask
-            loss = criterion(valid_output, valid_batch_masks)
-
-            train_correct += compute_accuracy(valid_output, valid_batch_masks)
+            train_correct += compute_accuracy(output_stroke, output_loop, program_gt_batch)
             train_total += 16
 
 
@@ -187,26 +181,26 @@ def train():
         correct = 0
         total = 0
 
+        program_encoder.eval()
         graph_encoder.eval()
-        graph_decoder.eval()
+        graph_decoder_stroke.eval()
+        graph_decoder_loop.eval()
         with torch.no_grad():
-            total_iterations_val = min(len(graph_val_loader), len(mask_val_loader))
+            total_iterations_val = min(len(graph_val_loader), len(program_val_existing_loader))
 
-            for hetero_batch, batch_masks in tqdm(zip(graph_val_loader, mask_val_loader), 
-                                                  desc="Validation", 
-                                                  dynamic_ncols=True, 
-                                                  total=total_iterations_val):
+            for hetero_batch, (program_existing_batch,),  (program_gt_batch,) in tqdm(zip(graph_val_loader, program_val_existing_loader, program_val_gt_loader), 
+                                                desc=f"Epoch {epoch+1}/{epochs} - Validation", 
+                                                dynamic_ncols=True, 
+                                              total=total_iterations_val):
+                
                 x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-                output = graph_decoder(x_dict)
+                output_loop = graph_decoder_loop(x_dict, program_existing_batch.long())
+                output_stroke = graph_decoder_loop(x_dict, program_existing_batch.long())
 
-                batch_masks = batch_masks.to(output.device).view(-1, 1)
-                valid_mask = (batch_masks != -1).float()
-                valid_output = output * valid_mask
-                valid_batch_masks = batch_masks * valid_mask
-                loss = criterion(valid_output, valid_batch_masks)
+                loss = criterion(output_loop, program_gt_batch.squeeze(1).long()) + criterion(output_stroke, program_gt_batch.squeeze(1).long())
 
-                correct += compute_accuracy(valid_output, valid_batch_masks)
-                total += 16
+                train_correct += compute_accuracy(output_stroke, output_loop, program_gt_batch)
+                train_total += 16
 
         
         val_loss /= len(val_graphs)

@@ -116,9 +116,8 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
         if max_output_index.item() in gt_indices:
             correct_count[category_idx] += 1
         else:
-            pass
-            # Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_output_index.item()])
-            # Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_mask_index.item()])
+            Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_output_index.item()])
+            Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, gt_indices)
 
     return category_count, correct_count
 
@@ -141,7 +140,6 @@ def train():
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
-
         if program[-1] != 'sketch':
             continue
 
@@ -177,7 +175,7 @@ def train():
 
         # Encoders.helper.vis_stroke_with_order(stroke_node_features)
         # Encoders.helper.vis_brep(output_brep_edges)
-        # Encoders.helper.vis_selected_loops(graph['stroke'].x.cpu().numpy(), graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(loop_selection_mask)])
+        # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(loop_selection_mask)])
 
         # Prepare the pair
         graphs.append(gnn_graph)
@@ -349,7 +347,7 @@ def eval():
         # Prepare the pair
         gnn_graph.to_device_withPadding(device)
         loop_selection_mask = loop_selection_mask.to(device)
-
+        
         eval_graphs.append(gnn_graph)
         eval_loop_selection_masks.append(loop_selection_mask)
         eval_all_loop_selection_masks.append(all_loop_selection_mask)
