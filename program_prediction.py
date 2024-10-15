@@ -34,7 +34,7 @@ optimizer = optim.Adam(list(program_encoder.parameters()) + list(graph_encoder.p
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'program_prediction_2')
+save_dir = os.path.join(current_dir, 'checkpoints', 'program_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -63,7 +63,7 @@ def compute_accuracy(output_stroke, output_loop, program_gt_batch):
     program_gt_batch = program_gt_batch.view(-1)
     
     # Create a mask to ignore cases where the ground truth is 2
-    valid_mask = program_gt_batch != 2
+    valid_mask = (program_gt_batch != 2)
     
     # Apply the mask to both the predicted and ground truth tensors
     filtered_predicted_classes = predicted_classes[valid_mask]
@@ -210,7 +210,7 @@ def train():
                 output_loop = graph_decoder_loop(x_dict, program_existing_batch.long())
                 output_stroke = graph_decoder_loop(x_dict, program_existing_batch.long())
 
-                loss = criterion(output_loop, program_gt_batch.squeeze(1).long()) + criterion(output_stroke, program_gt_batch.squeeze(1).long())
+                val_loss += criterion(output_loop, program_gt_batch.squeeze(1).long()) + criterion(output_stroke, program_gt_batch.squeeze(1).long())
 
                 tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, program_gt_batch)
                 val_correct += tempt_correct

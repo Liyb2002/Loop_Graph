@@ -23,7 +23,7 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
-        self.generate_dataset('dataset/messy_order_eval', number_data = 500, start = 96)
+        self.generate_dataset('dataset/messy_order_eval', number_data = 500, start = 110)
         # self.generate_dataset('dataset/messy_order', number_data = 0, start = 3650)
         # self.generate_dataset('dataset/messy_order_eval', number_data = 500, start = 0)
 

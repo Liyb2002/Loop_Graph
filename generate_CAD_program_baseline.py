@@ -29,7 +29,7 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_eval')
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
 data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 
@@ -118,7 +118,7 @@ def cascade_brep(brep_files):
 
 # --------------------- Main Code --------------------- #
 for data in tqdm(data_loader, desc="Generating CAD Programs"):
-    _, _, _, stroke_node_features, _, _, _, _, _,_, _, _ = data
+    _, stroke_node_features, _, _, _, _, _, _, _ ,_ = data
     
     stroke_node_features = stroke_node_features.squeeze(0)
     stroke_node_features = stroke_node_features.cpu().numpy()
@@ -142,35 +142,18 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
 
 
     # Strokes / Loops in the Graph
-    loops_fset = whole_process_helper.helper.face_aggregate_addStroke(stroke_node_features) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
-    stroke_cloud_loops = [list(fset) for fset in loops_fset]
-    
-    connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(stroke_node_features)
-    strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, connected_stroke_nodes)
+    stroke_in_graph = 0
+    existing_loops = []
+    prev_operation_strokes = 0
 
-    loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(stroke_cloud_loops)
-    loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(stroke_cloud_loops, stroke_node_features, loop_neighboring_all)
-    loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(loop_neighboring_all, loop_neighboring_vertical)
-    loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(stroke_cloud_loops, stroke_node_features)
-
-
-    # Operation prediction
-    current_op = 1
-
-    while current_op != 0:
+    while stroke_in_graph < stroke_node_features.shape[0]:
+        print("stroke_in_graph", stroke_in_graph, "out of", stroke_node_features.shape[0])
 
     # -------------------- Prepare the graph informations -------------------- #
-        # 1) Stroke to brep
-        stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, brep_edges)
-        stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, brep_edges)
-        stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
-        
-        stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, brep_edges)
-        stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, brep_edges)
-        stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
-
-        print("-----------cut off-----------")
-        break
+        # 1) Get stroke cloud loops
+        read_strokes = stroke_node_features[:stroke_in_graph + 1]
+        loops_fset = whole_process_helper.helper.face_aggregate_addStroke(read_strokes)
+        existing_loops += [list(fset) for fset in loops_fset]
 
         # Preprocessing.proc_CAD.helper.vis_multiple_loops([list(fset) for fset in loops_fset], read_strokes)
 
