@@ -19,7 +19,7 @@ import Encoders.helper
 
 from torch.utils.data import DataLoader, random_split, Subset
 from tqdm import tqdm
-from Preprocessing.config import device
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -53,7 +53,7 @@ def predict_sketch(gnn_graph):
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     sketch_selection_mask = sketch_graph_decoder(x_dict)
 
-    Encoders.helper.vis_selected_loops(gnn_graph, torch.argmax(sketch_selection_mask))
+    Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, torch.argmax(sketch_selection_mask))
 
     return sketch_selection_mask
 
@@ -79,7 +79,7 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
 
     x_dict = extrude_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     extrude_selection_mask = extrude_graph_decoder(x_dict)
-    Encoders.helper.vis_selected_strokes(gnn_graph, extrude_selection_mask.detach())
+    # Encoders.helper.vis_selected_loops(gnn_graph['loop'].x, extrude_selection_mask.detach())
     return extrude_selection_mask
 
 # This extrude_amount, extrude_direction is not total correct. Work on it later
@@ -125,9 +125,8 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     stroke_node_features = np.round(stroke_node_features, 4)
 
     print("NEW SHAPE -----------------!")
-    print("stroke_node_features", stroke_node_features.shape)
     # We only want to process complicated shapes
-    if stroke_node_features.shape[0] < 90:
+    if stroke_node_features.shape[0] > 50:
         continue
     
     # Init Brep
@@ -142,7 +141,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
 
 
     # Strokes / Loops in the Graph
-    loops_fset = whole_process_helper.helper.face_aggregate_addStroke(stroke_node_features) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
+    loops_fset = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
     stroke_cloud_loops = [list(fset) for fset in loops_fset]
     
     connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(stroke_node_features)
@@ -158,7 +157,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     current_op = 1
 
     while current_op != 0:
-
+    
     # -------------------- Prepare the graph informations -------------------- #
         # 1) Stroke to brep
         stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, brep_edges)
@@ -168,30 +167,11 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, brep_edges)
         stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, brep_edges)
         stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
-
-        print("-----------cut off-----------")
-        break
-
-        # Preprocessing.proc_CAD.helper.vis_multiple_loops([list(fset) for fset in loops_fset], read_strokes)
-
-        # 2) Compute stroke / loop information 
-        connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(read_strokes)
-        strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(read_strokes, connected_stroke_nodes)
-
-
-        loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(existing_loops)
-        loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(existing_loops, read_strokes)
-        loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(loop_neighboring_all, loop_neighboring_vertical)
-        loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(existing_loops, read_strokes)
         
-        # 3) Stroke to Brep
-        stroke_to_loop = Preprocessing.proc_CAD.helper.stroke_to_brep(existing_loops, brep_loops, read_strokes, brep_edges)
-        stroke_to_edge = Preprocessing.proc_CAD.helper.stroke_to_edge(read_strokes, brep_edges)
-
-        # 4) Build graph & check validity of the graph
+        # 2) Build graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
-            existing_loops, 
-            read_strokes, 
+            stroke_cloud_loops, 
+            stroke_node_features, 
             strokes_perpendicular, 
             loop_neighboring_vertical, 
             loop_neighboring_horizontal, 
@@ -200,55 +180,49 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
             stroke_to_edge
         )
         
+        # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+
         
-        # 5) If it satisfy the condition, we can build the operations
-        if gnn_graph._full_shape and gnn_graph._has_circle_shape() and (stroke_in_graph - prev_operation_strokes) > 10:
-            prev_operation_strokes = stroke_in_graph
-            
-            Encoders.helper.vis_left_graph(gnn_graph)
-            Encoders.helper.vis_full_graph(gnn_graph)
 
-            print("build !!")
+        # 3) Build operations
 
-            # 5.1) Do sketch
-            sketch_selection_mask, sketch_points, normal = do_sketch(gnn_graph)
-            cur__brep_class._sketch_op(sketch_points, normal, sketch_points)
+        # 3.1) Do sketch
+        sketch_selection_mask, sketch_points, normal = do_sketch(gnn_graph)
+        cur__brep_class._sketch_op(sketch_points, normal, sketch_points)
 
-            print("sketch_points", sketch_points)
+        print("sketch_points", sketch_points)
+
+        print("-------cut of -------")
+        break
 
 
-            # 5.2) Do Extrude
-            extrude_amount, extrude_direction = do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges)
 
-            cur__brep_class.extrude_op(extrude_amount, extrude_direction)
+        # 5.2) Do Extrude
+        extrude_amount, extrude_direction = do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges)
 
-
-            # 5.3) Write to brep
-            cur__brep_class.write_to_json(output_dir)
+        cur__brep_class.extrude_op(extrude_amount, extrude_direction)
 
 
-            # 5.4) Read the program and produce the brep file
-            if os.path.exists(output_relative_dir):
-                shutil.rmtree(output_relative_dir)
-            os.makedirs(output_relative_dir, exist_ok=True)
-
-            parsed_program_class = Preprocessing.proc_CAD.Program_to_STL.parsed_program(file_path, output_dir)
-            parsed_program_class.read_json_file()
+        # 5.3) Write to brep
+        cur__brep_class.write_to_json(output_dir)
 
 
-            # 5.5) Read brep file
-            brep_files = [file_name for file_name in os.listdir(os.path.join(output_dir, 'canvas'))
-                    if file_name.startswith('brep_') and file_name.endswith('.step')]
-            brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+        # 5.4) Read the program and produce the brep file
+        if os.path.exists(output_relative_dir):
+            shutil.rmtree(output_relative_dir)
+        os.makedirs(output_relative_dir, exist_ok=True)
+
+        parsed_program_class = Preprocessing.proc_CAD.Program_to_STL.parsed_program(file_path, output_dir)
+        parsed_program_class.read_json_file()
 
 
-            # 5.6) Update brep data
-            brep_edges, brep_loops = cascade_brep(brep_files)
-            Encoders.helper.vis_brep(brep_edges)
-            
+        # 5.5) Read brep file
+        brep_files = [file_name for file_name in os.listdir(os.path.join(output_dir, 'canvas'))
+                if file_name.startswith('brep_') and file_name.endswith('.step')]
+        brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
 
-        # n) Lastly, update the strokes 
-        stroke_in_graph += 1
-        print('------')
-    
-    break
+
+        # 5.6) Update brep data
+        brep_edges, brep_loops = cascade_brep(brep_files)
+        Encoders.helper.vis_brep(brep_edges)
+        

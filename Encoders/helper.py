@@ -294,16 +294,18 @@ def vis_full_graph(gnn_graph):
     # Show plot
     plt.show()
 
-def vis_left_graph(graph):
+
+def vis_left_graph(stroke_node_features):
     """
-    Visualize only the strokes that are not used (i.e., have the 8th value as 0) in 3D space.
+    Visualize the graph with loops and strokes in 3D space, including circles for strokes where stroke[7] != 0.
     
     Parameters:
     graph (SketchLoopGraph): A single graph object containing loops and strokes.
+    selected_loop_idx (int): The index of the loop that is chosen to be highlighted (not used yet).
     """
 
     # Extract stroke features
-    stroke_node_features = graph['stroke'].x.numpy()
+    stroke_node_features = feature_depad(stroke_node_features)
 
     # Initialize the 3D plot
     fig = plt.figure()
@@ -315,19 +317,28 @@ def vis_left_graph(graph):
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
-    # Plot only strokes where the 8th value (index 7) is 0
+    # Plot strokes based on the last value: 0 for blue, otherwise green
     for stroke in stroke_node_features:
-        if stroke[7] == 0:  # Check if the 8th value is 0
-            start, end = stroke[:3], stroke[3:6]
+        start, end = stroke[:3], stroke[3:6]
+        stroke_color = 'blue' if stroke[8] == 0 else 'green'  # Color based on the last value
 
-            # Update the min and max limits for each axis
+        # Update the min and max limits for rescaling based only on strokes (ignoring circles)
+        if stroke[7] == 0:
             x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
 
-            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+        if stroke[7] != 0:
+            # Circle face (plot in green)
+            x_values, y_values, z_values = plot_circle(stroke)
 
-    # Compute the center of the shape
+            ax.plot(x_values, y_values, z_values, color=stroke_color)
+
+        else:
+            # Plot the stroke (in blue or green depending on the condition)
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color=stroke_color, linewidth=1)
+
+    # Compute the center of the shape based on the strokes only (ignoring circles)
     x_center = (x_min + x_max) / 2
     y_center = (y_min + y_max) / 2
     z_center = (z_min + z_max) / 2
