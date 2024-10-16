@@ -97,12 +97,14 @@ class Program_Decoder(nn.Module):
         program_embedding = self.program_encoder(program_tokens)  # (batch_size, seq_len, embed_dim)
 
         if self.method_type == 'stroke':
-            batch_size = x_dict['stroke'].shape[0] // 200
-            node_features = x_dict['stroke'].view(batch_size, 200, 128)
-        
+            num_strokes = x_dict['stroke'].shape[0]
+            batch_size = max(1, num_strokes // 200)  # Ensure batch_size is at least 1
+            node_features = x_dict['stroke'].view(batch_size, min(200, num_strokes), 128)
+            
         elif self.method_type == 'loop':
-            batch_size = x_dict['loop'].shape[0] // 200
-            node_features = x_dict['loop'].view(batch_size, 200, 128)
+            num_loops = x_dict['loop'].shape[0]
+            batch_size = max(1, num_loops // 200)  # Ensure batch_size is at least 1
+            node_features = x_dict['loop'].view(batch_size, min(200, num_loops), 128)
  
 
         # Transpose for MultiheadAttention: (seq_len, batch_size, embed_dim)

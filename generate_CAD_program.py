@@ -79,7 +79,9 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
 
     x_dict = extrude_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     extrude_selection_mask = extrude_graph_decoder(x_dict)
-    # Encoders.helper.vis_selected_loops(gnn_graph['loop'].x, extrude_selection_mask.detach())
+    extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+    
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
     return extrude_selection_mask
 
 # This extrude_amount, extrude_direction is not total correct. Work on it later
@@ -91,28 +93,55 @@ def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges):
     return extrude_amount, extrude_direction
 
 
+
+# --------------------- Program Prediction Network --------------------- #
+program_graph_encoder = Encoders.gnn.gnn.SemanticModule()
+program_graph_decoder_stroke = Encoders.gnn.gnn.Program_Decoder('stroke')
+program_graph_decoder_loop = Encoders.gnn.gnn.Program_Decoder('loop')
+program_dir = os.path.join(current_dir, 'checkpoints', 'program_prediction')
+program_graph_encoder.eval()
+program_graph_decoder_stroke.eval()
+program_graph_decoder_loop.eval()
+program_graph_encoder.load_state_dict(torch.load(os.path.join(program_dir, 'graph_encoder.pth')))
+program_graph_decoder_stroke.load_state_dict(torch.load(os.path.join(program_dir, 'graph_decoder.pth')))
+program_graph_decoder_loop.load_state_dict(torch.load(os.path.join(program_dir, 'graph_decoder.pth')))
+
+
+def program_prediction(gnn_graph, past_programs):
+    past_programs = whole_process_helper.helper.padd_program(past_programs)
+    x_dict = program_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+    output_loop = program_graph_decoder_loop(x_dict, past_programs)
+    output_stroke = program_graph_decoder_loop(x_dict, past_programs)
+    predicted_class = torch.argmax(output_stroke + output_loop, dim=1)
+
+    return predicted_class
+
+
 # --------------------- Cascade Brep Features --------------------- #
 def cascade_brep(brep_files):
-    final_brep_edges_list = []
+    final_brep_edges = []
+    final_cylinder_features = []
 
     for file_name in brep_files:
         brep_directory = os.path.join(output_dir, 'canvas')
         brep_file_path = os.path.join(brep_directory, file_name)
 
-        edge_features_list, _= Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
-        if len(final_brep_edges_list) == 0:
-            final_brep_edges_list = edge_features_list
-            new_features = edge_features_list
+        edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
+        
+        if len(final_brep_edges) == 0:
+            final_brep_edges = edge_features_list
+            final_cylinder_features = cylinder_features
         else:
             # We already have brep
-            new_features= Preprocessing.generate_dataset.find_new_features(final_brep_edges_list, edge_features_list) 
-            final_brep_edges_list += new_features
+            new_features = Preprocessing.generate_dataset.find_new_features(final_brep_edges, edge_features_list) 
+            final_brep_edges += new_features
+            final_cylinder_features += cylinder_features
 
-    final_brep_edges = np.array(final_brep_edges_list)
-    final_brep_edges = np.round(final_brep_edges, 4)
-    brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(final_brep_edges)
+    output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
+    brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(output_brep_edges) + Preprocessing.proc_CAD.helper.face_aggregate_circle_brep(output_brep_edges)
+    brep_loops = [list(loop) for loop in brep_loops]
 
-    return final_brep_edges, brep_loops
+    return output_brep_edges, brep_loops
 
 
 
@@ -155,6 +184,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
 
     # Operation prediction
     current_op = 1
+    past_programs = []
 
     while current_op != 0:
     
@@ -190,16 +220,9 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         sketch_selection_mask, sketch_points, normal = do_sketch(gnn_graph)
         cur__brep_class._sketch_op(sketch_points, normal, sketch_points)
 
-        print("sketch_points", sketch_points)
 
-        print("-------cut of -------")
-        break
-
-
-
-        # 5.2) Do Extrude
+        # 3.2) Do Extrude
         extrude_amount, extrude_direction = do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges)
-
         cur__brep_class.extrude_op(extrude_amount, extrude_direction)
 
 
@@ -226,3 +249,8 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         brep_edges, brep_loops = cascade_brep(brep_files)
         Encoders.helper.vis_brep(brep_edges)
         
+        past_programs.append(1)
+        past_programs.append(2)
+        current_op = program_prediction(gnn_graph, past_programs)
+
+

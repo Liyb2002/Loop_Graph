@@ -323,3 +323,31 @@ def clean_mask(sketch_selection_mask):
 
     return cleaned_mask
     
+
+# --------------------------------------------------------------------------- #
+
+def padd_program(past_program):
+    """
+    Pads the input program token list to a length of 20 with the value 10, 
+    and then reshapes it to have a batch size of 1.
+
+    Args:
+        past_program (list or torch.Tensor): The input program token list or tensor.
+
+    Returns:
+        torch.Tensor: The padded program with a batch size of 1.
+    """
+    # Convert to tensor if it's a list
+    if isinstance(past_program, list):
+        past_program = torch.tensor(past_program, dtype=torch.int64)
+    
+    # Padding the input program to length 20 with the value 10
+    pad_size = 20 - past_program.shape[0]
+    if pad_size > 0:
+        pad = torch.full((pad_size,), 10, dtype=torch.int64, device=past_program.device)
+        past_program = torch.cat((past_program, pad), dim=0)
+    
+    # Reshape to (1, 20) for batch size of 1
+    past_program = past_program.unsqueeze(0)  # Adding batch dimension
+    
+    return past_program

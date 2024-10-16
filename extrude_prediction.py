@@ -47,61 +47,6 @@ def save_models():
 # ------------------------------------------------------------------------------# 
 
 
-def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
-    # Infer batch size and sequence length from the shapes
-    batch_size = valid_output.shape[0] // 200
-
-    # Initialize counters for each category
-    category_count = [0, 0, 0, 0]  # Tracks the number of batches in each category
-    correct_count = [0, 0, 0, 0]   # Tracks the correct predictions in each category
-
-    for i in range(batch_size):
-        # Slice for each example in the batch
-
-        output_slice = valid_output[i * 200:(i + 1) * 200]
-        mask_slice = valid_batch_masks[i * 200:(i + 1) * 200]
-        
-        stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 200:(i + 1) * 200]
-        edge_features = hetero_batch.edge_index_dict['stroke', 'represents', 'loop']
-        edge_features_slice = Encoders.helper.find_edge_features_slice(edge_features, i)
-
-
-        # Find k: the number of rows where all elements are not -1
-        k = 0
-        for row in stroke_node_features_slice:
-            if not torch.all(row == -1):
-                k += 1
-            else:
-                break
-
-        # Determine category based on k
-        if k < 50:
-            category_idx = 0  # Category 1
-        elif 50 <= k < 70:
-            category_idx = 1  # Category 2
-        elif 70 <= k < 90:
-            category_idx = 2  # Category 3
-        else:
-            category_idx = 3  # Category 4
-
-        # Increment the batch count for the category
-        category_count[category_idx] += 1
-
-        # Get the index of the maximum value for both the output and mask
-        condition_1 = (mask_slice == 1) & (output_slice > 0.5)
-        condition_2 = (mask_slice == 0) & (output_slice < 0.5)
-
-        # Check if the prediction is correct and increment the correct counter for the category
-        if torch.all(condition_1 | condition_2):
-            correct_count[category_idx] += 1
-        else:
-            pass
-            # Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_output_index.item()])
-            # Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_mask_index.item()])
-
-    return category_count, correct_count
-
-
 
 def compute_accuracy(valid_output, valid_batch_masks):
     batch_size = valid_output.shape[0] // 200
@@ -113,6 +58,7 @@ def compute_accuracy(valid_output, valid_batch_masks):
 
         condition_1 = (mask_slice == 1) & (output_slice > 0.5)
         condition_2 = (mask_slice == 0) & (output_slice < 0.5)
+
 
         if torch.all(condition_1 | condition_2):
             correct += 1
@@ -157,7 +103,7 @@ def compute_accuracy_eval(output, loop_selection_mask, padded_size=200):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0
@@ -217,9 +163,8 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
 
-        print("extrude_stroke_idx", extrude_stroke_idx)
         # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(sketch_loop_selection_mask)])
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -410,6 +355,9 @@ def eval():
         # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(sketch_loop_selection_mask)])
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
 
+        if len(graphs) > 100:
+            break
+
         
     print(f"Total number of preprocessed graphs: {len(graphs)}")
 
@@ -446,7 +394,7 @@ def eval():
             valid_batch_masks = batch_masks * valid_mask
 
 
-            category_count, correct_count = compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch)           
+            category_count, correct_count = compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch)           
 
             for i in range(4):
                 total_category_count[i] += category_count[i]
@@ -482,4 +430,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()
