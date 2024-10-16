@@ -67,7 +67,7 @@ def compute_accuracy(valid_output, valid_batch_masks):
 
 
 
-def compute_accuracy_eval(output, loop_selection_mask, padded_size=200):
+def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, padded_size=200):
     correct = 0
     total_loops = loop_selection_mask.shape[0] // padded_size  # Determine how many (200,1) matrices there are
 
@@ -79,6 +79,8 @@ def compute_accuracy_eval(output, loop_selection_mask, padded_size=200):
         # Extract the (200, 1) slice for both output and loop_selection_mask
         output_slice = output[start_idx:end_idx]
         mask_slice = loop_selection_mask[start_idx:end_idx]
+        stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 200:(i + 1) * 200]
+
 
         # Evaluate conditions for this slice
         condition_1 = (mask_slice == 1) & (output_slice > 0.5)
@@ -93,6 +95,10 @@ def compute_accuracy_eval(output, loop_selection_mask, padded_size=200):
         # Check if all conditions are met for this slice
         if torch.all(condition_1 | condition_2):
             correct += 1
+        else:
+            extrude_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), extrude_stroke_idx)
+
 
     return correct
 
@@ -370,8 +376,8 @@ def eval():
     mask_eval_loader = DataLoader(padded_masks, batch_size=batch_size, shuffle=False)
 
     eval_loss = 0.0
-    total_category_count = [0, 0, 0, 0]
-    total_correct_count = [0, 0, 0, 0] 
+    total = 0
+    correct = 0
 
     criterion = torch.nn.BCELoss()  # Assuming BCELoss is used in the training
 
@@ -394,40 +400,20 @@ def eval():
             valid_batch_masks = batch_masks * valid_mask
 
 
-            category_count, correct_count = compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch)           
-
-            for i in range(4):
-                total_category_count[i] += category_count[i]
-                total_correct_count[i] += correct_count[i]
+            correct += compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch)           
+            total += batch_size
 
             # Compute loss
             loss = criterion(valid_output, valid_batch_masks)
             eval_loss += loss.item()
 
 
-    print("Category-wise Accuracy:")
-    total_correct = 0
-    total_samples = 0
-
-    for i in range(4):
-        if total_category_count[i] > 0:
-            accuracy = total_correct_count[i] / total_category_count[i] * 100
-            total_correct += total_correct_count[i]
-            total_samples += total_category_count[i]
-            print(f"Category {i+1}: {accuracy:.2f}% (Correct: {total_correct_count[i]}/{total_category_count[i]})")
-        else:
-            print(f"Category {i+1}: No samples")
-
-    # Calculate and print average evaluation loss
-    average_eval_loss = eval_loss / total_iterations_eval
-    print(f"Average Evaluation Loss: {average_eval_loss:.4f}")
-
     # Calculate and print overall average accuracy
-    overall_accuracy = total_correct / total_samples * 100
+    overall_accuracy = correct / total
     print(f"Overall Average Accuracy: {overall_accuracy:.2f}%")
 
 
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

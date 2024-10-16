@@ -60,10 +60,11 @@ def predict_sketch(gnn_graph):
 def do_sketch(gnn_graph):
     sketch_selection_mask = predict_sketch(gnn_graph)
     sketch_points = whole_process_helper.helper.extract_unique_points(sketch_selection_mask, gnn_graph)
+    
     normal = [1, 0, 0]
     sketch_selection_mask = whole_process_helper.helper.clean_mask(sketch_selection_mask)
-
     return sketch_selection_mask, sketch_points, normal
+
 
 # --------------------- Extrude Network --------------------- #
 extrude_graph_encoder = Encoders.gnn.gnn.SemanticModule()
@@ -218,7 +219,11 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
 
         # 3.1) Do sketch
         sketch_selection_mask, sketch_points, normal = do_sketch(gnn_graph)
-        cur__brep_class._sketch_op(sketch_points, normal, sketch_points)
+        if sketch_points.shape[0] == 1:
+            # do circle sketch
+            cur__brep_class.regular_sketch_circle(sketch_points[0, 3:6].tolist(), sketch_points[0, 7].item(), sketch_points[0, :3].tolist())
+        else: 
+            cur__brep_class._sketch_op(sketch_points, normal, sketch_points)
 
 
         # 3.2) Do Extrude

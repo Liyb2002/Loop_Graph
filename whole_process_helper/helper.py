@@ -175,6 +175,10 @@ def extract_unique_points(sketch_selection_mask, gnn_graph):
     loop_stroke_edges = gnn_graph['loop', 'represented_by', 'stroke'].edge_index
     connected_stroke_indices = loop_stroke_edges[1][loop_stroke_edges[0] == max_prob_loop_idx]
 
+    if connected_stroke_indices.shape[0] == 1:
+        circle_stroke = gnn_graph['stroke'].x[connected_stroke_indices[0]]
+        return circle_stroke.unsqueeze(0)
+
     # 3. Extract strokes (pairs of points) from the connected stroke nodes
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
     strokes = []
