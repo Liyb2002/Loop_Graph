@@ -221,20 +221,42 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
     # 2. Extract stroke node features for the selected stroke
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
     stroke_feature = stroke_features[max_prob_stroke_idx]
-    
+
+
+
+    if sketch_points.shape[0] == 1:
+        circle_stroke = sketch_points.squeeze(0)
+        # circle stroke
+        normal_vector = circle_stroke[3:6]
+
+        # Find common_axis_idx where the normal vector has a value of 1
+        common_axis_idx = -1
+        for i in range(3):
+            if normal_vector[i] == 1 or normal_vector[i] == -1:
+                common_axis_idx = i
+                break
+        
+        if common_axis_idx != -1:
+            plane_value = circle_stroke[common_axis_idx]
+        else:
+            plane_value = None  # Handle case if no axis has a value of 1
+
+    else: 
+        # 3. Determine the common axis and value from the coplanar sketch_points
+        sketch_points_tensor = torch.tensor(sketch_points, dtype=torch.float32)  # Convert to tensor
+        common_axes = (torch.all(sketch_points_tensor[:, 0] == sketch_points_tensor[0, 0]),
+                    torch.all(sketch_points_tensor[:, 1] == sketch_points_tensor[0, 1]),
+                    torch.all(sketch_points_tensor[:, 2] == sketch_points_tensor[0, 2]))
+
+        # Find the index of the common axis (x: 0, y: 1, z: 2)
+        common_axis_idx = common_axes.index(True)
+        plane_value = sketch_points_tensor[0, common_axis_idx]
+
+
+
     # Extract the two 3D points for the stroke
     point1 = stroke_feature[:3]
     point2 = stroke_feature[3:6]
-
-    # 3. Determine the common axis and value from the coplanar sketch_points
-    sketch_points_tensor = torch.tensor(sketch_points, dtype=torch.float32)  # Convert to tensor
-    common_axes = (torch.all(sketch_points_tensor[:, 0] == sketch_points_tensor[0, 0]),
-                   torch.all(sketch_points_tensor[:, 1] == sketch_points_tensor[0, 1]),
-                   torch.all(sketch_points_tensor[:, 2] == sketch_points_tensor[0, 2]))
-
-    # Find the index of the common axis (x: 0, y: 1, z: 2)
-    common_axis_idx = common_axes.index(True)
-    plane_value = sketch_points_tensor[0, common_axis_idx]
 
     # 4. Determine which point of the extruding stroke is on the same plane as the sketch_points
     if torch.isclose(point1[common_axis_idx], plane_value):

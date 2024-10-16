@@ -29,7 +29,7 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_eval')
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
 data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 
@@ -90,7 +90,6 @@ def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges):
     extrude_selection_mask = predict_extrude(gnn_graph, sketch_selection_mask)
     extrude_amount, extrude_direction = whole_process_helper.helper.get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges)
     
-    print("extrude_amount", extrude_amount)
     return extrude_amount, extrude_direction
 
 
