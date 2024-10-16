@@ -109,6 +109,7 @@ program_graph_decoder_loop.load_state_dict(torch.load(os.path.join(program_dir, 
 
 def program_prediction(gnn_graph, past_programs):
     past_programs = whole_process_helper.helper.padd_program(past_programs)
+    gnn_graph.padding()
     x_dict = program_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     output_loop = program_graph_decoder_loop(x_dict, past_programs)
     output_stroke = program_graph_decoder_loop(x_dict, past_programs)

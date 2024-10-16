@@ -58,6 +58,26 @@ class SketchLoopGraph(HeteroData):
         self['stroke', 'perpendicular', 'stroke'].edge_index = torch.tensor(strokes_perpendicular_edges, dtype=torch.long)
 
 
+    def padding(self):
+    
+        target_shape = (200, 9)
+        
+        for node_type in self.node_types:
+            if 'x' in self[node_type]:
+                x = self[node_type].x
+                current_shape = x.shape
+
+                # Check if padding is needed
+                if current_shape[0] < target_shape[0]:
+                    # Pad to (200, 9) with -1
+                    pad_size = (0, target_shape[1] - current_shape[1], 0, target_shape[0] - current_shape[0])  # (pad_last_dim, pad_first_dim, pad_dim_for_nodes)
+                    x_padded = torch.nn.functional.pad(x, pad_size, mode='constant', value=-1)
+                    self[node_type].x = x_padded
+                else:
+                    self[node_type].x = x  # No padding needed if already the correct size
+
+        
+
     def to_device_withPadding(self, device):
         # Target shape (200, 9)
         target_shape = (200, 9)
