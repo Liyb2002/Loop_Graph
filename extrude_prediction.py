@@ -88,16 +88,17 @@ def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, padded_size
 
         # Print output values where loop_selection_mask == 1 for the current slice
         mask_1_indices = (mask_slice == 1).nonzero(as_tuple=True)
-        if mask_1_indices[0].numel() > 0:
-            print(f"Output values where loop_selection_mask == 1 for slice {i}:")
-            print(output_slice[mask_1_indices])
+        # if mask_1_indices[0].numel() > 0:
+        #     print(f"Output values where loop_selection_mask == 1 for slice {i}:")
+        #     print(output_slice[mask_1_indices])
 
         # Check if all conditions are met for this slice
         if torch.all(condition_1 | condition_2):
             correct += 1
         else:
-            extrude_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), extrude_stroke_idx)
+            pass
+            # extrude_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+            # Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), extrude_stroke_idx)
 
 
     return correct
@@ -361,9 +362,6 @@ def eval():
         # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(sketch_loop_selection_mask)])
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
 
-        if len(graphs) > 100:
-            break
-
         
     print(f"Total number of preprocessed graphs: {len(graphs)}")
 
@@ -416,4 +414,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

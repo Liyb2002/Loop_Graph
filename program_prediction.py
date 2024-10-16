@@ -270,8 +270,8 @@ def eval():
         gnn_graph.to_device_withPadding(device)
         graphs.append(gnn_graph)
         
-        existing_programs.append(Encoders.helper.program_mapping(program[:-1]))
-        gt_tokens.append(Encoders.helper.program_gt_mapping([program[-1]]))
+        existing_programs.append(Encoders.helper.program_mapping(program[:-1], device))
+        gt_tokens.append(Encoders.helper.program_gt_mapping([program[-1]], device))
 
 
 
@@ -279,14 +279,18 @@ def eval():
     hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in graphs]
     graph_train_loader = GraphDataLoader(hetero_train_graphs, batch_size=16, shuffle=False)
 
-    train_existing_programs_tensor = torch.tensor(existing_programs, dtype=torch.float32)
+    train_existing_programs_tensor = torch.stack(existing_programs).to(device)
+
+    # Create TensorDataset for existing programs (inputs)
     train_existing_dataset = TensorDataset(train_existing_programs_tensor)
     program_train_existing_loader = DataLoader(train_existing_dataset, batch_size=16, shuffle=False)
 
-    train_gt_programs_tensor = torch.tensor(gt_tokens, dtype=torch.float32)
+    # Convert ground truth tokens to long (integer class indices)
+    train_gt_programs_tensor = torch.tensor(gt_tokens, dtype=torch.long).to(device)
+
+    # Create TensorDataset for ground truth programs (targets)
     train_gt_dataset = TensorDataset(train_gt_programs_tensor)
     program_train_gt_loader = DataLoader(train_gt_dataset, batch_size=16, shuffle=False)
-
 
     # Eval
     program_encoder.eval()
@@ -306,10 +310,10 @@ def eval():
                         
 
             x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-            output_loop = graph_decoder_loop(x_dict, program_existing_batch.long())
-            output_stroke = graph_decoder_loop(x_dict, program_existing_batch.long())
+            output_loop = graph_decoder_loop(x_dict, program_existing_batch)
+            output_stroke = graph_decoder_loop(x_dict, program_existing_batch)
 
-            loss = criterion(output_loop, program_gt_batch.squeeze(1).long()) + criterion(output_stroke, program_gt_batch.squeeze(1).long())
+            loss = criterion(output_loop, program_gt_batch.long()) + criterion(output_stroke, program_gt_batch.long())
 
             tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, program_gt_batch)
             eval_correct += tempt_correct
@@ -327,4 +331,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

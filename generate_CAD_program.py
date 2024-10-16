@@ -114,6 +114,8 @@ def program_prediction(gnn_graph, past_programs):
     output_stroke = program_graph_decoder_loop(x_dict, past_programs)
     predicted_class = torch.argmax(output_stroke + output_loop, dim=1)
 
+    print("output_loop", output_loop)
+    print("past_programs", past_programs, "predicted_class", predicted_class)
     return predicted_class
 
 
@@ -256,6 +258,5 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         past_programs.append(1)
         past_programs.append(2)
         current_op = program_prediction(gnn_graph, past_programs)
-        print("current_op", current_op, "past_programs", past_programs)
 
 
