@@ -20,6 +20,7 @@ import Encoders.helper
 from torch.utils.data import DataLoader, random_split, Subset
 from tqdm import tqdm
 
+import pickle
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -266,3 +267,10 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         current_op = program_prediction(gnn_graph, past_programs)
 
 
+    # 6) Write the stroke_cloud data to pkl file
+    output_file_path = os.path.join(cur_output_dir, f'shape_info.pkl')
+    with open(output_file_path, 'wb') as f:
+        pickle.dump({
+            'stroke_node_features': stroke_node_features,
+        }, f)
+    
