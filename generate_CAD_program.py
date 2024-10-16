@@ -210,7 +210,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
             stroke_to_edge
         )
         
-        # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+        Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
 
         
 
@@ -256,5 +256,6 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         past_programs.append(1)
         past_programs.append(2)
         current_op = program_prediction(gnn_graph, past_programs)
+        print("current_op", current_op, "past_programs", past_programs)
 
 
