@@ -116,8 +116,9 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
         if max_output_index.item() in gt_indices:
             correct_count[category_idx] += 1
         else:
-            Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_output_index.item()])
-            Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, gt_indices)
+            pass
+            # Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_output_index.item()])
+            # Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, gt_indices)
 
     return category_count, correct_count
 

@@ -115,8 +115,8 @@ def train():
 
         graphs.append(gnn_graph)
         
-        existing_programs.append(Encoders.helper.program_mapping(program[:-1]))
-        gt_programs.append(Encoders.helper.program_gt_mapping([program[-1]]))
+        existing_programs.append(Encoders.helper.program_mapping(program[:-1], device))
+        gt_programs.append(Encoders.helper.program_gt_mapping([program[-1]], device))
 
 
 
@@ -135,20 +135,28 @@ def train():
     graph_val_loader = GraphDataLoader(hetero_val_graphs, batch_size=16, shuffle=False)
 
 
-    train_existing_programs_tensor = torch.tensor(train_existing_programs, dtype=torch.float32)
-    val_existing_programs_tensor = torch.tensor(val_existing_programs, dtype=torch.float32)
-    train_existing_dataset = TensorDataset(train_existing_programs_tensor)
-    val__existing_dataset = TensorDataset(val_existing_programs_tensor)
+    train_existing_tensor = torch.stack(train_existing_programs).to(device)
+    val_existing_tensor = torch.stack(val_existing_programs).to(device)
+
+    # Create datasets for the existing programs dataset (on GPU)
+    train_existing_dataset = TensorDataset(train_existing_tensor)
+    val_existing_dataset = TensorDataset(val_existing_tensor)
+
+    # Create DataLoaders for the existing programs dataset
     program_train_existing_loader = DataLoader(train_existing_dataset, batch_size=16, shuffle=False)
-    program_val_existing_loader = DataLoader(val__existing_dataset, batch_size=16, shuffle=False)
+    program_val_existing_loader = DataLoader(val_existing_dataset, batch_size=16, shuffle=False)
 
+    # Move ground truth programs to the GPU
+    train_gt_programs_tensor = torch.tensor(train_gt_programs, dtype=torch.float32).to(device)
+    val_gt_programs_tensor = torch.tensor(val_gt_programs, dtype=torch.float32).to(device)
 
-    train_gt_programs_tensor = torch.tensor(train_gt_programs, dtype=torch.float32)
-    val_gt_programs_tensor = torch.tensor(val_gt_programs, dtype=torch.float32)
+    # Create datasets for ground truth programs (on GPU)
     train_gt_dataset = TensorDataset(train_gt_programs_tensor)
-    val__gt_dataset = TensorDataset(val_gt_programs_tensor)
+    val_gt_dataset = TensorDataset(val_gt_programs_tensor)
+
+    # Create DataLoaders for the ground truth programs dataset
     program_train_gt_loader = DataLoader(train_gt_dataset, batch_size=16, shuffle=False)
-    program_val_gt_loader = DataLoader(val__gt_dataset, batch_size=16, shuffle=False)
+    program_val_gt_loader = DataLoader(val_gt_dataset, batch_size=16, shuffle=False)
 
 
     # Training loop
@@ -173,10 +181,10 @@ def train():
             optimizer.zero_grad()
 
             x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-            output_loop = graph_decoder_loop(x_dict, program_existing_batch.long())
-            output_stroke = graph_decoder_loop(x_dict, program_existing_batch.long())
+            output_loop = graph_decoder_loop(x_dict, program_existing_batch)
+            output_stroke = graph_decoder_loop(x_dict, program_existing_batch)
 
-            loss = criterion(output_loop, program_gt_batch.squeeze(1).long()) + criterion(output_stroke, program_gt_batch.squeeze(1).long())
+            loss = criterion(output_loop, program_gt_batch.long()) + criterion(output_stroke, program_gt_batch.long())
 
             tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, program_gt_batch)
             train_correct += tempt_correct
@@ -207,10 +215,10 @@ def train():
                                               total=total_iterations_val):
                 
                 x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-                output_loop = graph_decoder_loop(x_dict, program_existing_batch.long())
-                output_stroke = graph_decoder_loop(x_dict, program_existing_batch.long())
+                output_loop = graph_decoder_loop(x_dict, program_existing_batch)
+                output_stroke = graph_decoder_loop(x_dict, program_existing_batch)
 
-                val_loss += criterion(output_loop, program_gt_batch.squeeze(1).long()) + criterion(output_stroke, program_gt_batch.squeeze(1).long())
+                val_loss += criterion(output_loop, program_gt_batch.long()) + criterion(output_stroke, program_gt_batch.long())
 
                 tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, program_gt_batch)
                 val_correct += tempt_correct
@@ -319,4 +327,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

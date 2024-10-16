@@ -107,7 +107,7 @@ def stroke_to_face(kth_operation, face_to_stroke):
     return face_chosen
 
 
-def program_mapping(program):
+def program_mapping(program, device):
     operation_map = {
         'sketch': 1,
         'extrude': 2,
@@ -121,10 +121,12 @@ def program_mapping(program):
     for i in range (20 - len(mapped_program)):
         mapped_program.append(10)
     
-    return mapped_program
+    mapped_program_tensor = torch.tensor(mapped_program, dtype=torch.long, device=device)
+
+    return mapped_program_tensor
 
 
-def program_gt_mapping(program):
+def program_gt_mapping(program, device):
     operation_map = {
         'sketch': 1,
         'extrude': 2,
@@ -135,7 +137,9 @@ def program_gt_mapping(program):
     # Map each operation in the program list to its corresponding value
     mapped_program = [operation_map.get(op, -1) for op in program]
     
-    return mapped_program
+    mapped_program_tensor = torch.tensor(mapped_program, dtype=torch.long, device=device)
+
+    return mapped_program_tensor
 
 #------------------------------------------------------------------------------------------------------#
 
