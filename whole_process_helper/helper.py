@@ -243,7 +243,7 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
 
     else: 
         # 3. Determine the common axis and value from the coplanar sketch_points
-        sketch_points_tensor = torch.tensor(sketch_points, dtype=torch.float32)  # Convert to tensor
+        sketch_points_tensor = sketch_points.clone().detach().float()  # Convert to tensor if needed and clone
         common_axes = (torch.all(sketch_points_tensor[:, 0] == sketch_points_tensor[0, 0]),
                     torch.all(sketch_points_tensor[:, 1] == sketch_points_tensor[0, 1]),
                     torch.all(sketch_points_tensor[:, 2] == sketch_points_tensor[0, 2]))

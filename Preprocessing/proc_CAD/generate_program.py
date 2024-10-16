@@ -231,7 +231,6 @@ class Brep:
 
 
     def write_to_json(self, data_directory = None):
-        
         #clean everything in the folder
         folder = os.path.join(os.path.dirname(__file__), 'canvas')
         if not os.path.exists(folder):
@@ -240,7 +239,7 @@ class Brep:
         if data_directory:
             folder = data_directory
 
-        
+
         for file in os.listdir(folder):
             file_path = os.path.join(folder, file)
             try:

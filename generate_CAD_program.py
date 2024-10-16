@@ -36,7 +36,6 @@ data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 # --------------------- Directory --------------------- #
 current_dir = os.getcwd()
 output_dir = os.path.join(current_dir, 'program_output')
-output_relative_dir = ('program_output/canvas')
 
 
 
@@ -46,8 +45,8 @@ sketch_graph_decoder = Encoders.gnn.gnn.Sketch_Decoder()
 sketch_graph_encoder.eval()
 sketch_graph_decoder.eval()
 sketch_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
-sketch_graph_encoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_encoder.pth')))
-sketch_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_decoder.pth')))
+sketch_graph_encoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_encoder.pth'), weights_only=True))
+sketch_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_decoder.pth'), weights_only=True))
 
 def predict_sketch(gnn_graph):
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
@@ -72,8 +71,8 @@ extrude_graph_decoder = Encoders.gnn.gnn.Extrude_Decoder()
 extrude_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction')
 extrude_graph_encoder.eval()
 extrude_graph_decoder.eval()
-extrude_graph_encoder.load_state_dict(torch.load(os.path.join(extrude_dir, 'graph_encoder.pth')))
-extrude_graph_decoder.load_state_dict(torch.load(os.path.join(extrude_dir, 'graph_decoder.pth')))
+extrude_graph_encoder.load_state_dict(torch.load(os.path.join(extrude_dir, 'graph_encoder.pth'), weights_only=True))
+extrude_graph_decoder.load_state_dict(torch.load(os.path.join(extrude_dir, 'graph_decoder.pth'), weights_only=True))
 
 def predict_extrude(gnn_graph, sketch_selection_mask):
     gnn_graph.set_select_sketch(sketch_selection_mask)
@@ -102,9 +101,9 @@ program_dir = os.path.join(current_dir, 'checkpoints', 'program_prediction')
 program_graph_encoder.eval()
 program_graph_decoder_stroke.eval()
 program_graph_decoder_loop.eval()
-program_graph_encoder.load_state_dict(torch.load(os.path.join(program_dir, 'graph_encoder.pth')))
-program_graph_decoder_stroke.load_state_dict(torch.load(os.path.join(program_dir, 'graph_decoder.pth')))
-program_graph_decoder_loop.load_state_dict(torch.load(os.path.join(program_dir, 'graph_decoder.pth')))
+program_graph_encoder.load_state_dict(torch.load(os.path.join(program_dir, 'graph_encoder.pth'), weights_only=True))
+program_graph_decoder_stroke.load_state_dict(torch.load(os.path.join(program_dir, 'graph_decoder.pth'), weights_only=True))
+program_graph_decoder_loop.load_state_dict(torch.load(os.path.join(program_dir, 'graph_decoder.pth'), weights_only=True))
 
 
 def program_prediction(gnn_graph, past_programs):
@@ -126,7 +125,7 @@ def cascade_brep(brep_files):
     final_cylinder_features = []
 
     for file_name in brep_files:
-        brep_directory = os.path.join(output_dir, 'canvas')
+        brep_directory = os.path.join(output_dir, f'data_{data_produced}', 'canvas')
         brep_file_path = os.path.join(brep_directory, file_name)
 
         edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
@@ -149,6 +148,7 @@ def cascade_brep(brep_files):
 
 
 # --------------------- Main Code --------------------- #
+data_produced = -1
 for data in tqdm(data_loader, desc="Generating CAD Programs"):
     _, _, _, stroke_node_features, _, _, _, _, _,_, _, _ = data
     
@@ -156,15 +156,22 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     stroke_node_features = stroke_node_features.cpu().numpy()
     stroke_node_features = np.round(stroke_node_features, 4)
 
-    print("NEW SHAPE -----------------!")
+    print("NEW SHAPE, data_produced:", data_produced, "-----------------!")
     # We only want to process complicated shapes
     if stroke_node_features.shape[0] > 50:
         continue
     
+    data_produced += 1
+    cur_output_dir = os.path.join(output_dir, f'data_{data_produced}')
+    if os.path.exists(cur_output_dir):
+        shutil.rmtree(cur_output_dir)
+
+    os.makedirs(cur_output_dir, exist_ok=True)
+
     # Init Brep
     brep_edges = torch.zeros(0)
     brep_loops = []
-    file_path = os.path.join(output_dir, 'Program.json')
+    file_path = os.path.join(cur_output_dir, 'Program.json')
 
 
     # Program State Init
@@ -234,20 +241,18 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
 
 
         # 5.3) Write to brep
-        cur__brep_class.write_to_json(output_dir)
+        cur__brep_class.write_to_json(cur_output_dir)
 
 
         # 5.4) Read the program and produce the brep file
-        if os.path.exists(output_relative_dir):
-            shutil.rmtree(output_relative_dir)
-        os.makedirs(output_relative_dir, exist_ok=True)
-
-        parsed_program_class = Preprocessing.proc_CAD.Program_to_STL.parsed_program(file_path, output_dir)
+        parsed_program_class = Preprocessing.proc_CAD.Program_to_STL.parsed_program(file_path, cur_output_dir)
         parsed_program_class.read_json_file()
 
 
         # 5.5) Read brep file
-        brep_files = [file_name for file_name in os.listdir(os.path.join(output_dir, 'canvas'))
+        cur_relative_output_dir = os.path.join('program_output/', f'data_{data_produced}')
+
+        brep_files = [file_name for file_name in os.listdir(os.path.join(cur_relative_output_dir, 'canvas'))
                 if file_name.startswith('brep_') and file_name.endswith('.step')]
         brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
 
