@@ -30,7 +30,7 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_eval')
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
 data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 
@@ -53,7 +53,7 @@ def predict_sketch(gnn_graph):
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     sketch_selection_mask = sketch_graph_decoder(x_dict)
 
-    # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, torch.argmax(sketch_selection_mask))
+    Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, torch.argmax(sketch_selection_mask))
 
     return sketch_selection_mask
 
@@ -82,7 +82,7 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
     extrude_selection_mask = extrude_graph_decoder(x_dict)
     extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
     
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
     return extrude_selection_mask
 
 # This extrude_amount, extrude_direction is not total correct. Work on it later
@@ -207,7 +207,7 @@ def generate_CAD_program(cur_output_dir, data_produced, stroke_node_features):
             stroke_to_edge
         )
         
-        # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+        Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
 
         
 
@@ -246,7 +246,7 @@ def generate_CAD_program(cur_output_dir, data_produced, stroke_node_features):
 
         # 5.6) Update brep data
         brep_edges, brep_loops = cascade_brep(brep_files)
-        # Encoders.helper.vis_brep(brep_edges)
+        Encoders.helper.vis_brep(brep_edges)
         
         past_programs.append(1)
         past_programs.append(2)

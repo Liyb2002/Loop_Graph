@@ -208,7 +208,6 @@ def count_type(index_to_type_dict):
     return result
 
 def create_graph_from_step_file(step_path):
-    print("step_path", step_path)
     shape = read_step_file(step_path)
 
     # each sublist in edge_coplanar_list is a face that has multiple edges
