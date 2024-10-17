@@ -71,6 +71,9 @@ class parsed_program():
         center = Op['faces'][0]['center']
         normal = Op['faces'][0]['normal']
 
+        if normal[0] == 0 and normal[1] == 0 and normal[2] == 0:
+            normal[0] = 1
+
         self.prev_sketch = Preprocessing.proc_CAD.build123.protocol.build_circle(self.Op_idx, radius, center, normal, self.output, self.data_directory)
         self.Op_idx += 1
         self.circle_center = center

@@ -17,7 +17,7 @@ import Encoders.gnn_stroke.gnn
 import Encoders.helper
 
 
-from torch.utils.data import DataLoader, random_split, Subset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 import pickle
@@ -30,7 +30,7 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_eval')
 data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 
@@ -53,7 +53,7 @@ def predict_sketch(gnn_graph):
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     sketch_selection_mask = sketch_graph_decoder(x_dict)
 
-    Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, torch.argmax(sketch_selection_mask))
+    # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, torch.argmax(sketch_selection_mask))
 
     return sketch_selection_mask
 
@@ -82,7 +82,7 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
     extrude_selection_mask = extrude_graph_decoder(x_dict)
     extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
     
-    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
     return extrude_selection_mask
 
 # This extrude_amount, extrude_direction is not total correct. Work on it later
@@ -115,8 +115,6 @@ def program_prediction(gnn_graph, past_programs):
     output_stroke = program_graph_decoder_loop(x_dict, past_programs)
     predicted_class = torch.argmax(output_stroke + output_loop, dim=1)
 
-    print("output_loop", output_loop)
-    print("past_programs", past_programs, "predicted_class", predicted_class)
     return predicted_class
 
 
@@ -147,27 +145,15 @@ def cascade_brep(brep_files):
     return output_brep_edges, brep_loops
 
 
-
-# --------------------- Main Code --------------------- #
-data_produced = -1
-for data in tqdm(data_loader, desc="Generating CAD Programs"):
-    _, _, _, stroke_node_features, _, _, _, _, _,_, _, _ = data
-    
+# --------------------- Main Loop --------------------- #
+def generate_CAD_program(cur_output_dir, data_produced, stroke_node_features):
     stroke_node_features = stroke_node_features.squeeze(0)
     stroke_node_features = stroke_node_features.cpu().numpy()
     stroke_node_features = np.round(stroke_node_features, 4)
 
     print("NEW SHAPE, data_produced:", data_produced, "-----------------!")
     # We only want to process complicated shapes
-    if stroke_node_features.shape[0] > 50:
-        continue
     
-    data_produced += 1
-    cur_output_dir = os.path.join(output_dir, f'data_{data_produced}')
-    if os.path.exists(cur_output_dir):
-        shutil.rmtree(cur_output_dir)
-
-    os.makedirs(cur_output_dir, exist_ok=True)
 
     # Init Brep
     brep_edges = torch.zeros(0)
@@ -221,7 +207,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
             stroke_to_edge
         )
         
-        Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+        # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
 
         
 
@@ -260,7 +246,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
 
         # 5.6) Update brep data
         brep_edges, brep_loops = cascade_brep(brep_files)
-        Encoders.helper.vis_brep(brep_edges)
+        # Encoders.helper.vis_brep(brep_edges)
         
         past_programs.append(1)
         past_programs.append(2)
@@ -273,4 +259,31 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         pickle.dump({
             'stroke_node_features': stroke_node_features,
         }, f)
+
+
+# --------------------- Main Code --------------------- #
+data_produced = 0
+for data in tqdm(data_loader, desc="Generating CAD Programs"):
+    program, program_whole, _, stroke_node_features, _, _, _, _, _,_, _, _ = data
     
+    if data_produced > 10:
+        break
+
+    if program[-1][0] != 'terminate':
+        continue
+
+    try:
+        cur_output_dir = os.path.join(output_dir, f'data_{data_produced}')
+        if os.path.exists(cur_output_dir):
+            shutil.rmtree(cur_output_dir)
+        os.makedirs(cur_output_dir, exist_ok=True)
+
+        generate_CAD_program(cur_output_dir, data_produced, stroke_node_features)
+
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        if os.path.exists(cur_output_dir):
+            shutil.rmtree(cur_output_dir)
+
+    data_produced += 1
