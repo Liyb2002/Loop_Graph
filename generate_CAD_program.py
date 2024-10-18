@@ -30,7 +30,7 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 
@@ -53,7 +53,7 @@ def predict_sketch(gnn_graph):
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     sketch_selection_mask = sketch_graph_decoder(x_dict)
 
-    Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, torch.argmax(sketch_selection_mask))
+    # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, torch.argmax(sketch_selection_mask))
 
     return sketch_selection_mask
 
@@ -82,7 +82,7 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
     extrude_selection_mask = extrude_graph_decoder(x_dict)
     extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
     
-    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
     return extrude_selection_mask
 
 # This extrude_amount, extrude_direction is not total correct. Work on it later
@@ -146,7 +146,7 @@ def cascade_brep(brep_files):
 
 
 # --------------------- Main Loop --------------------- #
-def generate_CAD_program(cur_output_dir, data_produced, stroke_node_features):
+def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, stroke_node_features):
     stroke_node_features = stroke_node_features.squeeze(0)
     stroke_node_features = stroke_node_features.cpu().numpy()
     stroke_node_features = np.round(stroke_node_features, 4)
@@ -207,7 +207,7 @@ def generate_CAD_program(cur_output_dir, data_produced, stroke_node_features):
             stroke_to_edge
         )
         
-        Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+        # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
 
         
 
@@ -246,7 +246,7 @@ def generate_CAD_program(cur_output_dir, data_produced, stroke_node_features):
 
         # 5.6) Update brep data
         brep_edges, brep_loops = cascade_brep(brep_files)
-        Encoders.helper.vis_brep(brep_edges)
+        # Encoders.helper.vis_brep(brep_edges)
         
         past_programs.append(1)
         past_programs.append(2)
@@ -259,12 +259,17 @@ def generate_CAD_program(cur_output_dir, data_produced, stroke_node_features):
         pickle.dump({
             'stroke_node_features': stroke_node_features,
         }, f)
+    
+
+    # 7) Also copy the gt brep file
+    shutil.copy(gt_brep_file_path, os.path.join(gt_brep_file_path, 'gt.brep'))
+
 
 
 # --------------------- Main Code --------------------- #
 data_produced = 0
 for data in tqdm(data_loader, desc="Generating CAD Programs"):
-    program, program_whole, _, stroke_node_features, _, _, _, _, _,_, _, _ = data
+    program, stroke_node_features, data_path= data
     
     if data_produced > 10:
         break
@@ -277,8 +282,15 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         if os.path.exists(cur_output_dir):
             shutil.rmtree(cur_output_dir)
         os.makedirs(cur_output_dir, exist_ok=True)
+        
 
-        generate_CAD_program(cur_output_dir, data_produced, stroke_node_features)
+        gt_brep_dir = os.path.join(data_path[0], 'canvas')
+        brep_files = [file_name for file_name in os.listdir(gt_brep_dir)
+                if file_name.startswith('brep_') and file_name.endswith('.step')]
+        brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+        gt_brep_file_path = os.path.join(gt_brep_dir, brep_files[-1])
+
+        generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, stroke_node_features)
 
 
     except Exception as e:
