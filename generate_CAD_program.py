@@ -183,7 +183,10 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
     current_op = 1
     past_programs = []
 
-    while current_op != 0:
+    while True:
+
+        if current_op == 0 and not gnn_graph._has_circle_shape():
+            break
     
     # -------------------- Prepare the graph informations -------------------- #
         # 1) Stroke to brep
@@ -208,7 +211,6 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
         )
         
         # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
-
         
 
         # 3) Build operations
@@ -262,17 +264,20 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
     
 
     # 7) Also copy the gt brep file
-    print("gt_brep_file_path", gt_brep_file_path)
     shutil.copy(gt_brep_file_path, os.path.join(cur_output_dir, 'gt_brep.step'))
 
 
 
 # --------------------- Main Code --------------------- #
 data_produced = 0
+if os.path.exists(output_dir):
+    shutil.rmtree(output_dir)
+os.makedirs(output_dir, exist_ok=True)
+
 for data in tqdm(data_loader, desc="Generating CAD Programs"):
     program, stroke_node_features, data_path= data
     
-    if data_produced > 10:
+    if data_produced > 100:
         break
 
     if program[-1][0] != 'terminate':

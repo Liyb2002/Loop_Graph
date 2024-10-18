@@ -362,6 +362,9 @@ class SketchLoopGraph(HeteroData):
             if loop_features == [1] * 9:
                 continue
 
+            if loop_idx >= loop_neighboring_vertical_matrix.shape[0]:
+                return False
+
             # Condition B: Calculate number of neighboring_vertical and representedBy edges
             num_vertical_edges = (loop_neighboring_vertical_matrix[loop_idx] != -1).sum()
             num_represented_by_edges = (represented_by_edges[0] == loop_idx).sum().item()
@@ -388,7 +391,7 @@ class SketchLoopGraph(HeteroData):
         # If there are fewer than 4 valid loops, return False
         if len(valid_loop_nodes) < 4:
             return False
-
+        
         # Create a graph using the filtered nodes and the neighboring_vertical edges
         G = nx.Graph()
 
@@ -408,6 +411,7 @@ class SketchLoopGraph(HeteroData):
 
         # If no valid subgraph with > 4 nodes is found, return False
         return False
+
 
 
 
