@@ -40,6 +40,8 @@ class Evaluation_Dataset(Dataset):
         edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(final_brep_file_path)
         output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(edge_features_list + cylinder_features)
 
+        # Load gt Brep file
+        gt_brep_file_path = os.path.join(self.data_path, data_dir, 'gt_brep.pkl')
 
         return stroke_node_features, output_brep_edges
 

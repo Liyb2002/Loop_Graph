@@ -262,7 +262,8 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
     
 
     # 7) Also copy the gt brep file
-    shutil.copy(gt_brep_file_path, os.path.join(gt_brep_file_path, 'gt.brep'))
+    print("gt_brep_file_path", gt_brep_file_path)
+    shutil.copy(gt_brep_file_path, os.path.join(cur_output_dir, 'gt_brep.step'))
 
 
 
@@ -297,5 +298,6 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         print(f"An error occurred: {e}")
         if os.path.exists(cur_output_dir):
             shutil.rmtree(cur_output_dir)
+        data_produced -= 1
 
     data_produced += 1
