@@ -331,6 +331,59 @@ class SketchLoopGraph(HeteroData):
         return True  # All loops are full shapes
 
 
+    def _has_unused_circles(self):
+        """
+        Checks if there exists an unused loop that is connected to exactly one stroke,
+        and this stroke is also unused.
+
+        Returns:
+            bool: True if such a loop exists, False otherwise.
+        """
+        # Get loop node features and extract the 'chosen' flag (last feature)
+        loop_features = self['loop'].x
+        loop_chosen_flags = loop_features[:, -1]  # Shape: (num_loops,)
+        
+        # Find indices of loops that are not chosen
+        unused_loop_indices = torch.nonzero(loop_chosen_flags == 0).squeeze()
+        if unused_loop_indices.numel() == 0:
+            return False  # No unused loops
+
+        # Get edges from loops to strokes
+        loop_to_stroke_edge_index = self['loop', 'represented_by', 'stroke'].edge_index
+        loop_indices_in_edges = loop_to_stroke_edge_index[0]  # Source nodes (loops)
+        
+        # Count the number of strokes connected to each loop
+        num_loops = self['loop'].num_nodes
+        loop_edge_counts = torch.bincount(loop_indices_in_edges, minlength=num_loops)
+        
+        # For unused loops, get the count of connected strokes
+        unused_loop_edge_counts = loop_edge_counts[unused_loop_indices]
+        
+        # Find unused loops that are connected to exactly one stroke
+        loops_with_one_stroke_mask = (unused_loop_edge_counts == 1)
+        target_loop_indices = unused_loop_indices[loops_with_one_stroke_mask]
+        if target_loop_indices.numel() == 0:
+            return False  # No unused loops with exactly one connected stroke
+
+        # For each target loop, check if the connected stroke is also unused
+        for loop_idx in target_loop_indices:
+            # Get the indices of edges where the loop is the source
+            edge_mask = (loop_to_stroke_edge_index[0] == loop_idx)
+            connected_stroke_indices = loop_to_stroke_edge_index[1][edge_mask]
+            
+            # Since the loop is connected to exactly one stroke
+            stroke_idx = connected_stroke_indices[0]
+            
+            # Get the stroke's 'chosen' flag
+            stroke_features = self['stroke'].x[stroke_idx]
+            stroke_chosen_flag = stroke_features[-1]
+            
+            # Check if the stroke is not chosen
+            if stroke_chosen_flag == 0:
+                return True  # Found an unused loop connected to an unused stroke
+
+        return False  # No such loop found
+        
 
     def _has_circle_shape(self):
         """

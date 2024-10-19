@@ -108,7 +108,7 @@ data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 total_correct = 0
 total = 0
-for data in tqdm(data_loader, desc="Generating CAD Programs"):
+for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
     stroke_node_features, output_brep_edges, gt_brep_edges= data
 
 
@@ -122,13 +122,21 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     gt_brep_edges = torch.round(gt_brep_edges * 10000) / 10000
 
 
-    chamfer_dist = chamfer_distance(stroke_node_features, gt_brep_edges)
+    if output_brep_edges.shape[0] == 0:
+        continue
+
+    chamfer_dist = chamfer_distance(output_brep_edges, gt_brep_edges)
     # Encoders.helper.vis_brep(stroke_node_features)
     # Encoders.helper.vis_brep(output_brep_edges)
     # Encoders.helper.vis_brep(gt_brep_edges)
+    # print("chamfer_dist", chamfer_dist)
 
     if chamfer_dist < 0.05:
         total_correct += 1
+    else:
+        Encoders.helper.vis_brep(output_brep_edges)
+        Encoders.helper.vis_brep(gt_brep_edges)
+
     
     total += 1
-print(f"Overall Average Accuracy: {total_correct / total:.2f}%")
+print(f"Overall Average Accuracy: {total_correct / total:.4f}, with total_correct : {total_correct} and total: {total}")

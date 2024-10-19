@@ -53,16 +53,17 @@ def predict_sketch(gnn_graph):
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     sketch_selection_mask = sketch_graph_decoder(x_dict)
 
-    # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, torch.argmax(sketch_selection_mask))
+    selected_loop_idx = whole_process_helper.helper.find_valid_sketch(gnn_graph, sketch_selection_mask)
+    Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
 
-    return sketch_selection_mask
+    return selected_loop_idx, sketch_selection_mask
 
 def do_sketch(gnn_graph):
-    sketch_selection_mask = predict_sketch(gnn_graph)
-    sketch_points = whole_process_helper.helper.extract_unique_points(sketch_selection_mask, gnn_graph)
-    
+    selected_loop_idx, sketch_selection_mask= predict_sketch(gnn_graph)
+    sketch_points = whole_process_helper.helper.extract_unique_points(selected_loop_idx[0], gnn_graph)
+
     normal = [1, 0, 0]
-    sketch_selection_mask = whole_process_helper.helper.clean_mask(sketch_selection_mask)
+    sketch_selection_mask = whole_process_helper.helper.clean_mask(sketch_selection_mask, selected_loop_idx)
     return sketch_selection_mask, sketch_points, normal
 
 
@@ -82,7 +83,7 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
     extrude_selection_mask = extrude_graph_decoder(x_dict)
     extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
     
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
     return extrude_selection_mask
 
 # This extrude_amount, extrude_direction is not total correct. Work on it later
@@ -183,11 +184,12 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
     current_op = 1
     past_programs = []
 
+
+    # Iteration infos
+    prev_sketch_points = []
+
     while True:
 
-        if current_op == 0 and not gnn_graph._has_circle_shape():
-            break
-    
     # -------------------- Prepare the graph informations -------------------- #
         # 1) Stroke to brep
         stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, brep_edges)
@@ -210,7 +212,15 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
             stroke_to_edge
         )
         
-        # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+        if len(past_programs) > 20:
+            break
+        if current_op == 0 and (not gnn_graph._has_circle_shape()) and (not gnn_graph._has_unused_circles()):
+            break
+        
+        print("gnn_graph._has_circle_shape:", gnn_graph._has_circle_shape())
+        print("gnn_graph._has_unused_circles: ", gnn_graph._has_unused_circles())
+
+        Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
         
 
         # 3) Build operations
@@ -248,7 +258,7 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
 
         # 5.6) Update brep data
         brep_edges, brep_loops = cascade_brep(brep_files)
-        # Encoders.helper.vis_brep(brep_edges)
+        Encoders.helper.vis_brep(brep_edges)
         
         past_programs.append(1)
         past_programs.append(2)
@@ -270,6 +280,7 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
 
 # --------------------- Main Code --------------------- #
 data_produced = 0
+data_limit = 500
 if os.path.exists(output_dir):
     shutil.rmtree(output_dir)
 os.makedirs(output_dir, exist_ok=True)
@@ -277,7 +288,7 @@ os.makedirs(output_dir, exist_ok=True)
 for data in tqdm(data_loader, desc="Generating CAD Programs"):
     program, stroke_node_features, data_path= data
     
-    if data_produced > 100:
+    if data_produced >= data_limit:
         break
 
     if program[-1][0] != 'terminate':
