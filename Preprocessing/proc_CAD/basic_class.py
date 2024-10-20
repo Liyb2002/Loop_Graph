@@ -51,19 +51,21 @@ class Edge:
         self.id = id
         self.vertices = vertices
 
-
-        self.round = False
         self.is_circle = False
+        self.fillet_permited = False
 
         self.edge_type = 'maybe_feature_line'
 
         self.Op = []
         self.order_count = 0
         self.connected_edges = []
-    
-    def fillet_edge(self):
-        self.round = True
-    
+        
+    def enable_fillet(self):
+        self.fillet_permited = True
+
+    def disable_fillet(self):
+        self.fillet_permited = False
+
     def check_is_circle(self, radius, center, normal):
         self.is_circle = True
         self.radius = radius

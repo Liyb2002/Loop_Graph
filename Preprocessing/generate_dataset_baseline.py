@@ -24,8 +24,8 @@ class dataset_generator():
         # os.makedirs('dataset', exist_ok=True)
 
         # self.generate_dataset('dataset/messy_order_eval', number_data = 500, start = 110)
-        self.generate_dataset('dataset/messy_order', number_data = 6500, start = 5260)
-        # self.generate_dataset('dataset/test', number_data = 10, start = 0)
+        # self.generate_dataset('dataset/messy_order', number_data = 6500, start = 5260)
+        self.generate_dataset('dataset/test', number_data = 1, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):
@@ -46,22 +46,22 @@ class dataset_generator():
         os.makedirs(data_directory, exist_ok=True)
 
         # Generate a new program & save the brep
-        try:
+        # try:
             # Pass in the directory to the simple_gen function
-            Preprocessing.proc_CAD.proc_gen.random_program(data_directory)
+        Preprocessing.proc_CAD.proc_gen.random_program(data_directory)
             # Preprocessing.proc_CAD.proc_gen.simple_gen(data_directory)
 
             # Create brep for the new program and pass in the directory
-            valid_parse = Preprocessing.proc_CAD.Program_to_STL.run(data_directory)
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            shutil.rmtree(data_directory)
-            return False
+        valid_parse = Preprocessing.proc_CAD.Program_to_STL.run(data_directory)
+        # except Exception as e:
+        #     print(f"An error occurred: {e}")
+        #     shutil.rmtree(data_directory)
+        #     return False
         
-        if not valid_parse:
-            print("not valid valid_parse")
-            shutil.rmtree(data_directory)
-            return False
+        # if not valid_parse:
+        #     print("not valid valid_parse")
+        #     shutil.rmtree(data_directory)
+        #     return False
         
         
         print("----------------------")

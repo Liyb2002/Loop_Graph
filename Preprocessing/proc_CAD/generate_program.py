@@ -7,6 +7,7 @@ import random
 import Preprocessing.proc_CAD.random_gen
 
 import os
+import math
 from Preprocessing.proc_CAD.basic_class import Face, Edge, Vertex
 
 class Brep:
@@ -46,7 +47,7 @@ class Brep:
         for i in range(num_vertices):
             edge_id = f"edge_{self.idx}_{i}"
             edge = Edge(edge_id, [vertex_list[i], vertex_list[(i+1) % num_vertices]])  # Loop back to first vertex to close the shape
-            edge.fillet_edge()
+            edge.enable_fillet()
             self.Edges.append(edge)
 
         face_id = f"face_{self.idx}_{0}"
@@ -74,8 +75,8 @@ class Brep:
         boundary_points = [vert.position for vert in target_face.vertices]
         normal = [ 0 - normal for normal in target_face.normal]
 
-        # cases = ['create_circle', 'find_rectangle', 'find_triangle', 'triangle_to_cut']
-        cases = [ 'create_circle', 'find_rectangle']
+        cases = ['create_circle', 'find_rectangle', 'find_triangle', 'triangle_to_cut']
+        # cases = [ 'create_circle', 'find_rectangle']
         selected_case = random.choice(cases)
         if selected_case == 'create_circle':
             radius, center = Preprocessing.proc_CAD.helper.random_circle(boundary_points, normal)
@@ -139,6 +140,7 @@ class Brep:
         for i in range(num_vertices):
             edge_id = f"edge_{self.idx}_{i}"
             edge = Edge(edge_id, [new_vertices[i], new_vertices[(i+1) % num_vertices]])  # Loop back to first vertex to close the shape
+            edge.enable_fillet()
             self.Edges.append(edge)
             new_edges.append(edge)
 
@@ -171,13 +173,17 @@ class Brep:
 
     def random_fillet(self):
         
-        edge_with_round = [edge for edge in self.Edges if not edge.round]
-        if not edge_with_round:
+        available_fillet_edges = [edge for edge in self.Edges if not edge.fillet_permited]
+        if not available_fillet_edges:
             return False
-        target_edge = random.choice(edge_with_round)
+        target_edge = random.choice(available_fillet_edges)
 
+        
         amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
-        target_edge.fillet_edge()
+        safe_amount = self.safe_fillet_check([vert.position for vert in target_edge.vertices])
+        amount = min(amount, safe_amount * 0.4)
+
+        target_edge.disable_fillet()
 
         verts_pos = []
         verts_id = []
@@ -385,3 +391,28 @@ class Brep:
             return inf_big
         else:
             return closest_value
+
+
+    def safe_fillet_check(self, points):
+        """
+        Finds the minimum distance between edge vertices in the provided points and sets max_dist accordingly.
+        """
+
+        def euclidean_dist(p1, p2):
+            """
+            Computes the Euclidean distance between two 3D points.
+            """
+            return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2 + (p1[2] - p2[2]) ** 2)
+
+        max_dist = float('inf')  # Set to a very large number
+        for e in self.Edges:
+            if not e.is_circle:  # Skip circular edges
+                for vert in e.vertices:
+                    vert_pos = vert.position
+                    if vert_pos in points:  # Check if vertex position is in the provided points
+                        dist = euclidean_dist(e.vertices[0].position, e.vertices[1].position)
+                        if dist < max_dist:
+                            max_dist = dist
+
+        return max_dist if max_dist != float('inf') else None  # Return None if no valid distance was found
+
