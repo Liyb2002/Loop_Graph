@@ -58,6 +58,7 @@ class Brep:
 
         if type(boundary_points) != list:
             boundary_points = boundary_points.tolist()
+        
         self.op.append(['sketch', boundary_points])
 
 
@@ -74,7 +75,7 @@ class Brep:
         normal = [ 0 - normal for normal in target_face.normal]
 
         # cases = ['create_circle', 'find_rectangle', 'find_triangle', 'triangle_to_cut']
-        cases = [ 'create_circle']
+        cases = [ 'create_circle', 'find_rectangle']
         selected_case = random.choice(cases)
         if selected_case == 'create_circle':
             radius, center = Preprocessing.proc_CAD.helper.random_circle(boundary_points, normal)

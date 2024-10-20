@@ -94,17 +94,14 @@ def chamfer_distance(stroke_node_features, output_brep_edges):
     min_dist_brep_to_stroke = torch.min(dist_brep_to_stroke, dim=1)[0]
 
     # Average Chamfer distance (forward + backward)
-    # chamfer_dist = torch.mean(min_dist_stroke_to_brep) + torch.mean(min_dist_brep_to_stroke)
     
-    chamfer_dist = torch.mean(min_dist_brep_to_stroke)
-
-    return chamfer_dist
+    return torch.mean(min_dist_brep_to_stroke), torch.mean(min_dist_stroke_to_brep) + torch.mean(min_dist_brep_to_stroke)
 
 # --------------------- Main Code --------------------- #
 
 # Set up dataloader
 dataset = Evaluation_Dataset('program_output')
-data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
+data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 total_correct = 0
 total = 0
@@ -124,16 +121,18 @@ for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
 
     if output_brep_edges.shape[0] == 0:
         continue
-
-    chamfer_dist = chamfer_distance(output_brep_edges, gt_brep_edges)
+    
+    # Covered = the first shape covers the second
+    covered_chamfer_dist, whole_chamfer_dist= chamfer_distance(gt_brep_edges, output_brep_edges)
     # Encoders.helper.vis_brep(stroke_node_features)
     # Encoders.helper.vis_brep(output_brep_edges)
     # Encoders.helper.vis_brep(gt_brep_edges)
     # print("chamfer_dist", chamfer_dist)
 
-    if chamfer_dist < 0.05:
+    if covered_chamfer_dist < 0.1:
         total_correct += 1
     else:
+        print("chamfer_dist", covered_chamfer_dist)
         Encoders.helper.vis_brep(output_brep_edges)
         Encoders.helper.vis_brep(gt_brep_edges)
 

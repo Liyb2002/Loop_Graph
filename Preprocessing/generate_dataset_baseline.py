@@ -24,8 +24,8 @@ class dataset_generator():
         # os.makedirs('dataset', exist_ok=True)
 
         # self.generate_dataset('dataset/messy_order_eval', number_data = 500, start = 110)
-        # self.generate_dataset('dataset/messy_order', number_data = 0, start = 3650)
-        self.generate_dataset('dataset/test', number_data = 5, start = 0)
+        self.generate_dataset('dataset/messy_order', number_data = 6500, start = 5260)
+        # self.generate_dataset('dataset/test', number_data = 10, start = 0)
 
 
     def generate_dataset(self, dir, number_data, start):

@@ -1,5 +1,5 @@
 import Preprocessing.dataloader
-import Preprocessing.generate_dataset
+import Preprocessing.generate_dataset_baseline
 import Preprocessing.gnn_graph
 import Preprocessing.gnn_graph_stroke
 
@@ -17,6 +17,8 @@ import Encoders.gnn_stroke.gnn
 import Encoders.helper
 
 
+import whole_process_evaluate
+
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -30,7 +32,7 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 
@@ -54,7 +56,7 @@ def predict_sketch(gnn_graph):
     sketch_selection_mask = sketch_graph_decoder(x_dict)
 
     selected_loop_idx = whole_process_helper.helper.find_valid_sketch(gnn_graph, sketch_selection_mask)
-    Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
+    # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
 
     return selected_loop_idx, sketch_selection_mask
 
@@ -64,7 +66,7 @@ def do_sketch(gnn_graph):
 
     normal = [1, 0, 0]
     sketch_selection_mask = whole_process_helper.helper.clean_mask(sketch_selection_mask, selected_loop_idx)
-    return sketch_selection_mask, sketch_points, normal
+    return sketch_selection_mask, sketch_points, normal, selected_loop_idx
 
 
 # --------------------- Extrude Network --------------------- #
@@ -83,10 +85,9 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
     extrude_selection_mask = extrude_graph_decoder(x_dict)
     extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
     
-    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
     return extrude_selection_mask
 
-# This extrude_amount, extrude_direction is not total correct. Work on it later
 def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges):
     extrude_selection_mask = predict_extrude(gnn_graph, sketch_selection_mask)
     extrude_amount, extrude_direction = whole_process_helper.helper.get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges)
@@ -135,7 +136,7 @@ def cascade_brep(brep_files):
             final_cylinder_features = cylinder_features
         else:
             # We already have brep
-            new_features = Preprocessing.generate_dataset.find_new_features(final_brep_edges, edge_features_list) 
+            new_features = Preprocessing.generate_dataset_baseline.find_new_features(final_brep_edges, edge_features_list) 
             final_brep_edges += new_features
             final_cylinder_features += cylinder_features
 
@@ -186,7 +187,7 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
 
 
     # Iteration infos
-    prev_sketch_points = []
+    selected_loop_indices = []
 
     while True:
 
@@ -211,22 +212,23 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
             stroke_to_loop,
             stroke_to_edge
         )
+        gnn_graph.ensure_prev_selected_loops(selected_loop_indices)
         
         if len(past_programs) > 20:
             break
         if current_op == 0 and (not gnn_graph._has_circle_shape()) and (not gnn_graph._has_unused_circles()):
             break
         
-        print("gnn_graph._has_circle_shape:", gnn_graph._has_circle_shape())
-        print("gnn_graph._has_unused_circles: ", gnn_graph._has_unused_circles())
 
-        Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+        # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
         
 
         # 3) Build operations
 
         # 3.1) Do sketch
-        sketch_selection_mask, sketch_points, normal = do_sketch(gnn_graph)
+        sketch_selection_mask, sketch_points, normal, selected_loop_idx = do_sketch(gnn_graph)
+        selected_loop_indices.append(selected_loop_idx)
+
         if sketch_points.shape[0] == 1:
             # do circle sketch
             cur__brep_class.regular_sketch_circle(sketch_points[0, 3:6].tolist(), sketch_points[0, 7].item(), sketch_points[0, :3].tolist())
@@ -237,7 +239,6 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
         # 3.2) Do Extrude
         extrude_amount, extrude_direction = do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges)
         cur__brep_class.extrude_op(extrude_amount, extrude_direction)
-
 
         # 5.3) Write to brep
         cur__brep_class.write_to_json(cur_output_dir)
@@ -258,7 +259,7 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
 
         # 5.6) Update brep data
         brep_edges, brep_loops = cascade_brep(brep_files)
-        Encoders.helper.vis_brep(brep_edges)
+        # Encoders.helper.vis_brep(brep_edges)
         
         past_programs.append(1)
         past_programs.append(2)
@@ -275,12 +276,20 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
 
     # 7) Also copy the gt brep file
     shutil.copy(gt_brep_file_path, os.path.join(cur_output_dir, 'gt_brep.step'))
+    gt_brep_edges = gt_brep_edges.squeeze(0)
+    gt_brep_edges = torch.round(gt_brep_edges * 10000) / 10000
+
+    covered_chamfer_dist, _ = whole_process_evaluate.chamfer_distance(stroke_node_features, gt_brep_edges)
+    if covered_chamfer_dist > 0.05:
+        raise ValueError(f"Chamfer distance {covered_chamfer_dist} exceeds allowable threshold of 0.05")
+
+
 
 
 
 # --------------------- Main Code --------------------- #
 data_produced = 0
-data_limit = 500
+data_limit = 100
 if os.path.exists(output_dir):
     shutil.rmtree(output_dir)
 os.makedirs(output_dir, exist_ok=True)

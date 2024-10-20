@@ -464,6 +464,21 @@ class SketchLoopGraph(HeteroData):
 
         # If no valid subgraph with > 4 nodes is found, return False
         return False
+    
+    def ensure_prev_selected_loops(self, selected_loop_indices):
+        """
+        This function ensures that the loop nodes corresponding to the given selected_loop_indices
+        have values of 1 repeated 9 times in their feature vector.
+        
+        Parameters:
+        selected_loop_indices (list): A list of loop indices that should be set to have feature values of 1.
+        
+        Returns:
+        None
+        """
+        # Ensure the node features are 1x9 for the loop nodes
+        for idx in selected_loop_indices:
+            self['loop'].x[idx] = torch.tensor([1] * 9, dtype=torch.float)
 
 
 
