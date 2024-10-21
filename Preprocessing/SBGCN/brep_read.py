@@ -12,7 +12,7 @@ from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
 from OCC.Core.GeomAbs import GeomAbs_SurfaceType
 from OCC.Core.gp import gp_Vec
 from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane, GeomAbs_Circle
-from OCC.Core.Geom import Geom_Circle
+from OCC.Core.Geom import Geom_Circle, Geom_Line
 from OCC.Core.GeomAdaptor import GeomAdaptor_Curve
 
 from torch.utils.data import Dataset
@@ -152,6 +152,24 @@ def create_face_node_gnn(face):
 
     
 def create_edge_node(edge):
+
+    # Get the underlying geometry of the edge
+    edge_curve_handle, first, last = BRep_Tool.Curve(edge)
+    adaptor = GeomAdaptor_Curve(edge_curve_handle)
+    curve_type = adaptor.GetType()
+
+    if curve_type == GeomAbs_Circle:
+        edge_type = "Curved (Fillet)"
+        start_point = adaptor.Value(first)
+        end_point = adaptor.Value(last)
+        radius = adaptor.Circle().Radius()
+
+        print(f"Arc radius: {radius}")
+        print(f"Start point of arc: ({start_point.X()}, {start_point.Y()}, {start_point.Z()})")
+        print(f"End point of arc: ({end_point.X()}, {end_point.Y()}, {end_point.Z()})")
+
+
+
     properties = GProp_GProps()
     brepgprop.LinearProperties(edge, properties)
     length = properties.Mass()

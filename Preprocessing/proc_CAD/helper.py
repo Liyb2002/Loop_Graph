@@ -79,13 +79,15 @@ def find_target_verts(target_vertices, edges) :
 
 def get_neighbor_verts(vert, non_app_edge, Edges):
     #get the neighbor of the given vert
+
     neighbors = []
     for edge in Edges:
         if edge.id == non_app_edge.id:
             continue
-        if edge.vertices[0].id == vert.id:
+
+        if edge.vertices[0].position == vert.position:
             neighbors.append(edge.vertices[1])
-        elif edge.vertices[1].id == vert.id:
+        elif edge.vertices[1].position == vert.position:
             neighbors.append(edge.vertices[0])  
 
     return neighbors

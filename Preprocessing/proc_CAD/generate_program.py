@@ -75,8 +75,8 @@ class Brep:
         boundary_points = [vert.position for vert in target_face.vertices]
         normal = [ 0 - normal for normal in target_face.normal]
 
-        cases = ['create_circle', 'find_rectangle', 'find_triangle', 'triangle_to_cut']
-        # cases = [ 'create_circle', 'find_rectangle']
+        # cases = ['create_circle', 'find_rectangle', 'find_triangle', 'triangle_to_cut']
+        cases = ['find_rectangle']
         selected_case = random.choice(cases)
         if selected_case == 'create_circle':
             radius, center = Preprocessing.proc_CAD.helper.random_circle(boundary_points, normal)
@@ -176,7 +176,11 @@ class Brep:
         available_fillet_edges = [edge for edge in self.Edges if not edge.fillet_permited]
         if not available_fillet_edges:
             return False
-        target_edge = random.choice(available_fillet_edges)
+        
+        target_edge = None
+        if not self.check_fillet_validity(target_edge):
+            target_edge = random.choice(available_fillet_edges)
+
 
         
         amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
@@ -192,7 +196,7 @@ class Brep:
         for vert in target_edge.vertices:
             verts_pos.append(vert.position)
             verts_id.append(vert.id)
-            neighbor_verts = Preprocessing.proc_CAD.helper.get_neighbor_verts(vert,target_edge,  self.Edges)
+            neighbor_verts = Preprocessing.proc_CAD.helper.get_neighbor_verts(vert, target_edge, self.Edges)
             new_vert_pos.append(Preprocessing.proc_CAD.helper.compute_fillet_new_vert(vert, neighbor_verts, amount))
         
         new_A = new_vert_pos[0][0]
@@ -235,6 +239,19 @@ class Brep:
                         {'old_verts_pos': verts_pos},
                         {'verts_id': verts_id},
                         ])
+
+
+    def check_fillet_validity(self, target_edge):
+        if target_edge is None:
+            return False
+        
+        for vert in target_edge.vertices:
+            neighbor_verts = Preprocessing.proc_CAD.helper.get_neighbor_verts(vert, target_edge, self.Edges)
+
+            if len(neighbor_verts) != 2:
+                return False
+        
+        return True
 
 
     def write_to_json(self, data_directory = None):
