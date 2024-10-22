@@ -220,16 +220,16 @@ class Brep:
         arc_0 = [new_A, new_B, centers[0].tolist(), [new_vert_A.id, new_vert_B.id]]
         arc_1 = [new_C, new_D, centers[1].tolist(), [new_vert_C.id, new_vert_D.id]]
 
-        # Fillet should only produce arc but not edges
 
         #create 2 edge that connect new_B and new_D / new_A and new_C
-        # new_edge_id_0 = f"edge_{self.idx}_0"
-        # new_edge_0 = Edge(new_edge_id_0, [new_vert_B, new_vert_D])
-        # new_edge_id_1 = f"edge_{self.idx}_1"
-        # new_edge_1 = Edge(new_edge_id_1, [new_vert_A, new_vert_C])
-        # self.Edges.append(new_edge_0)
-        # self.Edges.append(new_edge_1)
+        new_edge_id_0 = f"edge_{self.idx}_0"
+        new_edge_0 = Edge(new_edge_id_0, [new_vert_B, new_vert_D])
+        new_edge_id_1 = f"edge_{self.idx}_1"
+        new_edge_1 = Edge(new_edge_id_1, [new_vert_A, new_vert_C])
+        self.Edges.append(new_edge_0)
+        self.Edges.append(new_edge_1)
 
+        # Fillet should produce arc connecting the fillet verts
         #create 2 edge that connect new_A and new_B / new_C and new_D
         # new_edge_id_2 = f"edge_{self.idx}_2"
         # new_edge_2 = Edge(new_edge_id_2, [new_vert_A, new_vert_B])
