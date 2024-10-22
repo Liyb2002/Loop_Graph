@@ -67,9 +67,9 @@ class Edge:
     def disable_fillet(self):
         self.fillet_permited = False
     
-    def check_is_curve(self, radius):
+    def check_is_curve(self, center):
         self.is_curve = True
-        self.radius = radius
+        self.center = center
         self.alpha_value = np.random.uniform(0.5, 0.8)
 
     def check_is_circle(self, radius, center, normal):

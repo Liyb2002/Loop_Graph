@@ -164,41 +164,62 @@ class create_stroke_cloud():
             if edge.is_curve:
                 start_point = np.array(edge.vertices[0].position)
                 end_point = np.array(edge.vertices[1].position)
-                radius = edge.radius
+                center = edge.center
 
-                # Calculate the midpoint between start and end points
-                midpoint = (start_point + end_point) / 2
+                radius = np.linalg.norm(start_point - center)
 
-                # Compute the direction vector between start and end points
-                direction = end_point - start_point
-                direction_normalized = direction / np.linalg.norm(direction)
+                # Determine the plane where the arc lies by checking which axis is constant
+                shared_axes = np.isclose(start_point, center) & np.isclose(end_point, center)
+                
+                if np.sum(shared_axes) != 1:
+                    raise ValueError("The arc points and center do not lie on a plane aligned with one of the axes.")
 
-                # Compute a perpendicular vector for the curve plane
-                perp_vector = np.cross(direction_normalized, [0, 0, 1])
-                if np.linalg.norm(perp_vector) == 0:  # Handle case where direction is aligned with z-axis
-                    perp_vector = np.cross(direction_normalized, [0, 1, 0])
-                perp_vector = perp_vector / np.linalg.norm(perp_vector)
+                # The axis where all points have the same value (constant axis)
+                shared_axis = np.where(shared_axes)[0][0]  # This is the constant axis
+                plane_axes = [axis for axis in range(3) if axis != shared_axis]
 
-                # Calculate the center of the circle based on radius and perpendicular vector
-                center = midpoint + np.sqrt(radius**2 - np.linalg.norm(midpoint - start_point)**2) * perp_vector
+                # Calculate the angle between the start and end points around the center (for a quarter circle, it's 90 degrees)
+                vector_start = np.array([start_point[plane_axes[0]], start_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
+                vector_end = np.array([end_point[plane_axes[0]], end_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
 
-                # Generate points along the curve using the circle equation
-                num_points = 20
-                angles = np.linspace(0, np.pi, num_points)  # Assuming the curve is a semicircle for simplicity
-                curve_points = []
+                # Determine the angle step (90 degrees for a quarter-circle arc)
+                theta_start = np.arctan2(vector_start[1], vector_start[0])
+                theta_end = np.arctan2(vector_end[1], vector_end[0])
+                
+                # Ensure the angles go in the correct order (counterclockwise direction)
+                # if theta_end > theta_start:
+                #     theta_end += 2 * np.pi  # Adjust to ensure 90 degrees span
 
-                for angle in angles:
-                    point_on_curve = (
-                        center
-                        + radius * np.cos(angle) * direction_normalized
-                        + radius * np.sin(angle) * perp_vector
-                    )
-                    curve_points.append(point_on_curve)
+                # Generate angles between the start and end points (90 degrees in total)
+                theta = np.linspace(min(theta_start, theta_end), max(theta_start, theta_end), 10)
 
-                curve_points = np.array(curve_points)
+                # Generate arc points using parametric circle equation on the plane
+                arc_points = []
+                for t in theta:
+                    arc_x = center[plane_axes[0]] + radius * np.cos(t)
+                    arc_y = center[plane_axes[1]] + radius * np.sin(t)
+                    point = [0, 0, 0]  # Create a 3D point
 
-                # Plot the curve points
-                ax.plot(curve_points[:, 0], curve_points[:, 1], curve_points[:, 2], color='b', label='Curve', linewidth=2)
+                    # Set the shared axis (constant value for all points)
+                    point[shared_axis] = center[shared_axis]
+                    
+                    # Assign the arc points to the correct axes
+                    point[plane_axes[0]] = arc_x
+                    point[plane_axes[1]] = arc_y
+                    
+                    arc_points.append(point)
+
+                arc_points = np.array(arc_points)
+                
+                line_thickness = np.random.uniform(0.7, 0.9)
+                line_alpha_value = np.random.uniform(0.5, 0.8)
+
+                # Plot the arc points
+                ax.plot(arc_points[:, 0], arc_points[:, 1], arc_points[:, 2], label='Arc', color='black', alpha=line_alpha_value, linewidth=line_thickness)
+                continue
+
+
+                
                 
 
 
@@ -325,8 +346,33 @@ class create_stroke_cloud():
             self.vertices[vertex.id] = vertex
 
 
-        cur_op_vertex_ids = []
         new_edges = []
+        # fillet does not have edges. It has arcs
+        if op == 'fillet':
+            # arc_0
+            arc_0_vertices = [self.vertices[v_id] for v_id in Op['operation'][5]['arc_0'][3]]
+            arc_0 = Edge(id='arc0_' + Op['operation'][5]['arc_0'][3][0], vertices=arc_0_vertices)
+            arc_0_center = Op['operation'][5]['arc_0'][2]
+            arc_0.check_is_curve(arc_0_center)
+
+            arc_0.set_Op(op, index)
+            arc_0.set_order_count(self.order_count)
+            self.order_count += 1
+            new_edges.append(arc_0)
+
+            # arc_1
+            arc_1_vertices = [self.vertices[v_id] for v_id in Op['operation'][6]['arc_1'][3]]
+            arc_1 = Edge(id='arc0_' + Op['operation'][6]['arc_1'][3][0], vertices=arc_1_vertices)
+            arc_1_center = Op['operation'][6]['arc_1'][2]
+            arc_1.check_is_curve(arc_1_center)
+
+            arc_1.set_Op(op, index)
+            arc_1.set_order_count(self.order_count)
+            self.order_count += 1
+            new_edges.append(arc_1)
+
+
+        cur_op_vertex_ids = []
         for edge_data in Op['edges']:
             vertices = [self.vertices[v_id] for v_id in edge_data['vertices']]
 
@@ -334,12 +380,6 @@ class create_stroke_cloud():
                 cur_op_vertex_ids.append(v_id)
 
             edge = Edge(id=edge_data['id'], vertices=vertices)
-
-            # if this is a fillet operation, then give the radius to the edge
-            if op == 'fillet':
-                radius = Op['operation'][2]['amount']
-                edge.check_is_curve(radius)
-                
 
             edge.set_Op(op, index)
             edge.set_order_count(self.order_count)

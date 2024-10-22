@@ -192,18 +192,20 @@ class Brep:
         verts_pos = []
         verts_id = []
         new_vert_pos = []
+        centers = []
 
         for vert in target_edge.vertices:
             verts_pos.append(vert.position)
             verts_id.append(vert.id)
             neighbor_verts = Preprocessing.proc_CAD.helper.get_neighbor_verts(vert, target_edge, self.Edges)
-            new_vert_pos.append(Preprocessing.proc_CAD.helper.compute_fillet_new_vert(vert, neighbor_verts, amount))
+            new_vert_pos_half, center = Preprocessing.proc_CAD.helper.compute_fillet_new_vert(vert, neighbor_verts, amount)
+            new_vert_pos.append(new_vert_pos_half)
+            centers.append(center)
         
         new_A = new_vert_pos[0][0]
         new_B = new_vert_pos[0][1]
         new_C = new_vert_pos[1][0]
         new_D = new_vert_pos[1][1]
-
 
         #create 4 new verts from new_A, new_B and new_C, new_D
         new_vert_B = Vertex(f"vertex_{self.idx}_0", new_B)
@@ -215,22 +217,26 @@ class Brep:
         self.Vertices.append(new_vert_A)
         self.Vertices.append(new_vert_C)
 
+        arc_0 = [new_A, new_B, centers[0].tolist(), [new_vert_A.id, new_vert_B.id]]
+        arc_1 = [new_C, new_D, centers[1].tolist(), [new_vert_C.id, new_vert_D.id]]
+
+        # Fillet should only produce arc but not edges
 
         #create 2 edge that connect new_B and new_D / new_A and new_C
-        new_edge_id_0 = f"edge_{self.idx}_0"
-        new_edge_0 = Edge(new_edge_id_0, [new_vert_B, new_vert_D])
-        new_edge_id_1 = f"edge_{self.idx}_1"
-        new_edge_1 = Edge(new_edge_id_1, [new_vert_A, new_vert_C])
-        self.Edges.append(new_edge_0)
-        self.Edges.append(new_edge_1)
+        # new_edge_id_0 = f"edge_{self.idx}_0"
+        # new_edge_0 = Edge(new_edge_id_0, [new_vert_B, new_vert_D])
+        # new_edge_id_1 = f"edge_{self.idx}_1"
+        # new_edge_1 = Edge(new_edge_id_1, [new_vert_A, new_vert_C])
+        # self.Edges.append(new_edge_0)
+        # self.Edges.append(new_edge_1)
 
         #create 2 edge that connect new_A and new_B / new_C and new_D
-        new_edge_id_2 = f"edge_{self.idx}_2"
-        new_edge_2 = Edge(new_edge_id_2, [new_vert_A, new_vert_B])
-        new_edge_id_3 = f"edge_{self.idx}_3"
-        new_edge_3 = Edge(new_edge_id_3, [new_vert_C, new_vert_D])
-        self.Edges.append(new_edge_2)
-        self.Edges.append(new_edge_3)
+        # new_edge_id_2 = f"edge_{self.idx}_2"
+        # new_edge_2 = Edge(new_edge_id_2, [new_vert_A, new_vert_B])
+        # new_edge_id_3 = f"edge_{self.idx}_3"
+        # new_edge_3 = Edge(new_edge_id_3, [new_vert_C, new_vert_D])
+        # self.Edges.append(new_edge_2)
+        # self.Edges.append(new_edge_3)
 
         self.idx += 1
         self.op.append(['fillet', 
@@ -238,6 +244,8 @@ class Brep:
                         {'amount': amount}, 
                         {'old_verts_pos': verts_pos},
                         {'verts_id': verts_id},
+                        {'arc_0': arc_0},
+                        {'arc_1': arc_1},
                         ])
 
 

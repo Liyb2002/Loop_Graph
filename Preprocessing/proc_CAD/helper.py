@@ -108,11 +108,10 @@ def find_edge_from_verts(vert_1, vert_2, edges):
     
 
 #----------------------------------------------------------------------------------#
-
 def compute_fillet_new_vert(old_vert, neighbor_verts, amount):
-    #given the old_vertex (chosen by fillet op), and the neighbor verts, compute the position to move them
+    # Given the old_vertex (chosen by fillet op), and the neighbor verts, compute the position to move them
     move_positions = []
-    old_position = old_vert.position
+    old_position = np.array(old_vert.position)
     
     for neighbor_vert in neighbor_verts:
         direction_vector = [neighbor_vert.position[i] - old_position[i] for i in range(len(old_position))]
@@ -123,7 +122,40 @@ def compute_fillet_new_vert(old_vert, neighbor_verts, amount):
         move_position = [old_position[i] + normalized_vector[i] * amount for i in range(len(old_position))]
         move_positions.append(move_position)
     
-    return move_positions
+    # Now move_positions contains the two new vertices (start and end of the arc)
+    start_point = np.array(move_positions[0])
+    end_point = np.array(move_positions[1])
+    
+    # Identify the shared axis where all points have the same value
+    shared_axis = None
+    for i in range(len(old_position)):
+        if old_position[i] == start_point[i] == end_point[i]:
+            shared_axis = i
+            break
+    
+    if shared_axis is None:
+        raise ValueError("No shared axis found for the square plane.")
+    
+    # For the other two axes, find the pairs that define the square
+    remaining_axes = [axis for axis in range(3) if axis != shared_axis]
+    
+    # Get the min and max for the remaining two axes (this will form the square)
+    center = np.copy(old_position)  # Copy old_position as the base
+    
+    for axis in remaining_axes:
+        values = [old_position[axis], start_point[axis], end_point[axis]]
+        unique_values = np.unique(values)
+        
+        if len(unique_values) != 2:
+            raise ValueError(f"Expected two unique values for axis {axis}, but got {unique_values}")
+        
+        # For the center, take the value not present in the old_position
+        if old_position[axis] == unique_values[0]:
+            center[axis] = unique_values[1]
+        else:
+            center[axis] = unique_values[0]
+        
+    return move_positions, center
 
 
 #----------------------------------------------------------------------------------#
