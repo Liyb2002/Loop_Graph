@@ -72,7 +72,6 @@ class dataset_generator():
         stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_class.edges)
         stroke_node_features, stroke_operations_order_matrix = Preprocessing.proc_CAD.helper.swap_rows_with_probability(stroke_node_features, stroke_operations_order_matrix)
         stroke_node_features = np.round(stroke_node_features, 4)
-        print("stroke_node_features", stroke_node_features)
 
         connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(stroke_node_features)
         strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, connected_stroke_nodes)
@@ -117,7 +116,6 @@ class dataset_generator():
                 final_cylinder_features += cylinder_features
             
             # Preprocessing.proc_CAD.helper.vis_brep(np.array(edge_features_list))
-
             output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
             brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(output_brep_edges) + Preprocessing.proc_CAD.helper.face_aggregate_circle_brep(output_brep_edges)
             brep_loops = [list(loop) for loop in brep_loops]
@@ -166,14 +164,14 @@ def find_new_features(prev_brep_edges, new_edge_features):
 
     def is_same_direction(line1, line2):
         """Check if two lines have the same direction."""
-        vector1 = np.array(line1[3:]) - np.array(line1[:3])
-        vector2 = np.array(line2[3:]) - np.array(line2[:3])
+        vector1 = np.array(line1[3:6]) - np.array(line1[:3])
+        vector2 = np.array(line2[3:6]) - np.array(line2[:3])
         return np.allclose(vector1 / np.linalg.norm(vector1), vector2 / np.linalg.norm(vector2))
 
     def is_point_on_line(point, line):
         """Check if a point lies on a given line segment."""
-        start, end = np.array(line[:3]), np.array(line[3:])
-        
+        start, end = np.array(line[:3]), np.array(line[3:6])
+
         # Check if the point is collinear (still important to check)
         if not np.allclose(np.cross(end - start, point - start), 0):
             return False
@@ -187,7 +185,7 @@ def find_new_features(prev_brep_edges, new_edge_features):
 
     def is_line_contained(line1, line2):
         """Check if line1 is contained within line2."""
-        return is_point_on_line(np.array(line1[:3]), line2) and is_point_on_line(np.array(line1[3:]), line2)
+        return is_point_on_line(np.array(line1[:3]), line2) and is_point_on_line(np.array(line1[3:6]), line2)
 
 
 
@@ -195,9 +193,9 @@ def find_new_features(prev_brep_edges, new_edge_features):
         """Find the two unique points between new_edge_line and prev_brep_line."""
         points = [
             tuple(new_edge_line[:3]),   # new_edge_line start
-            tuple(new_edge_line[3:]),   # new_edge_line end
+            tuple(new_edge_line[3:6]),   # new_edge_line end
             tuple(prev_brep_line[:3]),  # prev_brep_line start
-            tuple(prev_brep_line[3:]),  # prev_brep_line end
+            tuple(prev_brep_line[3:6]),  # prev_brep_line end
         ]
 
         # Find unique points
@@ -211,13 +209,19 @@ def find_new_features(prev_brep_edges, new_edge_features):
     new_features = []
 
     for new_edge_line in new_edge_features:
+        if new_edge_line[-1] != 0:
+            new_features.append(new_edge_line)
+            continue
+
         relation_found = False
 
-        edge_start, edge_end = np.array(new_edge_line[:3]), np.array(new_edge_line[3:])
+        edge_start, edge_end = np.array(new_edge_line[:3]), np.array(new_edge_line[3:6])
         
         for prev_brep_line in prev_brep_edges:
+            if prev_brep_line[-1] != 0:
+                continue
 
-            brep_start, brep_end = np.array(prev_brep_line[:3]), np.array(prev_brep_line[3:])
+            brep_start, brep_end = np.array(prev_brep_line[:3]), np.array(prev_brep_line[3:6])
 
             # This is a circle edge
             if (edge_start == edge_end).all():
@@ -260,6 +264,5 @@ def find_new_features(prev_brep_edges, new_edge_features):
         if not relation_found:
             # Relation 4: None of the relations apply
             new_features.append(new_edge_line)
-
 
     return new_features

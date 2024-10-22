@@ -95,6 +95,25 @@ def create_face_node_gnn(face):
 
     # cylinder surface
     if adaptor_surface.GetType() == GeomAbs_Cylinder:
+        
+        # we also need to compute the angle to see if this is cylinder or an arc
+        edge_explorer = TopExp_Explorer(face, TopAbs_EDGE)
+        total_angle = 0.0
+        while edge_explorer.More():
+            edge = edge_explorer.Current()
+            edge_curve_handle, first, last = BRep_Tool.Curve(edge)
+            
+            curve_adaptor = GeomAdaptor_Curve(edge_curve_handle)
+            curve_type = curve_adaptor.GetType()
+
+            if curve_type == GeomAbs_Circle:
+                angle_radians = abs(last - first)
+                total_angle += angle_radians
+            
+            edge_explorer.Next()
+        if total_angle < 6.27:
+            return []
+
         cylinder = adaptor_surface.Cylinder()
         radius = cylinder.Radius()
 
@@ -162,8 +181,10 @@ def create_edge_node(edge):
         start_point = adaptor.Value(first)
         end_point = adaptor.Value(last)
         radius = adaptor.Circle().Radius()
+        center = adaptor.Circle().Location()
 
-        return [start_point.X(), start_point.Y(), start_point.Z(), end_point.X(), end_point.Y(), end_point.Z(), radius]
+
+        return [start_point.X(), start_point.Y(), start_point.Z(), end_point.X(), end_point.Y(), end_point.Z(), center.X(),center.Y(), center.Z() ]
  
 
 

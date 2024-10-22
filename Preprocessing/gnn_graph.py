@@ -482,7 +482,7 @@ class SketchLoopGraph(HeteroData):
 
 
 
-# Edge Feature:
+# Edge Feature: 10 values
 # 0-3: point1, 3-6:point2, 6-7:alpha_value
 
 # Circle Feature:

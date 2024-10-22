@@ -994,7 +994,7 @@ def loop_contained(loops, stroke_node_features):
         # If circle
         if len(loop) < 3:
             circle_id = list(loop)[0]
-            center_x, center_y, center_z, normal_x, normal_y, normal_z, alpha_value, radius = stroke_coords = stroke_node_features[circle_id]
+            center_x, center_y, center_z, normal_x, normal_y, normal_z, alpha_value, radius, _, _ = stroke_coords = stroke_node_features[circle_id]
             min_x = max_x = center_x
             min_y = max_y = center_y
             min_z = max_z = center_z
@@ -1004,7 +1004,7 @@ def loop_contained(loops, stroke_node_features):
         # Process each stroke in the loop
         for stroke in loop:
             stroke_coords = stroke_node_features[stroke]  # Each stroke has exactly 6 values: [x1, y1, z1, x2, y2, z2]
-            x1, y1, z1, x2, y2, z2, _,  _ = stroke_coords
+            x1, y1, z1, x2, y2, z2, _,  _, _, _ = stroke_coords
             
             # Update bounding box for the loop
             min_x, max_x = min(min_x, x1, x2), max(max_x, x1, x2)
@@ -1161,20 +1161,16 @@ def dist(center, point):
 
 
 def pad_brep_features(final_brep_edges):
-    # Create an empty list to store the padded results
+    # Target padded_length = 10
     padded_edges = []
 
     # Iterate through each sublist in final_brep_edges
     for edge in final_brep_edges:
-        # If the sublist has 6 elements, pad it with two zeros
-        if len(edge) == 6:
-            padded_edge = edge + [0, 0]
-        else:
-            padded_edge = edge
+        # Pad each edge list with zeros to ensure it has exactly 10 elements
+        padded_edge = edge + [0] * (10 - len(edge))
         padded_edges.append(padded_edge)
 
     return np.round(np.array(padded_edges), 4)
-
 
 
 #----------------------------------------------------------------------------------#
