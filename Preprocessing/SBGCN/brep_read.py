@@ -180,7 +180,7 @@ def create_edge_node(edge):
         vertices.append([vertex_coords.X(), vertex_coords.Y(), vertex_coords.Z()])
         vertex_explorer.Next()
 
-    return [vertices[0][0], vertices[0][1], vertices[0][2], vertices[1][0], vertices[1][1], vertices[1][2], 0]
+    return [vertices[0][0], vertices[0][1], vertices[0][2], vertices[1][0], vertices[1][1], vertices[1][2], 0, 0, 0]
 
 def create_vertex_node(vertex):
     pt = BRep_Tool.Pnt(vertex)

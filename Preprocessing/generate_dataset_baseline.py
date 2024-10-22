@@ -72,6 +72,7 @@ class dataset_generator():
         stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_class.edges)
         stroke_node_features, stroke_operations_order_matrix = Preprocessing.proc_CAD.helper.swap_rows_with_probability(stroke_node_features, stroke_operations_order_matrix)
         stroke_node_features = np.round(stroke_node_features, 4)
+        print("stroke_node_features", stroke_node_features)
 
         connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(stroke_node_features)
         strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, connected_stroke_nodes)

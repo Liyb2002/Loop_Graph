@@ -482,7 +482,14 @@ class SketchLoopGraph(HeteroData):
 
 
 
+# Edge Feature:
+# 0-3: point1, 3-6:point2, 6-7:alpha_value
 
+# Circle Feature:
+# 0-3: center, 3-6:normal, 6-7:alpha_value, 7-8:radius
+
+# Arc Feature:
+# 0-3: point1, 3-6:point2, 6-7:alpha_value, 7-10:center
 
 def build_graph(stroke_dict, messy = False):
     num_strokes = len(stroke_dict)
@@ -493,7 +500,7 @@ def build_graph(stroke_dict, messy = False):
         if len(stroke.Op) > 0 and num_operations < stroke.Op[0]:
             num_operations = stroke.Op[0]
 
-    node_features = np.zeros((num_strokes, 8))
+    node_features = np.zeros((num_strokes, 10))
     operations_order_matrix = np.zeros((num_strokes, num_operations+1))
 
 
@@ -509,7 +516,7 @@ def build_graph(stroke_dict, messy = False):
             node_features[i, :3] = center
             node_features[i, 3:6] = normal
             node_features[i, 6:7] = alpha_value
-            node_features[i, 7:] = radius
+            node_features[i, 7:8] = radius
 
             for stroke_op_count in stroke.Op:
                 operations_order_matrix[i, stroke_op_count] = 1
@@ -530,6 +537,10 @@ def build_graph(stroke_dict, messy = False):
         # operation_order_matrix has shape num_strokes x num_ops
         for stroke_op_count in stroke.Op:
             operations_order_matrix[i, stroke_op_count] = 1
+
+        # arc: 
+        if stroke.is_curve:
+            node_features[i, 7:] = stroke.center
 
 
     return node_features, operations_order_matrix
