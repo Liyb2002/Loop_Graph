@@ -4,6 +4,7 @@ from Preprocessing.proc_CAD.basic_class import Face, Edge, Vertex
 
 import random
 import math
+import numpy as np
 
 
 # -------------------- Midpoint Lines -------------------- #
@@ -679,3 +680,75 @@ def create_edge_nodes(base_id, verts):
     
     # Return the edges as a tuple
     return e1, e2, e3, e4
+
+
+# -------------------- Fillet Lines -------------------- #
+def edges_splited_by_fillet(target_verts, self_edges, self_vertices):
+    fillet_feature_lines = []
+    
+    for vertex_data in target_verts:
+        fillet_id = vertex_data['id']
+        fillet_position = vertex_data['coordinates']
+
+        for edge_id, edge in self_edges.items():
+            position_1 = edge.vertices[0].position
+            position_2 = edge.vertices[1].position
+
+            if (position_1[0] == position_2[0] and position_1[1] == position_2[1] and position_1[2] != position_2[2]) or \
+               (position_1[0] == position_2[0] and position_1[2] == position_2[2] and position_1[1] != position_2[1]) or \
+               (position_1[1] == position_2[1] and position_1[2] == position_2[2] and position_1[0] != position_2[0]):
+
+                if is_point_on_line(fillet_position, position_1, position_2):
+                    # Create edge1 with vertices (position_1, fillet_position)
+                    edge1 = Edge(
+                        id=f"edge_1_{edge.id}",
+                        vertices=[self_vertices[fillet_id], self_vertices[edge.vertices[0].id]]
+                    )
+                    # Create edge2 with vertices (position_2, fillet_position)
+                    edge2 = Edge(
+                        id=f"edge_2_{edge.id}",
+                        vertices=[self_vertices[fillet_id], self_vertices[edge.vertices[1].id]]
+                    )
+
+                    # Append the new edges to the list
+                    fillet_feature_lines.append(edge1)
+                    fillet_feature_lines.append(edge2)
+
+    unique_edges = []
+    seen_edges = set()
+
+    for edge in fillet_feature_lines:
+        # Create a tuple of sorted vertex IDs to ensure undirected edge comparison
+        edge_vertices = tuple(sorted([edge.vertices[0].id, edge.vertices[1].id]))
+        
+        # Check if this set of vertices has been seen before
+        if edge_vertices not in seen_edges:
+            unique_edges.append(edge)
+            seen_edges.add(edge_vertices)
+
+    return unique_edges
+
+
+
+def is_point_on_line(point, line_start, line_end, tolerance=1e-6):
+    """
+    Checks if a point lies on a line segment between line_start and line_end
+    by verifying if the point's x, y, z values are between the min and max values
+    of the line segment's start and end points.
+    """
+    # Get the min and max values for x, y, z from the line segment
+
+    if (np.allclose(point, line_start, atol=tolerance) or
+        np.allclose(point, line_end, atol=tolerance)):
+        return False
+
+    min_x, max_x = min(line_start[0], line_end[0]), max(line_start[0], line_end[0])
+    min_y, max_y = min(line_start[1], line_end[1]), max(line_start[1], line_end[1])
+    min_z, max_z = min(line_start[2], line_end[2]), max(line_start[2], line_end[2])
+
+    # Check if the point's x, y, z coordinates lie within the bounds
+    if (min_x - tolerance <= point[0] <= max_x + tolerance and
+        min_y - tolerance <= point[1] <= max_y + tolerance and
+        min_z - tolerance <= point[2] <= max_z + tolerance):
+        return True
+    return False

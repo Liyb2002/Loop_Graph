@@ -314,6 +314,19 @@ class create_stroke_cloud():
             construction_lines += Preprocessing.proc_CAD.line_utils.bounding_box_lines(new_edges)
             # construction_lines = Preprocessing.proc_CAD.line_utils.grid_lines(self.edges, new_edges)
 
+        if op == 'fillet':
+            fillet_vert_ids = []
+            for vertex_data in Op['vertices']:
+                fillet_vert_ids.append(vertex_data['id'])
+            fillet_feature_lines = Preprocessing.proc_CAD.line_utils.edges_splited_by_fillet(Op['vertices'], self.edges, self.vertices)
+            
+            for line in fillet_feature_lines:
+                line.set_edge_type('maybe_feature_line')
+                line.set_order_count(self.order_count)
+                self.order_count += 1
+                self.edges[line.order_count] = line
+
+
         for line in construction_lines:
             line.set_edge_type('construction_line')
             line.set_order_count(self.order_count)

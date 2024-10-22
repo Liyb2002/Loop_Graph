@@ -158,15 +158,13 @@ def create_edge_node(edge):
     adaptor = GeomAdaptor_Curve(edge_curve_handle)
     curve_type = adaptor.GetType()
 
-    if curve_type == GeomAbs_Circle:
-        edge_type = "Curved (Fillet)"
+    if curve_type == GeomAbs_Circle and abs(last - first) < 6.27:
         start_point = adaptor.Value(first)
         end_point = adaptor.Value(last)
         radius = adaptor.Circle().Radius()
 
-        print(f"Arc radius: {radius}")
-        print(f"Start point of arc: ({start_point.X()}, {start_point.Y()}, {start_point.Z()})")
-        print(f"End point of arc: ({end_point.X()}, {end_point.Y()}, {end_point.Z()})")
+        return [start_point.X(), start_point.Y(), start_point.Z(), end_point.X(), end_point.Y(), end_point.Z(), radius]
+ 
 
 
 
@@ -182,7 +180,7 @@ def create_edge_node(edge):
         vertices.append([vertex_coords.X(), vertex_coords.Y(), vertex_coords.Z()])
         vertex_explorer.Next()
 
-    return [vertices[0][0], vertices[0][1], vertices[0][2], vertices[1][0], vertices[1][1], vertices[1][2]]
+    return [vertices[0][0], vertices[0][1], vertices[0][2], vertices[1][0], vertices[1][1], vertices[1][2], 0]
 
 def create_vertex_node(vertex):
     pt = BRep_Tool.Pnt(vertex)
