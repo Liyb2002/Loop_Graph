@@ -52,6 +52,7 @@ class Edge:
         self.vertices = vertices
 
         self.is_circle = False
+        self.is_curve = False
         self.fillet_permited = False
 
         self.edge_type = 'maybe_feature_line'
@@ -65,6 +66,11 @@ class Edge:
 
     def disable_fillet(self):
         self.fillet_permited = False
+    
+    def check_is_curve(self, radius):
+        self.is_curve = True
+        self.radius = radius
+        self.alpha_value = np.random.uniform(0.5, 0.8)
 
     def check_is_circle(self, radius, center, normal):
         self.is_circle = True

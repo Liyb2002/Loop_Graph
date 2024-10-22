@@ -160,6 +160,47 @@ class create_stroke_cloud():
                 # Plot the circle
                 ax.plot(x_values, y_values, z_values, color='black', alpha=line_alpha_value, linewidth=line_thickness)
                 continue
+            
+            if edge.is_curve:
+                start_point = np.array(edge.vertices[0].position)
+                end_point = np.array(edge.vertices[1].position)
+                radius = edge.radius
+
+                # Calculate the midpoint between start and end points
+                midpoint = (start_point + end_point) / 2
+
+                # Compute the direction vector between start and end points
+                direction = end_point - start_point
+                direction_normalized = direction / np.linalg.norm(direction)
+
+                # Compute a perpendicular vector for the curve plane
+                perp_vector = np.cross(direction_normalized, [0, 0, 1])
+                if np.linalg.norm(perp_vector) == 0:  # Handle case where direction is aligned with z-axis
+                    perp_vector = np.cross(direction_normalized, [0, 1, 0])
+                perp_vector = perp_vector / np.linalg.norm(perp_vector)
+
+                # Calculate the center of the circle based on radius and perpendicular vector
+                center = midpoint + np.sqrt(radius**2 - np.linalg.norm(midpoint - start_point)**2) * perp_vector
+
+                # Generate points along the curve using the circle equation
+                num_points = 20
+                angles = np.linspace(0, np.pi, num_points)  # Assuming the curve is a semicircle for simplicity
+                curve_points = []
+
+                for angle in angles:
+                    point_on_curve = (
+                        center
+                        + radius * np.cos(angle) * direction_normalized
+                        + radius * np.sin(angle) * perp_vector
+                    )
+                    curve_points.append(point_on_curve)
+
+                curve_points = np.array(curve_points)
+
+                # Plot the curve points
+                ax.plot(curve_points[:, 0], curve_points[:, 1], curve_points[:, 2], color='b', label='Curve', linewidth=2)
+                
+
 
             if edge.edge_type == 'feature_line':
                 line_color = 'black'
@@ -293,6 +334,13 @@ class create_stroke_cloud():
                 cur_op_vertex_ids.append(v_id)
 
             edge = Edge(id=edge_data['id'], vertices=vertices)
+
+            # if this is a fillet operation, then give the radius to the edge
+            if op == 'fillet':
+                radius = Op['operation'][2]['amount']
+                edge.check_is_curve(radius)
+                
+
             edge.set_Op(op, index)
             edge.set_order_count(self.order_count)
             self.order_count += 1
