@@ -764,7 +764,7 @@ def plot_arc(stroke):
     # Calculate the radius of the arc (distance from center to start_point)
     radius = np.linalg.norm(start_point - center)
 
-    # Determine the plane by checking which axis is constant
+    # Determine the plane where the arc lies by checking which axis is constant
     shared_axes = np.isclose(start_point, center) & np.isclose(end_point, center)
     
     if np.sum(shared_axes) != 1:
@@ -774,21 +774,31 @@ def plot_arc(stroke):
     shared_axis = np.where(shared_axes)[0][0]  # This is the constant axis
     plane_axes = [axis for axis in range(3) if axis != shared_axis]
 
-    # Calculate the angles for start_point and end_point relative to the center
+    # Calculate the angles for start_point and end_point relative to the center using atan2
     vector_start = np.array([start_point[plane_axes[0]], start_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
     vector_end = np.array([end_point[plane_axes[0]], end_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
 
     theta_start = np.arctan2(vector_start[1], vector_start[0])
     theta_end = np.arctan2(vector_end[1], vector_end[0])
 
-    # Ensure clockwise direction: the start point should have a larger angle than the end point
-    if theta_start < theta_end:
-        theta_start += 2 * np.pi  # Ensure clockwise by adding a full rotation to theta_start
+    # Normalize angles to the range [0, 2pi]
+    if theta_start < 0:
+        theta_start += 2 * np.pi
+    if theta_end < 0:
+        theta_end += 2 * np.pi
+
+    # Ensure clockwise direction: the start point should have a smaller angle
+    if theta_start > theta_end:
+        theta_start, theta_end = theta_end, theta_start
+
+    # Ensure that the difference between angles is exactly 1.57 radians (quarter circle)
+    if np.abs(theta_end - theta_start) > np.pi / 2:
+        theta_end = theta_start + np.pi / 2
 
     # Generate angles for the arc in the clockwise direction
     theta = np.linspace(theta_start, theta_end, 100)
 
-    # Generate arc points using the parametric circle equation on the plane
+    # Generate arc points using parametric circle equation on the plane
     x_values, y_values, z_values = [], [], []
     for t in theta:
         arc_x = center[plane_axes[0]] + radius * np.cos(t)
@@ -802,8 +812,10 @@ def plot_arc(stroke):
         point[plane_axes[0]] = arc_x
         point[plane_axes[1]] = arc_y
 
+        # Append x, y, z values based on the computed theta points
         x_values.append(point[0])
         y_values.append(point[1])
         z_values.append(point[2])
 
+    # Return the computed x, y, z values
     return np.array(x_values), np.array(y_values), np.array(z_values)

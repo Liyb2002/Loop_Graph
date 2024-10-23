@@ -161,7 +161,6 @@ class create_stroke_cloud():
                 ax.plot(x_values, y_values, z_values, color='black', alpha=line_alpha_value, linewidth=line_thickness)
                 continue
                 
-
             if edge.is_curve:
                 start_point = np.array(edge.vertices[0].position)
                 end_point = np.array(edge.vertices[1].position)
@@ -179,19 +178,33 @@ class create_stroke_cloud():
                 shared_axis = np.where(shared_axes)[0][0]  # This is the constant axis
                 plane_axes = [axis for axis in range(3) if axis != shared_axis]
 
-                # Calculate the angles for start_point and end_point relative to the center
+                # Calculate the angles for start_point and end_point relative to the center using atan2
                 vector_start = np.array([start_point[plane_axes[0]], start_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
                 vector_end = np.array([end_point[plane_axes[0]], end_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
 
                 theta_start = np.arctan2(vector_start[1], vector_start[0])
                 theta_end = np.arctan2(vector_end[1], vector_end[0])
 
-                # Ensure clockwise direction: the start point should have a larger angle than the end point
-                if theta_start < theta_end:
-                    theta_start += 2 * np.pi  # Ensure clockwise by adding a full rotation to theta_start
+                # Normalize angles to the range [-pi, pi]
+                if theta_start < 0:
+                    theta_start += 2 * np.pi
+                if theta_end < 0:
+                    theta_end += 2 * np.pi
 
-                # Generate angles for the arc in the clockwise direction
-                theta = np.linspace(theta_start, theta_end, 10)
+                # Ensure that the difference is exactly 1.57 (quarter circle)
+                angle_diff = theta_end - theta_start
+
+                if np.abs(angle_diff) > np.pi / 2:  # If the difference exceeds 1.57 radians
+                    # Find the correct direction for the arc (handle crossing the -pi to pi boundary)
+                    if theta_start > theta_end:
+                        # Go clockwise
+                        theta_end = theta_start + np.pi / 2
+                    else:
+                        # Go counterclockwise
+                        theta_end = theta_start - np.pi / 2
+
+                # Generate angles for the arc (make sure it's no more than 1.57 radians apart)
+                theta = np.linspace(theta_start, theta_end, 100)
 
                 # Generate arc points using parametric circle equation on the plane
                 arc_points = []
@@ -217,7 +230,6 @@ class create_stroke_cloud():
                 # Plot the arc points
                 ax.plot(arc_points[:, 0], arc_points[:, 1], arc_points[:, 2], label='Arc', color='black', alpha=line_alpha_value, linewidth=line_thickness)
                 continue
-
 
                 
                 

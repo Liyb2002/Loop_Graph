@@ -435,7 +435,7 @@ class Brep:
                 for vert in e.vertices:
                     vert_pos = vert.position
                     if vert_pos in points:  # Check if vertex position is in the provided points
-                        dist = euclidean_dist(e.vertices[0].position, e.vertices[1].position)
+                        dist = max(euclidean_dist(e.vertices[0].position, vert_pos), euclidean_dist(e.vertices[1].position, vert_pos))
                         if dist < max_dist:
                             max_dist = dist
 
