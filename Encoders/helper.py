@@ -105,7 +105,14 @@ def choose_fillet_strokes(raw_fillet_stroke_idx, stroke_node_features):
            stroke_node_features[idx][9] != 0
     ]
     
-    return filtered_strokes
+    num_strokes = stroke_node_features.shape[0]
+    stroke_selection_matrix = torch.zeros((num_strokes, 1), dtype=torch.float32)
+    
+    # Set the value to 1 for the selected strokes
+    for idx in filtered_strokes:
+        stroke_selection_matrix[idx] = 1.0  # Use 1.0 to ensure float32 type
+    
+    return filtered_strokes, stroke_selection_matrix
 #------------------------------------------------------------------------------------------------------#
 
 
