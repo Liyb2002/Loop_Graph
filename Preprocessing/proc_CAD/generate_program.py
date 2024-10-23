@@ -247,6 +247,80 @@ class Brep:
                         {'arc_0': arc_0},
                         {'arc_1': arc_1},
                         ])
+    
+
+    def random_chamfer(self):
+        # Chamfer is just non-linear version of fillet
+        # so we copy fillet code for it
+        available_fillet_edges = [edge for edge in self.Edges if not edge.fillet_permited]
+        if not available_fillet_edges:
+            return False
+        
+        target_edge = None
+        if not self.check_fillet_validity(target_edge):
+            target_edge = random.choice(available_fillet_edges)
+
+
+        
+        amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
+        safe_amount = self.safe_fillet_check([vert.position for vert in target_edge.vertices])
+        amount = min(amount * 0.3, safe_amount * 0.3)
+
+        target_edge.disable_fillet()
+
+        verts_pos = []
+        verts_id = []
+        new_vert_pos = []
+        centers = []
+
+        for vert in target_edge.vertices:
+            verts_pos.append(vert.position)
+            verts_id.append(vert.id)
+            neighbor_verts = Preprocessing.proc_CAD.helper.get_neighbor_verts(vert, target_edge, self.Edges)
+            new_vert_pos_half, center = Preprocessing.proc_CAD.helper.compute_fillet_new_vert(vert, neighbor_verts, amount)
+            new_vert_pos.append(new_vert_pos_half)
+            centers.append(center)
+        
+        new_A = new_vert_pos[0][0]
+        new_B = new_vert_pos[0][1]
+        new_C = new_vert_pos[1][0]
+        new_D = new_vert_pos[1][1]
+
+        #create 4 new verts from new_A, new_B and new_C, new_D
+        new_vert_B = Vertex(f"vertex_{self.idx}_0", new_B)
+        new_vert_D = Vertex(f"vertex_{self.idx}_1", new_D)
+        new_vert_A = Vertex(f"vertex_{self.idx}_2", new_A)
+        new_vert_C = Vertex(f"vertex_{self.idx}_3", new_C)
+        self.Vertices.append(new_vert_B)
+        self.Vertices.append(new_vert_D)
+        self.Vertices.append(new_vert_A)
+        self.Vertices.append(new_vert_C)
+
+
+
+        #create 2 edge that connect new_B and new_D / new_A and new_C
+        new_edge_id_0 = f"edge_{self.idx}_0"
+        new_edge_0 = Edge(new_edge_id_0, [new_vert_B, new_vert_D])
+        new_edge_id_1 = f"edge_{self.idx}_1"
+        new_edge_1 = Edge(new_edge_id_1, [new_vert_A, new_vert_C])
+        self.Edges.append(new_edge_0)
+        self.Edges.append(new_edge_1)
+
+        #create 2 edge that connect new_A and new_B / new_C and new_D
+        new_edge_id_2 = f"edge_{self.idx}_2"
+        new_edge_2 = Edge(new_edge_id_2, [new_vert_A, new_vert_B])
+        new_edge_id_3 = f"edge_{self.idx}_3"
+        new_edge_3 = Edge(new_edge_id_3, [new_vert_C, new_vert_D])
+        self.Edges.append(new_edge_2)
+        self.Edges.append(new_edge_3)
+
+        self.idx += 1
+        self.op.append(['chamfer', 
+                        target_edge.id, 
+                        {'amount': amount}, 
+                        {'old_verts_pos': verts_pos},
+                        {'verts_id': verts_id},
+                        ])
 
 
     def check_fillet_validity(self, target_edge):

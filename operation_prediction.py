@@ -34,7 +34,7 @@ optimizer = optim.Adam(list(program_encoder.parameters()) + list(graph_encoder.p
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'program_prediction')
+save_dir = os.path.join(current_dir, 'checkpoints', 'operation_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -84,7 +84,7 @@ def compute_accuracy(output_stroke, output_loop, program_gt_batch):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/fillet')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -331,4 +331,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

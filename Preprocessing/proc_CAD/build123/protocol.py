@@ -137,3 +137,18 @@ def build_fillet(count, canvas, target_edge, radius, output, data_dir):
 
 
     return canvas
+
+
+def build_chamfer(count, canvas, target_edge, radius, output, data_dir):
+    stl_dir = os.path.join(data_dir, "canvas", f"vis_{count}.stl")
+    step_dir = os.path.join(data_dir, "canvas", f"brep_{count}.step")
+
+    with canvas:
+        chamfer(target_edge, radius)
+    
+    if output:
+        _ = canvas.part.export_stl(stl_dir)
+        _ = canvas.part.export_step(step_dir)
+
+
+    return canvas

@@ -393,6 +393,9 @@ class create_stroke_cloud():
 
             edge = Edge(id=edge_data['id'], vertices=vertices)
 
+            if op == 'chamfer':
+                edge.set_edge_type('feature_line')
+
             edge.set_Op(op, index)
             edge.set_order_count(self.order_count)
             self.order_count += 1
@@ -414,7 +417,7 @@ class create_stroke_cloud():
             construction_lines += Preprocessing.proc_CAD.line_utils.bounding_box_lines(new_edges)
             # construction_lines = Preprocessing.proc_CAD.line_utils.grid_lines(self.edges, new_edges)
 
-        if op == 'fillet':
+        if op == 'fillet' or op == 'chamfer':
             fillet_vert_ids = []
             for vertex_data in Op['vertices']:
                 fillet_vert_ids.append(vertex_data['id'])
@@ -819,7 +822,7 @@ class create_stroke_cloud():
         
         self.adj_edges()
         self.map_id_to_count()
-        # self.vis_stroke_cloud(self.directory, True)
+        self.vis_stroke_cloud(self.directory, True)
         # self.vis_brep()
 
 

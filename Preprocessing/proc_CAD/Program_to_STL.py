@@ -40,6 +40,9 @@ class parsed_program():
                 if operation[0] == 'fillet':
                     self.parse_fillet(Op)
                 
+                if operation[0] == 'chamfer':
+                    self.parse_chamfer(Op)
+ 
                 if operation[0] == 'terminate':
                     self.Op_idx += 1
                     break
@@ -133,6 +136,16 @@ class parsed_program():
             self.canvas = Preprocessing.proc_CAD.build123.protocol.build_fillet(self.Op_idx, self.canvas, target_edge, fillet_amount, self.output, self.data_directory)
             self.Op_idx += 1
             
+    def parse_chamfer(self, Op):
+        chamfer_amount = Op['operation'][2]['amount']
+        verts = Op['operation'][3]['old_verts_pos']
+
+        target_edge = Preprocessing.proc_CAD.helper.find_target_verts(verts, self.canvas.edges())
+
+        if target_edge != None:
+            self.canvas = Preprocessing.proc_CAD.build123.protocol.build_chamfer(self.Op_idx, self.canvas, target_edge, chamfer_amount, self.output, self.data_directory)
+            self.Op_idx += 1
+
     def is_valid_parse(self):
         return self.Op_idx == self.len_program 
 

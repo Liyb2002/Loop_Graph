@@ -71,6 +71,7 @@ class Edge:
         self.is_curve = True
         self.center = center
         self.alpha_value = np.random.uniform(0.5, 0.8)
+        self.edge_type = 'feature_line'
 
     def check_is_circle(self, radius, center, normal):
         self.is_circle = True
@@ -78,6 +79,7 @@ class Edge:
         self.center = center
         self.normal = normal
         self.alpha_value = np.random.uniform(0.5, 0.8)
+        self.edge_type = 'feature_line'
 
     def set_Op(self, Op, index):
         self.Op.append(index)
