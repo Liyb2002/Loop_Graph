@@ -148,7 +148,6 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
-        # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(sketch_loop_selection_mask)])
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
 
 
@@ -271,6 +270,102 @@ def train():
             best_accuracy = val_accuracy
             print(f"New best accuracy: {best_accuracy:.4f}, saved model")
             save_models()
+
+
+
+def eval():
+    load_models()  
+    graph_encoder.eval()
+    graph_decoder.eval()
+
+    batch_size = 16
+
+    # Load the dataset
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/fillet_eval')
+    print(f"Total number of shape data: {len(dataset)}")
+
+    graphs = []
+    stroke_selection_masks = []
+
+    # Preprocess and build the graphs (same as in training)
+    for data in tqdm(dataset, desc=f"Building Graphs"):
+        # Extract the necessary elements from the dataset
+        program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+
+        if program[-1] != 'fillet'or len(program) > stroke_operations_order_matrix.shape[1]:
+            continue
+        
+        kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
+        raw_fillet_stroke_idx = (kth_operation == 1).nonzero(as_tuple=True)[0] 
+        fillet_stroke_idx, stroke_selection_matrix= Encoders.helper.choose_fillet_strokes(raw_fillet_stroke_idx, stroke_node_features)
+
+
+        gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
+            stroke_cloud_loops, 
+            stroke_node_features, 
+            strokes_perpendicular, 
+            loop_neighboring_vertical, 
+            loop_neighboring_horizontal, 
+            loop_neighboring_contained,
+            stroke_to_loop,
+            stroke_to_edge
+        )
+
+        gnn_graph.to_device_withPadding(device)
+        stroke_selection_matrix = stroke_selection_matrix.to(device)
+
+        graphs.append(gnn_graph)
+        stroke_selection_masks.append(stroke_selection_matrix)
+    
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
+
+        
+    print(f"Total number of preprocessed graphs: {len(graphs)}")
+
+    # Convert to HeteroData and pad the masks
+    hetero_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in graphs]
+    padded_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in stroke_selection_masks]
+
+    # Create DataLoader for evaluation
+    graph_eval_loader = DataLoader(hetero_graphs, batch_size=batch_size, shuffle=False)
+    mask_eval_loader = DataLoader(padded_masks, batch_size=batch_size, shuffle=False)
+
+    eval_loss = 0.0
+    total = 0
+    correct = 0
+
+    criterion = torch.nn.BCELoss()  # Assuming BCELoss is used in the training
+
+    with torch.no_grad():
+        total_iterations_eval = min(len(graph_eval_loader), len(mask_eval_loader))
+
+        for hetero_batch, batch_masks in tqdm(zip(graph_eval_loader, mask_eval_loader), desc="Evaluation", dynamic_ncols=True, total=total_iterations_eval):
+            # Forward pass through the graph encoder
+            x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
+
+            # Forward pass through the graph decoder
+            output = graph_decoder(x_dict)
+
+            # Ensure masks are on the correct device and reshape them
+            batch_masks = batch_masks.to(output.device).view(-1, 1)
+
+            # Create a valid mask for non-zero values (padding values are -1)
+            valid_mask = (batch_masks != -1).float()
+            valid_output = output * valid_mask
+            valid_batch_masks = batch_masks * valid_mask
+
+
+            correct += compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch)           
+            total += batch_size
+
+            # Compute loss
+            loss = criterion(valid_output, valid_batch_masks)
+            eval_loss += loss.item()
+
+
+    # Calculate and print overall average accuracy
+    overall_accuracy = correct / total
+    print(f"Overall Average Accuracy: {overall_accuracy:.2f}%")
 
 
 #---------------------------------- Public Functions ----------------------------------#
