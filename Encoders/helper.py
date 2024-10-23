@@ -619,9 +619,16 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx):
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
         
-        if stroke[7] != 0:
+        if stroke[7] != 0 and stroke[8] == 0:
             # Circle face
             x_values, y_values, z_values = plot_circle(stroke)
+
+            ax.plot(x_values, y_values, z_values, color='blue')
+
+        if stroke[7] != 0 and stroke[8] != 0:
+            # Arc
+            print("stroke",stroke)
+            x_values, y_values, z_values = plot_arc(stroke)
 
             ax.plot(x_values, y_values, z_values, color='blue')
 
@@ -634,9 +641,16 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx):
     for idx, stroke in enumerate(stroke_node_features):
         if idx in selected_stroke_idx:
             stroke = stroke_node_features[idx]
-            if stroke[7] != 0:
+            if stroke[7] != 0 and stroke[8] == 0:
+                # Circle
                 x_values, y_values, z_values = plot_circle(stroke)
                 ax.plot(x_values, y_values, z_values, color='red')
+            
+            if stroke[7] != 0 and stroke[8] != 0:
+                # Arc
+                x_values, y_values, z_values = plot_arc(stroke)
+                ax.plot(x_values, y_values, z_values, color='red')
+
             else:
                 start, end = stroke[:3], stroke[3:6]
                 ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='red', linewidth=1)
@@ -720,3 +734,58 @@ def plot_circle(stroke):
 
     return x_values, y_values, z_values
 
+
+
+
+def plot_arc(stroke):
+    # Extract start point, end point, and center from stroke
+    start_point = stroke[:3]
+    end_point = stroke[3:6]
+    center = stroke[7:10]
+
+    # Calculate the radius of the arc (distance from center to start_point)
+    radius = np.linalg.norm(start_point - center)
+
+    # Determine the plane by checking which axis is constant
+    shared_axes = np.isclose(start_point, center) & np.isclose(end_point, center)
+    
+    if np.sum(shared_axes) != 1:
+        raise ValueError("The arc points and center do not lie on a plane aligned with one of the axes.")
+
+    # The axis where all points have the same value (constant axis)
+    shared_axis = np.where(shared_axes)[0][0]  # This is the constant axis
+    plane_axes = [axis for axis in range(3) if axis != shared_axis]
+
+    # Calculate the angles for start_point and end_point relative to the center
+    vector_start = np.array([start_point[plane_axes[0]], start_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
+    vector_end = np.array([end_point[plane_axes[0]], end_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
+
+    theta_start = np.arctan2(vector_start[1], vector_start[0])
+    theta_end = np.arctan2(vector_end[1], vector_end[0])
+
+    # Ensure clockwise direction: the start point should have a larger angle than the end point
+    if theta_start < theta_end:
+        theta_start += 2 * np.pi  # Ensure clockwise by adding a full rotation to theta_start
+
+    # Generate angles for the arc in the clockwise direction
+    theta = np.linspace(theta_start, theta_end, 100)
+
+    # Generate arc points using the parametric circle equation on the plane
+    x_values, y_values, z_values = [], [], []
+    for t in theta:
+        arc_x = center[plane_axes[0]] + radius * np.cos(t)
+        arc_y = center[plane_axes[1]] + radius * np.sin(t)
+        point = [0, 0, 0]  # Create a 3D point
+
+        # Set the shared axis (constant value for all points)
+        point[shared_axis] = center[shared_axis]
+        
+        # Assign the arc points to the correct axes
+        point[plane_axes[0]] = arc_x
+        point[plane_axes[1]] = arc_y
+
+        x_values.append(point[0])
+        y_values.append(point[1])
+        z_values.append(point[2])
+
+    return np.array(x_values), np.array(y_values), np.array(z_values)

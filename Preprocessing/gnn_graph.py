@@ -28,7 +28,7 @@ class SketchLoopGraph(HeteroData):
                                  torch.tensor(stroke_to_edge, dtype=torch.float)], dim=1)
 
 
-        # Loop node features based on whether the loop is used (repeated 9 times)
+        # Loop node features based on whether the loop is used (repeated 11 times)
         self._compute_loop_features(stroke_cloud_loops, loop_to_brep)
 
         # Create edges between loops and strokes
@@ -60,7 +60,7 @@ class SketchLoopGraph(HeteroData):
 
     def padding(self):
     
-        target_shape = (200, 9)
+        target_shape = (200, 11)
         
         for node_type in self.node_types:
             if 'x' in self[node_type]:
@@ -69,7 +69,7 @@ class SketchLoopGraph(HeteroData):
 
                 # Check if padding is needed
                 if current_shape[0] < target_shape[0]:
-                    # Pad to (200, 9) with -1
+                    # Pad to (200, 11) with -1
                     pad_size = (0, target_shape[1] - current_shape[1], 0, target_shape[0] - current_shape[0])  # (pad_last_dim, pad_first_dim, pad_dim_for_nodes)
                     x_padded = torch.nn.functional.pad(x, pad_size, mode='constant', value=-1)
                     self[node_type].x = x_padded
@@ -79,8 +79,8 @@ class SketchLoopGraph(HeteroData):
         
 
     def to_device_withPadding(self, device):
-        # Target shape (200, 9)
-        target_shape = (200, 9)
+        # Target shape (200, 11)
+        target_shape = (200, 11)
         
         for node_type in self.node_types:
             if 'x' in self[node_type]:
@@ -89,7 +89,7 @@ class SketchLoopGraph(HeteroData):
 
                 # Check if padding is needed
                 if current_shape[0] < target_shape[0]:
-                    # Pad to (200, 9) with -1
+                    # Pad to (200, 11) with -1
                     pad_size = (0, target_shape[1] - current_shape[1], 0, target_shape[0] - current_shape[0])  # (pad_last_dim, pad_first_dim, pad_dim_for_nodes)
                     x_padded = torch.nn.functional.pad(x, pad_size, mode='constant', value=-1)
                     self[node_type].x = x_padded
@@ -117,7 +117,7 @@ class SketchLoopGraph(HeteroData):
     def _compute_loop_features(self, stroke_cloud_loops, loop_to_brep):
         """
         Compute loop features. If the loop is used (based on loop_to_brep), assign 1, otherwise 0.
-        Repeat the value 9 times to match the feature size of 9.
+        Repeat the value 11 times to match the feature size of 11.
         """
         num_loops = len(stroke_cloud_loops)
         loop_features = []
@@ -131,8 +131,8 @@ class SketchLoopGraph(HeteroData):
                 # Compute the last value: 1 if any value in the row is 1, otherwise 0
                 last_value = float(loop_to_brep[loop_idx, :].sum() > 0)
 
-            # Repeat the last_value 9 times for the loop feature
-            loop_feature = [last_value] * 9
+            # Repeat the last_value 11 times for the loop feature
+            loop_feature = [last_value] * 11
             loop_features.append(loop_feature)
 
         self['loop'].x = torch.tensor(loop_features, dtype=torch.float)
@@ -141,7 +141,7 @@ class SketchLoopGraph(HeteroData):
     def set_loop_features(self, loop_to_brep):
         # Erase the current loop features
         num_loops = self['loop'].num_nodes
-        self['loop'].x = torch.zeros((num_loops, 9), dtype=torch.float)  # Set all features to 0 initially
+        self['loop'].x = torch.zeros((num_loops, 11), dtype=torch.float)  # Set all features to 0 initially
 
         # Recompute the loop features using loop_to_brep
         loop_features = []
@@ -152,8 +152,8 @@ class SketchLoopGraph(HeteroData):
                 # Compute the last value: 1 if any value in the row is 1, otherwise 0
                 last_value = float(loop_to_brep[loop_idx, :].sum() > 0)
 
-            # Repeat the last_value 9 times for the loop feature
-            loop_feature = [last_value] * 9
+            # Repeat the last_value 11 times for the loop feature
+            loop_feature = [last_value] * 111
             loop_features.append(loop_feature)
 
         # Update the loop features
@@ -264,7 +264,7 @@ class SketchLoopGraph(HeteroData):
     def set_select_sketch(self, sketch_loop_selection_mask):
         """
         Update the loop node features based on the sketch_loop_selection_mask.
-        If a loop is selected (value is 1 in sketch_loop_selection_mask), update its features to be 2, repeated 9 times.
+        If a loop is selected (value is 1 in sketch_loop_selection_mask), update its features to be 2, repeated 11 times.
         
         Also, for strokes represented by the selected loops, update the last digit of the stroke features to 2.
         
@@ -279,8 +279,8 @@ class SketchLoopGraph(HeteroData):
         # Update loop node features based on the mask
         for loop_idx in range(num_loops):
             if sketch_loop_selection_mask[loop_idx].item() == 1:
-                # If the loop is selected, set its features to 2, repeated 9 times
-                self['loop'].x[loop_idx] = torch.tensor([2] * 9, dtype=torch.float)
+                # If the loop is selected, set its features to 2, repeated 11 times
+                self['loop'].x[loop_idx] = torch.tensor([2] * 11, dtype=torch.float)
 
         # Get the edges between loops and strokes
         loop_to_stroke_edges = self['loop', 'represented_by', 'stroke'].edge_index
@@ -412,7 +412,7 @@ class SketchLoopGraph(HeteroData):
             loop_features = self['loop'].x[loop_idx].tolist()
             
             # Condition A: Skip loops that have features all equal to 1
-            if loop_features == [1] * 9:
+            if loop_features == [1] * 11:
                 continue
 
             if loop_idx >= loop_neighboring_vertical_matrix.shape[0]:
@@ -468,7 +468,7 @@ class SketchLoopGraph(HeteroData):
     def ensure_prev_selected_loops(self, selected_loop_indices):
         """
         This function ensures that the loop nodes corresponding to the given selected_loop_indices
-        have values of 1 repeated 9 times in their feature vector.
+        have values of 1 repeated 11 times in their feature vector.
         
         Parameters:
         selected_loop_indices (list): A list of loop indices that should be set to have feature values of 1.
@@ -476,9 +476,9 @@ class SketchLoopGraph(HeteroData):
         Returns:
         None
         """
-        # Ensure the node features are 1x9 for the loop nodes
+        # Ensure the node features are 11 for the loop nodes
         for idx in selected_loop_indices:
-            self['loop'].x[idx] = torch.tensor([1] * 9, dtype=torch.float)
+            self['loop'].x[idx] = torch.tensor([1] * 11, dtype=torch.float)
 
 
 

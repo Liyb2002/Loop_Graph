@@ -160,7 +160,8 @@ class create_stroke_cloud():
                 # Plot the circle
                 ax.plot(x_values, y_values, z_values, color='black', alpha=line_alpha_value, linewidth=line_thickness)
                 continue
-            
+                
+
             if edge.is_curve:
                 start_point = np.array(edge.vertices[0].position)
                 end_point = np.array(edge.vertices[1].position)
@@ -178,20 +179,19 @@ class create_stroke_cloud():
                 shared_axis = np.where(shared_axes)[0][0]  # This is the constant axis
                 plane_axes = [axis for axis in range(3) if axis != shared_axis]
 
-                # Calculate the angle between the start and end points around the center (for a quarter circle, it's 90 degrees)
+                # Calculate the angles for start_point and end_point relative to the center
                 vector_start = np.array([start_point[plane_axes[0]], start_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
                 vector_end = np.array([end_point[plane_axes[0]], end_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
 
-                # Determine the angle step (90 degrees for a quarter-circle arc)
                 theta_start = np.arctan2(vector_start[1], vector_start[0])
                 theta_end = np.arctan2(vector_end[1], vector_end[0])
-                
-                # Ensure the angles go in the correct order (counterclockwise direction)
-                # if theta_end > theta_start:
-                #     theta_end += 2 * np.pi  # Adjust to ensure 90 degrees span
 
-                # Generate angles between the start and end points (90 degrees in total)
-                theta = np.linspace(min(theta_start, theta_end), max(theta_start, theta_end), 10)
+                # Ensure clockwise direction: the start point should have a larger angle than the end point
+                if theta_start < theta_end:
+                    theta_start += 2 * np.pi  # Ensure clockwise by adding a full rotation to theta_start
+
+                # Generate angles for the arc in the clockwise direction
+                theta = np.linspace(theta_start, theta_end, 10)
 
                 # Generate arc points using parametric circle equation on the plane
                 arc_points = []
@@ -210,7 +210,7 @@ class create_stroke_cloud():
                     arc_points.append(point)
 
                 arc_points = np.array(arc_points)
-                
+
                 line_thickness = np.random.uniform(0.7, 0.9)
                 line_alpha_value = np.random.uniform(0.5, 0.8)
 
@@ -807,7 +807,7 @@ class create_stroke_cloud():
         
         self.adj_edges()
         self.map_id_to_count()
-        # self.vis_stroke_cloud(self.directory, True)
+        self.vis_stroke_cloud(self.directory, True)
         # self.vis_brep()
 
 
