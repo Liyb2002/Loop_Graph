@@ -96,6 +96,20 @@ def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_
     return extrude_strokes
 
 
+def choose_fillet_strokes(raw_fillet_stroke_idx, stroke_node_features):
+    # Filter raw_fillet_stroke_idx based on conditions in stroke_node_features
+    filtered_strokes = [
+        idx for idx in raw_fillet_stroke_idx
+        if stroke_node_features[idx][7] != 0 or
+           stroke_node_features[idx][8] != 0 or
+           stroke_node_features[idx][9] != 0
+    ]
+    
+    return filtered_strokes
+#------------------------------------------------------------------------------------------------------#
+
+
+
 def stroke_to_face(kth_operation, face_to_stroke):
     num_faces = len(face_to_stroke)
     face_chosen = torch.zeros((num_faces, 1), dtype=torch.float32)
@@ -105,6 +119,11 @@ def stroke_to_face(kth_operation, face_to_stroke):
             face_chosen[i] = 1
 
     return face_chosen
+
+
+
+#------------------------------------------------------------------------------------------------------#
+
 
 
 def program_mapping(program, device):
@@ -627,7 +646,6 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx):
 
         if stroke[7] != 0 and stroke[8] != 0:
             # Arc
-            print("stroke",stroke)
             x_values, y_values, z_values = plot_arc(stroke)
 
             ax.plot(x_values, y_values, z_values, color='blue')

@@ -65,7 +65,8 @@ def train():
             continue
         
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
-        fillet_stroke_idx = (kth_operation == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        raw_fillet_stroke_idx = (kth_operation == 1).nonzero(as_tuple=True)[0] 
+        fillet_stroke_idx = Encoders.helper.choose_fillet_strokes(raw_fillet_stroke_idx, stroke_node_features)
 
 
 
