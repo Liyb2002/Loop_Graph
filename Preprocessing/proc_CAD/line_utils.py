@@ -691,6 +691,8 @@ def edges_splited_by_fillet(target_verts, self_edges, self_vertices):
         fillet_position = vertex_data['coordinates']
 
         for edge_id, edge in self_edges.items():
+            if edge is None or edge.vertices is None or len(edge.vertices) != 2:
+                continue
             position_1 = edge.vertices[0].position
             position_2 = edge.vertices[1].position
 

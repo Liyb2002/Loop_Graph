@@ -121,7 +121,8 @@ def compute_fillet_new_vert(old_vert, neighbor_verts, amount):
         
         move_position = [old_position[i] + normalized_vector[i] * amount for i in range(len(old_position))]
         move_positions.append(move_position)
-    
+
+
     # Now move_positions contains the two new vertices (start and end of the arc)
     start_point = np.array(move_positions[0])
     end_point = np.array(move_positions[1])
@@ -261,8 +262,8 @@ def find_triangle_to_cut(points, normal):
     pin_point = points[pin_index]
     
     # Interpolate between the pin point and the other two points
-    point1 = 0.5 * (pin_point + points[indices[0]])
-    point2 = 0.5 * (pin_point + points[indices[2]])
+    point1 = 0.5 * random.random() * (pin_point + points[indices[0]])
+    point2 = 0.5 * random.random() * (pin_point + points[indices[2]])
 
     return [pin_point, point1, point2]
 

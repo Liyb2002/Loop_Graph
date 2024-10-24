@@ -75,8 +75,8 @@ class Brep:
         boundary_points = [vert.position for vert in target_face.vertices]
         normal = [ 0 - normal for normal in target_face.normal]
 
-        # cases = ['create_circle', 'find_rectangle', 'find_triangle', 'triangle_to_cut']
-        cases = ['find_rectangle']
+        cases = ['create_circle', 'find_rectangle', 'find_triangle', 'triangle_to_cut']
+        # cases = ['find_rectangle']
         selected_case = random.choice(cases)
         if selected_case == 'create_circle':
             radius, center = Preprocessing.proc_CAD.helper.random_circle(boundary_points, normal)
@@ -257,7 +257,7 @@ class Brep:
             return False
         
         target_edge = None
-        if not self.check_fillet_validity(target_edge):
+        while not self.check_fillet_validity(target_edge):
             target_edge = random.choice(available_fillet_edges)
 
 
