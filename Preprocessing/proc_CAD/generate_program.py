@@ -155,6 +155,7 @@ class Brep:
             # Vertical edges from old vertices to new vertices
             vertical_edge_id = f"edge_{self.idx}_{i+num_vertices}"
             vertical_edge = Edge(vertical_edge_id, [sketch_face.vertices[i], new_vertices[i]])
+            vertical_edge.enable_fillet()
             self.Edges.append(vertical_edge)
 
             # Side faces formed between pairs of old and new vertices
@@ -173,7 +174,7 @@ class Brep:
 
     def random_fillet(self):
         
-        available_fillet_edges = [edge for edge in self.Edges if not edge.fillet_permited]
+        available_fillet_edges = [edge for edge in self.Edges if edge.fillet_permited]
         if not available_fillet_edges:
             return False
         
@@ -252,7 +253,7 @@ class Brep:
     def random_chamfer(self):
         # Chamfer is just non-linear version of fillet
         # so we copy fillet code for it
-        available_fillet_edges = [edge for edge in self.Edges if not edge.fillet_permited]
+        available_fillet_edges = [edge for edge in self.Edges if edge.fillet_permited]
         if not available_fillet_edges:
             return False
         

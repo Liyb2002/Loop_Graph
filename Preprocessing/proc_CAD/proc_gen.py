@@ -10,9 +10,13 @@ def random_program(data_directory = None):
     #init a program
     canvas_class.init_sketch_op()
     canvas_class.extrude_op()
+    if random.random() < 0.5:
+        canvas_class.random_chamfer()
+    else:
+        canvas_class.random_fillet()
     
     #random gen for n steps
-    steps = random.randint(3, 4)
+    steps = random.randint(4, 4)
     for _ in range(steps - 1):
         canvas_class.regular_sketch_op()
         canvas_class.extrude_op()
