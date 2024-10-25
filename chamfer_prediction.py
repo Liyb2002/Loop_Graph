@@ -125,7 +125,9 @@ def train():
             continue
         
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
-        chamfer_stroke_idx = (kth_operation == 1).nonzero(as_tuple=True)[0] 
+        all_chamfer_strokes = Encoders.helper.get_all_operation_strokes(stroke_operations_order_matrix, program_whole, 'chamfer')
+
+        chamfer_stroke_idx = (all_chamfer_strokes == 1).nonzero(as_tuple=True)[0] 
 
 
 
@@ -147,7 +149,7 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")

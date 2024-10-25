@@ -26,7 +26,7 @@ class dataset_generator():
         # self.generate_dataset('dataset/messy_order_eval', number_data = 500, start = 110)
         # self.generate_dataset('dataset/messy_order', number_data = 6500, start = 5260)
         # self.generate_dataset('dataset/test', number_data = 10, start = 0)
-        self.generate_dataset('dataset/whole', number_data = 8000, start = 4213)
+        self.generate_dataset('dataset/whole', number_data = 8000, start = 374)
 
 
     def generate_dataset(self, dir, number_data, start):

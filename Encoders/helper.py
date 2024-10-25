@@ -648,17 +648,17 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx):
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
         
-        if stroke[7] != 0 and stroke[8] == 0:
+        if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
             # Circle face
             x_values, y_values, z_values = plot_circle(stroke)
-
             ax.plot(x_values, y_values, z_values, color='blue')
+            continue
 
         if stroke[7] != 0 and stroke[8] != 0:
             # Arc
             x_values, y_values, z_values = plot_arc(stroke)
-
             ax.plot(x_values, y_values, z_values, color='blue')
+            continue
 
         else:
             # Plot the stroke
@@ -673,11 +673,13 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx):
                 # Circle
                 x_values, y_values, z_values = plot_circle(stroke)
                 ax.plot(x_values, y_values, z_values, color='red')
+                continue
             
             if stroke[7] != 0 and stroke[8] != 0:
                 # Arc
                 x_values, y_values, z_values = plot_arc(stroke)
                 ax.plot(x_values, y_values, z_values, color='red')
+                continue
 
             else:
                 start, end = stroke[:3], stroke[3:6]

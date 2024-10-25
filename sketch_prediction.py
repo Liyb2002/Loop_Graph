@@ -282,9 +282,9 @@ def train():
 
 
 def eval():
-    load_models()
+    # load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -343,7 +343,7 @@ def eval():
         # Encoders.helper.vis_brep(final_brep_edges)
         all_selected_loops_idx = [idx for idx, value in enumerate(all_loop_chosen_mask) if value != 0]
 
-        # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, all_selected_loops_idx )
+        Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, all_selected_loops_idx )
 
         # Prepare the pair
         gnn_graph.to_device_withPadding(device)
@@ -433,4 +433,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()
