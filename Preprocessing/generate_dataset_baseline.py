@@ -15,6 +15,7 @@ import pickle
 import torch
 import numpy as np
 import threading
+import re
 
 class dataset_generator():
 
@@ -23,10 +24,32 @@ class dataset_generator():
         #     shutil.rmtree('dataset')
         # os.makedirs('dataset', exist_ok=True)
 
+        self.dataset_name = 'dataset/whole'
+        print("start idx , ", self.compute_start_idx())
         # self.generate_dataset('dataset/messy_order_eval', number_data = 500, start = 110)
         # self.generate_dataset('dataset/messy_order', number_data = 6500, start = 5260)
         # self.generate_dataset('dataset/test', number_data = 10, start = 0)
-        self.generate_dataset('dataset/whole', number_data = 8000, start = 374)
+        self.generate_dataset(self.dataset_name, number_data = 8000, start = self.compute_start_idx())
+    
+
+    def compute_start_idx(self):
+        data_path = os.path.join(os.getcwd(), self.dataset_name)
+        data_dirs = [d for d in os.listdir(data_path) if os.path.isdir(os.path.join(data_path, d))]
+
+        pattern = re.compile(r'.*_(\d+)$')
+        
+        largest_number = 0
+        
+        # List all directories and retrieve the number at the end of the format
+        for d in os.listdir(data_path):
+            if os.path.isdir(os.path.join(data_path, d)):
+                match = pattern.match(d)
+                if match:
+                    number = int(match.group(1))  # Extract the number
+                    largest_number = max(largest_number, number)  # Keep track of the largest number
+
+        
+        return max(largest_number-1, 0)
 
 
     def generate_dataset(self, dir, number_data, start):
