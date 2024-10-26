@@ -113,10 +113,16 @@ class Chamfer_Decoder(nn.Module):
         return torch.sigmoid(self.decoder(x_dict['stroke']))
 
 
+
 class Program_Decoder(nn.Module):
     def __init__(self, method_type, embed_dim=128, num_heads=8, ff_dim=256, num_classes=10, dropout=0.1):
         super(Program_Decoder, self).__init__()
+        # Cross-attention layer
         self.cross_attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout)
+        # Self-attention layer after cross-attention
+        self.self_attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout)
+        
+        # Feed-forward layers and normalization
         self.ff = nn.Sequential(
             nn.Linear(embed_dim, ff_dim),
             nn.ReLU(),
@@ -124,9 +130,12 @@ class Program_Decoder(nn.Module):
         )
         self.norm1 = nn.LayerNorm(embed_dim)
         self.norm2 = nn.LayerNorm(embed_dim)
+        self.norm3 = nn.LayerNorm(embed_dim)  # Normalization after self-attention
+        
         self.dropout = nn.Dropout(dropout)
         self.classifier = nn.Linear(embed_dim, num_classes)
 
+        # Program encoder
         self.program_encoder = ProgramEncoder()
         self.method_type = method_type
 
@@ -136,37 +145,33 @@ class Program_Decoder(nn.Module):
 
         if self.method_type == 'stroke':
             num_strokes = x_dict['stroke'].shape[0]
-            batch_size = max(1, num_strokes // 200)  # Ensure batch_size is at least 1
-            node_features = x_dict['stroke'].view(batch_size, min(200, num_strokes), 128)
+            batch_size = max(1, num_strokes // 400)  # Ensure batch_size is at least 1
+            node_features = x_dict['stroke'].view(batch_size, min(400, num_strokes), 128)
             
         elif self.method_type == 'loop':
             num_loops = x_dict['loop'].shape[0]
-            batch_size = max(1, num_loops // 200)  # Ensure batch_size is at least 1
-            node_features = x_dict['loop'].view(batch_size, min(200, num_loops), 128)
+            batch_size = max(1, num_loops // 400)  # Ensure batch_size is at least 1
+            node_features = x_dict['loop'].view(batch_size, min(400, num_loops), 128)
  
 
         # Transpose for MultiheadAttention: (seq_len, batch_size, embed_dim)
         program_embedding = program_embedding.transpose(0, 1)  # (20, 16, 128)
-        node_features = node_features.transpose(0, 1)  # (200, 16, 128)
+        node_features = node_features.transpose(0, 1)  # (400, 16, 128)
 
-        # Perform cross-attention between program_embedding (query) and stroke_features (key, value)
         attn_output, _ = self.cross_attn(program_embedding, node_features, node_features)
-
-        # Add residual connection and normalize
         out = self.norm1(program_embedding + attn_output)
 
-        # Apply feed-forward layer with residual connection and normalization
-        ff_output = self.ff(out)
-        out = self.norm2(out + ff_output)
+        self_attn_output, _ = self.self_attn(out, out, out)
+        out = self.norm2(out + self_attn_output)
 
-        # Apply dropout for regularization
+        ff_output = self.ff(out)
+        out = self.norm3(out + ff_output)
+
         out = self.dropout(out)
 
-        # Pool the output (e.g., mean over the sequence) before classification
-        out_mean = out.mean(dim=0)  # Mean over the sequence dimension (seq_len)
+        cls_output = out[0, :, :]
 
-        # Final classification logits
-        logits = self.classifier(out_mean)
+        logits = self.classifier(cls_output)
 
         return logits
 

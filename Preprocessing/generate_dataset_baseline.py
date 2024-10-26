@@ -22,14 +22,11 @@ class dataset_generator():
     def __init__(self):
         # if os.path.exists('dataset'):
         #     shutil.rmtree('dataset')
-        # os.makedirs('dataset', exist_ok=True)
 
-        self.dataset_name = 'dataset/whole'
-        print("start idx , ", self.compute_start_idx())
-        # self.generate_dataset('dataset/messy_order_eval', number_data = 500, start = 110)
-        # self.generate_dataset('dataset/messy_order', number_data = 6500, start = 5260)
-        # self.generate_dataset('dataset/test', number_data = 10, start = 0)
-        self.generate_dataset(self.dataset_name, number_data = 8000, start = self.compute_start_idx())
+        self.dataset_name = 'dataset/test'
+        os.makedirs(self.dataset_name, exist_ok=True)
+
+        self.generate_dataset(self.dataset_name, number_data = 10, start =self.compute_start_idx())
     
 
     def compute_start_idx(self):

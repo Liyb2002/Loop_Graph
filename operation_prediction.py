@@ -84,7 +84,7 @@ def compute_accuracy(output_stroke, output_loop, program_gt_batch):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/fillet')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0

@@ -60,7 +60,7 @@ class SketchLoopGraph(HeteroData):
 
     def padding(self):
     
-        target_shape = (200, 11)
+        target_shape = (400, 11)
         
         for node_type in self.node_types:
             if 'x' in self[node_type]:
@@ -69,7 +69,7 @@ class SketchLoopGraph(HeteroData):
 
                 # Check if padding is needed
                 if current_shape[0] < target_shape[0]:
-                    # Pad to (200, 11) with -1
+                    # Pad to (400, 11) with -1
                     pad_size = (0, target_shape[1] - current_shape[1], 0, target_shape[0] - current_shape[0])  # (pad_last_dim, pad_first_dim, pad_dim_for_nodes)
                     x_padded = torch.nn.functional.pad(x, pad_size, mode='constant', value=-1)
                     self[node_type].x = x_padded
@@ -79,8 +79,8 @@ class SketchLoopGraph(HeteroData):
         
 
     def to_device_withPadding(self, device):
-        # Target shape (200, 11)
-        target_shape = (200, 11)
+        # Target shape (400, 11)
+        target_shape = (400, 11)
         
         for node_type in self.node_types:
             if 'x' in self[node_type]:
@@ -89,7 +89,7 @@ class SketchLoopGraph(HeteroData):
 
                 # Check if padding is needed
                 if current_shape[0] < target_shape[0]:
-                    # Pad to (200, 11) with -1
+                    # Pad to (400, 11) with -1
                     pad_size = (0, target_shape[1] - current_shape[1], 0, target_shape[0] - current_shape[0])  # (pad_last_dim, pad_first_dim, pad_dim_for_nodes)
                     x_padded = torch.nn.functional.pad(x, pad_size, mode='constant', value=-1)
                     self[node_type].x = x_padded

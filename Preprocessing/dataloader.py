@@ -80,7 +80,7 @@ class Program_Graph_Dataset(Dataset):
 
 
 
-def pad_masks(mask, target_size=(200, 1)):
+def pad_masks(mask, target_size=(400, 1)):
     num_loops = mask.shape[0]
     if num_loops < target_size[0]:
         pad_size = target_size[0] - num_loops

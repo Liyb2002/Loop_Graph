@@ -110,7 +110,7 @@ def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, padded_size
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0

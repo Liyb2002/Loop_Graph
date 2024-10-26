@@ -138,6 +138,7 @@ def program_mapping(program, device):
         'sketch': 1,
         'extrude': 2,
         'fillet': 3,
+        'chamfer': 4,
         'start': 9, 
         'terminate': 0,
         'padding': 10
@@ -159,6 +160,9 @@ def program_gt_mapping(program, device):
     operation_map = {
         'sketch': 1,
         'extrude': 2,
+        'fillet': 3,
+        'chamfer': 4,
+        'start': 9, 
         'terminate': 0,
         'padding': 10
     }
