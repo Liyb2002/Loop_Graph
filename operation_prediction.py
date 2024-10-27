@@ -17,19 +17,18 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from sklearn.metrics import confusion_matrix
 
 program_encoder = Encoders.gnn.gnn.ProgramEncoder()
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
-graph_decoder_stroke = Encoders.gnn.gnn.Program_Decoder('stroke')
-graph_decoder_loop = Encoders.gnn.gnn.Program_Decoder('loop')
+graph_decoder= Encoders.gnn.gnn.Program_Decoder()
 
 program_encoder.to(device)
 graph_encoder.to(device)
-graph_decoder_stroke.to(device)
-graph_decoder_loop.to(device)
+graph_decoder.to(device)
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(list(program_encoder.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder_stroke.parameters()) + list(graph_decoder_loop.parameters()), lr=0.0004)
+optimizer = optim.Adam(list(program_encoder.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
 
 # ------------------------------------------------------------------------------# 
 
@@ -40,24 +39,22 @@ os.makedirs(save_dir, exist_ok=True)
 def load_models():
     program_encoder.load_state_dict(torch.load(os.path.join(save_dir, 'program_encoder.pth')))
     graph_encoder.load_state_dict(torch.load(os.path.join(save_dir, 'graph_encoder.pth')))
-    graph_decoder_stroke.load_state_dict(torch.load(os.path.join(save_dir, 'graph_decoder.pth')))
-    graph_decoder_loop.load_state_dict(torch.load(os.path.join(save_dir, 'graph_decoder.pth')))
+    graph_decoder.load_state_dict(torch.load(os.path.join(save_dir, 'graph_decoder.pth')))
 
 
 def save_models():
     torch.save(program_encoder.state_dict(), os.path.join(save_dir, 'program_encoder.pth'))
     torch.save(graph_encoder.state_dict(), os.path.join(save_dir, 'graph_encoder.pth'))
-    torch.save(graph_decoder_stroke.state_dict(), os.path.join(save_dir, 'graph_decoder.pth'))
-    torch.save(graph_decoder_loop.state_dict(), os.path.join(save_dir, 'graph_decoder.pth'))
+    torch.save(graph_decoder.state_dict(), os.path.join(save_dir, 'graph_decoder.pth'))
 
 
 # ------------------------------------------------------------------------------# 
 
 
 
-def compute_accuracy(output_stroke, output_loop, program_gt_batch):
+def compute_accuracy(output, program_gt_batch):
     # Get the predicted classes from the output
-    predicted_classes = torch.argmax(output_stroke + output_loop, dim=1)
+    predicted_classes = torch.argmax(output, dim=1)
     
     # Flatten the ground truth labels for comparison
     program_gt_batch = program_gt_batch.view(-1)
@@ -77,6 +74,62 @@ def compute_accuracy(output_stroke, output_loop, program_gt_batch):
     
     # Output the total and the correct number of predictions
     return total, correct_predictions
+
+
+def compute_accuracy_confusionMatrix(output, program_gt_batch):
+    # Get the predicted classes from the output
+    predicted_classes = torch.argmax(output, dim=1)
+    
+    # Flatten the ground truth labels for comparison
+    program_gt_batch = program_gt_batch.view(-1)
+    
+    # Calculate the number of correct predictions
+    correct_predictions = (predicted_classes == program_gt_batch).sum().item()
+    
+    # Calculate the total number of valid cases
+    total = program_gt_batch.shape[0]
+    
+    # Compute the confusion matrix for this batch
+    num_classes = output.shape[1]  # Dynamically retrieve the number of categories
+    conf_matrix = confusion_matrix(program_gt_batch.cpu().numpy(), predicted_classes.cpu().numpy(), labels=range(num_classes))
+    
+    return total, correct_predictions, conf_matrix
+
+
+def compute_accuracy_eval(output,  program_gt_batch, program_existing_batch):
+    # Get the predicted classes from the output
+    predicted_classes = torch.argmax(output, dim=1)
+    
+    # Flatten the ground truth labels for comparison
+    program_gt_batch = program_gt_batch.view(-1)
+    
+    # Create a mask to ignore cases where the ground truth is 2
+    valid_mask = (program_gt_batch != 2)
+    
+    # Apply the mask to both the predicted and ground truth tensors
+    filtered_program_existing_batch = program_existing_batch[valid_mask]
+    filtered_predicted_classes = predicted_classes[valid_mask]
+    filtered_program_gt_batch = program_gt_batch[valid_mask]
+    
+    # Calculate the number of correct predictions
+    correct_predictions = (filtered_predicted_classes == filtered_program_gt_batch).sum().item()
+    
+    # Calculate the total number of valid cases
+    total = filtered_program_gt_batch.shape[0]
+    
+    # Output the total and the correct number of predictions
+    return total, correct_predictions
+
+
+def trim_confusion_matrix(conf_matrix):
+    # Find rows and columns that are all zero
+    non_zero_rows = conf_matrix.sum(dim=1) != 0
+    non_zero_cols = conf_matrix.sum(dim=0) != 0
+    
+    # Trim the matrix by removing zero rows and columns
+    trimmed_matrix = conf_matrix[non_zero_rows][:, non_zero_cols]
+    
+    return trimmed_matrix
 
 
 # ------------------------------------------------------------------------------# 
@@ -117,7 +170,6 @@ def train():
         
         existing_programs.append(Encoders.helper.program_mapping(program[:-1], device))
         gt_programs.append(Encoders.helper.program_gt_mapping([program[-1]], device))
-
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -165,8 +217,7 @@ def train():
 
         program_encoder.train()
         graph_encoder.train()
-        graph_decoder_stroke.train()
-        graph_decoder_loop.train()
+        graph_decoder.train()
 
         train_correct = 0
         train_total = 0
@@ -181,12 +232,11 @@ def train():
             optimizer.zero_grad()
 
             x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-            output_loop = graph_decoder_loop(x_dict, program_existing_batch)
-            output_stroke = graph_decoder_loop(x_dict, program_existing_batch)
+            output = graph_decoder(x_dict, program_existing_batch)
 
-            loss = criterion(output_loop, program_gt_batch.long()) + criterion(output_stroke, program_gt_batch.long())
+            loss = criterion(output, program_gt_batch.long())
 
-            tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, program_gt_batch)
+            tempt_total, tempt_correct = compute_accuracy(output, program_gt_batch)
             train_correct += tempt_correct
             train_total += tempt_total
 
@@ -204,8 +254,7 @@ def train():
 
         program_encoder.eval()
         graph_encoder.eval()
-        graph_decoder_stroke.eval()
-        graph_decoder_loop.eval()
+        graph_decoder.eval()
         with torch.no_grad():
             total_iterations_val = min(len(graph_val_loader), len(program_val_existing_loader))
 
@@ -215,12 +264,11 @@ def train():
                                               total=total_iterations_val):
                 
                 x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-                output_loop = graph_decoder_loop(x_dict, program_existing_batch)
-                output_stroke = graph_decoder_loop(x_dict, program_existing_batch)
+                output = graph_decoder(x_dict, program_existing_batch)
 
-                val_loss += criterion(output_loop, program_gt_batch.long()) + criterion(output_stroke, program_gt_batch.long())
+                val_loss += criterion(output, program_gt_batch.long())
 
-                tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, program_gt_batch)
+                tempt_total, tempt_correct = compute_accuracy(output, program_gt_batch)
                 val_correct += tempt_correct
                 val_total += tempt_total
 
@@ -241,7 +289,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -295,11 +343,13 @@ def eval():
     # Eval
     program_encoder.eval()
     graph_encoder.eval()
-    graph_decoder_stroke.eval()
-    graph_decoder_loop.eval()
+    graph_decoder.eval()
 
     eval_correct = 0
     eval_total = 0
+    num_classes = None
+    all_confusion_matrices = None
+
 
     with torch.no_grad():
         total_iterations = min(len(graph_train_loader), len(program_train_existing_loader))
@@ -310,20 +360,31 @@ def eval():
                         
 
             x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
-            output_loop = graph_decoder_loop(x_dict, program_existing_batch)
-            output_stroke = graph_decoder_loop(x_dict, program_existing_batch)
+            output = graph_decoder(x_dict, program_existing_batch)
 
-            loss = criterion(output_loop, program_gt_batch.long()) + criterion(output_stroke, program_gt_batch.long())
+            if num_classes is None:
+                num_classes = output.shape[1]
+                all_confusion_matrices = torch.zeros((num_classes, num_classes), dtype=torch.int32)
 
-            tempt_total, tempt_correct = compute_accuracy(output_stroke, output_loop, program_gt_batch)
+            # Calculate the loss (optional, for logging purposes)
+            loss = criterion(output, program_gt_batch.long())
+
+            # Calculate accuracy and confusion matrix for this batch
+            tempt_total, tempt_correct, conf_matrix = compute_accuracy_confusionMatrix(output, program_gt_batch)
             eval_correct += tempt_correct
             eval_total += tempt_total
 
+            # Accumulate the confusion matrix for the current batch
+            all_confusion_matrices += torch.tensor(conf_matrix)
 
-
-    # Calculate and print overall average accuracy
+    # Calculate overall accuracy
     overall_accuracy = eval_correct / eval_total
     print(f"Overall Average Accuracy: {overall_accuracy:.4f}")
+
+    trimmed_confusion_matrix = trim_confusion_matrix(all_confusion_matrices)
+    # Print or return the accumulated confusion matrix
+    print("Overall Confusion Matrix:")
+    print(trimmed_confusion_matrix)
 
 
 
@@ -331,4 +392,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

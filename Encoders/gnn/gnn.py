@@ -115,12 +115,10 @@ class Chamfer_Decoder(nn.Module):
 
 
 class Program_Decoder(nn.Module):
-    def __init__(self, method_type, embed_dim=128, num_heads=8, ff_dim=256, num_classes=10, dropout=0.1):
+    def __init__(self, embed_dim=128, num_heads=8, ff_dim=256, num_classes=10, dropout=0.1):
         super(Program_Decoder, self).__init__()
         # Cross-attention layer
         self.cross_attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout)
-        # Self-attention layer after cross-attention
-        self.self_attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout)
         
         # Feed-forward layers and normalization
         self.ff = nn.Sequential(
@@ -130,51 +128,55 @@ class Program_Decoder(nn.Module):
         )
         self.norm1 = nn.LayerNorm(embed_dim)
         self.norm2 = nn.LayerNorm(embed_dim)
-        self.norm3 = nn.LayerNorm(embed_dim)  # Normalization after self-attention
         
         self.dropout = nn.Dropout(dropout)
-        self.classifier = nn.Linear(embed_dim, num_classes)
-
+        self.classifier = nn.Linear(embed_dim * 2, num_classes)  # Adjusting for concatenated output
+        
         # Program encoder
         self.program_encoder = ProgramEncoder()
-        self.method_type = method_type
 
     def forward(self, x_dict, program_tokens):
         # Encode the program tokens to get their embeddings
         program_embedding = self.program_encoder(program_tokens)  # (batch_size, seq_len, embed_dim)
 
-        if self.method_type == 'stroke':
-            num_strokes = x_dict['stroke'].shape[0]
-            batch_size = max(1, num_strokes // 400)  # Ensure batch_size is at least 1
-            node_features = x_dict['stroke'].view(batch_size, min(400, num_strokes), 128)
-            
-        elif self.method_type == 'loop':
-            num_loops = x_dict['loop'].shape[0]
-            batch_size = max(1, num_loops // 400)  # Ensure batch_size is at least 1
-            node_features = x_dict['loop'].view(batch_size, min(400, num_loops), 128)
- 
+        # Process stroke node embeddings
+        num_strokes = x_dict['stroke'].shape[0]
+        batch_size_stroke = max(1, num_strokes // 400)  # Ensure batch_size is at least 1
+        node_features_stroke = x_dict['stroke'].view(batch_size_stroke, min(400, num_strokes), 128)
+        node_features_stroke = node_features_stroke.transpose(0, 1)  # Transpose for MultiheadAttention
 
-        # Transpose for MultiheadAttention: (seq_len, batch_size, embed_dim)
-        program_embedding = program_embedding.transpose(0, 1)  # (20, 16, 128)
-        node_features = node_features.transpose(0, 1)  # (400, 16, 128)
+        # Process loop node embeddings
+        num_loops = x_dict['loop'].shape[0]
+        batch_size_loop = max(1, num_loops // 400)  # Ensure batch_size is at least 1
+        node_features_loop = x_dict['loop'].view(batch_size_loop, min(400, num_loops), 128)
+        node_features_loop = node_features_loop.transpose(0, 1)  # Transpose for MultiheadAttention
 
-        attn_output, _ = self.cross_attn(program_embedding, node_features, node_features)
-        out = self.norm1(program_embedding + attn_output)
+        # Transpose program embeddings
+        program_embedding = program_embedding.transpose(0, 1)  # (seq_len, batch_size, embed_dim)
 
-        self_attn_output, _ = self.self_attn(out, out, out)
-        out = self.norm2(out + self_attn_output)
+        # Cross-attention for stroke nodes
+        attn_output_stroke, _ = self.cross_attn(program_embedding, node_features_stroke, node_features_stroke)
+        out_stroke = self.norm1(program_embedding + attn_output_stroke)
+        ff_output_stroke = self.ff(out_stroke)
+        out_stroke = self.norm2(out_stroke + ff_output_stroke)
+        out_stroke = self.dropout(out_stroke)
+        out_mean_stroke = out_stroke.mean(dim=0)  # Averaging over the sequence dimension
 
-        ff_output = self.ff(out)
-        out = self.norm3(out + ff_output)
+        # Cross-attention for loop nodes
+        attn_output_loop, _ = self.cross_attn(program_embedding, node_features_loop, node_features_loop)
+        out_loop = self.norm1(program_embedding + attn_output_loop)
+        ff_output_loop = self.ff(out_loop)
+        out_loop = self.norm2(out_loop + ff_output_loop)
+        out_loop = self.dropout(out_loop)
+        out_mean_loop = out_loop.mean(dim=0)  # Averaging over the sequence dimension
 
-        out = self.dropout(out)
+        # Concatenate outputs from stroke and loop
+        combined_output = torch.cat([out_mean_stroke, out_mean_loop], dim=-1)
 
-        cls_output = out[0, :, :]
-
-        logits = self.classifier(cls_output)
+        # Classification
+        logits = self.classifier(combined_output)
 
         return logits
-
 
 #---------------------------------- Loss Function ----------------------------------#
 
