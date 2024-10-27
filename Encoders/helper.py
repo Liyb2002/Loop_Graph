@@ -18,7 +18,7 @@ def get_all_operation_strokes(stroke_operations_order_matrix, program_whole, ope
 
     # Check if we found any valid indices
     if len(ks) == 0:
-        raise ValueError(f"Operation '{operation}' not found in program_whole.")
+        return None
 
     # Squeeze the matrix to remove any singleton dimensions at the 0-th axis
     squeezed_matrix = stroke_operations_order_matrix.squeeze(0)

@@ -48,12 +48,12 @@ def save_models():
 
 
 def compute_accuracy(valid_output, valid_batch_masks):
-    batch_size = valid_output.shape[0] // 200
+    batch_size = valid_output.shape[0] // 400
     correct = 0
 
     for i in range(batch_size):
-        output_slice = valid_output[i * 200:(i + 1) * 200]
-        mask_slice = valid_batch_masks[i * 200:(i + 1) * 200]
+        output_slice = valid_output[i * 400:(i + 1) * 400]
+        mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
 
         condition_1 = (mask_slice == 1) & (output_slice > 0.5)
         condition_2 = (mask_slice == 0) & (output_slice < 0.5)
@@ -66,42 +66,54 @@ def compute_accuracy(valid_output, valid_batch_masks):
 
 
 
-def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, padded_size=200):
+def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
+    batch_size = valid_output.shape[0] // 400
     correct = 0
-    total_loops = loop_selection_mask.shape[0] // padded_size  # Determine how many (200,1) matrices there are
 
-    # Loop through each matrix of size (200, 1)
-    for i in range(total_loops):
-        start_idx = i * padded_size
-        end_idx = start_idx + padded_size
+    for i in range(batch_size):
+        output_slice = valid_output[i * 400:(i + 1) * 400]
+        mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
+        stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 400:(i + 1) * 400]
 
-        # Extract the (200, 1) slice for both output and loop_selection_mask
-        output_slice = output[start_idx:end_idx]
-        mask_slice = loop_selection_mask[start_idx:end_idx]
-        stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 200:(i + 1) * 200]
-
-
-        # Evaluate conditions for this slice
         condition_1 = (mask_slice == 1) & (output_slice > 0.5)
         condition_2 = (mask_slice == 0) & (output_slice < 0.5)
 
-        # Print output values where loop_selection_mask == 1 for the current slice
-        mask_1_indices = (mask_slice == 1).nonzero(as_tuple=True)
-        # if mask_1_indices[0].numel() > 0:
-        #     print(f"Output values where loop_selection_mask == 1 for slice {i}:")
-        #     print(output_slice[mask_1_indices])
 
-        # Check if all conditions are met for this slice
         if torch.all(condition_1 | condition_2):
+            correct += 1
+
+        else:
+            predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+            gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
+
+
+    return correct
+
+
+def compute_accuracy_eval_whole(valid_output, valid_batch_masks, hetero_batch):
+    batch_size = valid_output.shape[0] // 400
+    correct = 0
+
+    for i in range(batch_size):
+        output_slice = valid_output[i * 400:(i + 1) * 400]
+        mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
+        stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 400:(i + 1) * 400]
+
+        predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of ground truth strokes
+
+        # Check if all predicted indices are in ground truth indices
+        if torch.all(torch.isin(predicted_stroke_idx, gt_stroke_idx)):
             correct += 1
         else:
-            pass
-            # extrude_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-            # Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), extrude_stroke_idx)
-
+            # Visualization for debugging
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
 
     return correct
-
 
 # ------------------------------------------------------------------------------# 
 
@@ -282,7 +294,7 @@ def eval():
     batch_size = 16
 
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole_eval')
     print(f"Total number of shape data: {len(dataset)}")
 
     graphs = []
@@ -293,10 +305,16 @@ def eval():
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
-        if program[-1] != 'fillet'or len(program) > stroke_operations_order_matrix.shape[1]:
+        if program[-1] != 'chamfer'or len(program) > stroke_operations_order_matrix.shape[1]:
             continue
         
-        kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
+        kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)        
+        all_chamfer_strokes = Encoders.helper.get_all_operation_strokes(stroke_operations_order_matrix, program_whole, 'chamfer')
+        
+        if kth_operation is None or all_chamfer_strokes is None:
+            continue
+
+
         chamfer_stroke_idx = (kth_operation == 1).nonzero(as_tuple=True)[0] 
 
 
@@ -316,6 +334,7 @@ def eval():
 
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
+
     
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
 
@@ -355,7 +374,7 @@ def eval():
             valid_batch_masks = batch_masks * valid_mask
 
 
-            correct += compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch)           
+            correct += compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch)    
             total += batch_size
 
             # Compute loss
@@ -365,10 +384,10 @@ def eval():
 
     # Calculate and print overall average accuracy
     overall_accuracy = correct / total
-    print(f"Overall Average Accuracy: {overall_accuracy:.2f}%")
+    print(f"Overall Average Accuracy: {overall_accuracy:.2f}")
 
 
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

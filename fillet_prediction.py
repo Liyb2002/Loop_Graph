@@ -66,38 +66,28 @@ def compute_accuracy(valid_output, valid_batch_masks):
 
 
 
-def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, padded_size=400):
+def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
+    batch_size = valid_output.shape[0] // 400
     correct = 0
-    total_loops = loop_selection_mask.shape[0] // padded_size  # Determine how many (400,1) matrices there are
 
-    # Loop through each matrix of size (400, 1)
-    for i in range(total_loops):
-        start_idx = i * padded_size
-        end_idx = start_idx + padded_size
-
-        # Extract the (400, 1) slice for both output and loop_selection_mask
-        output_slice = output[start_idx:end_idx]
-        mask_slice = loop_selection_mask[start_idx:end_idx]
+    for i in range(batch_size):
+        output_slice = valid_output[i * 400:(i + 1) * 400]
+        mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
         stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 400:(i + 1) * 400]
 
-
-        # Evaluate conditions for this slice
         condition_1 = (mask_slice == 1) & (output_slice > 0.5)
         condition_2 = (mask_slice == 0) & (output_slice < 0.5)
 
-        # Print output values where loop_selection_mask == 1 for the current slice
-        mask_1_indices = (mask_slice == 1).nonzero(as_tuple=True)
-        # if mask_1_indices[0].numel() > 0:
-        #     print(f"Output values where loop_selection_mask == 1 for slice {i}:")
-        #     print(output_slice[mask_1_indices])
 
-        # Check if all conditions are met for this slice
         if torch.all(condition_1 | condition_2):
             correct += 1
+
         else:
-            pass
-            # extrude_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-            # Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), extrude_stroke_idx)
+            predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+            gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
 
 
     return correct
@@ -281,7 +271,7 @@ def eval():
     batch_size = 16
 
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/fillet_eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole_eval')
     print(f"Total number of shape data: {len(dataset)}")
 
     graphs = []
@@ -316,6 +306,9 @@ def eval():
 
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
+
+        if len(graphs) > 200:
+            break
     
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
 
@@ -371,4 +364,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

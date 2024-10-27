@@ -46,12 +46,12 @@ def save_models():
 
 
 def compute_accuracy(valid_output, valid_batch_masks):
-    batch_size = valid_output.shape[0] // 200
+    batch_size = valid_output.shape[0] // 400
     correct = 0
 
     for i in range(batch_size):
-        output_slice = valid_output[i * 200:(i + 1) * 200]
-        mask_slice = valid_batch_masks[i * 200:(i + 1) * 200]
+        output_slice = valid_output[i * 400:(i + 1) * 400]
+        mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
 
         max_output_value, max_output_index = torch.max(output_slice, dim=0)
         max_mask_value, max_mask_index = torch.max(mask_slice, dim=0)
@@ -70,7 +70,7 @@ def compute_accuracy(valid_output, valid_batch_masks):
 
 def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
     # Infer batch size and sequence length from the shapes
-    batch_size = valid_output.shape[0] // 200
+    batch_size = valid_output.shape[0] // 400
 
     # Initialize counters for each category
     category_count = [0, 0, 0, 0]  # Tracks the number of batches in each category
@@ -79,10 +79,10 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
     for i in range(batch_size):
         # Slice for each example in the batch
 
-        output_slice = valid_output[i * 200:(i + 1) * 200]
-        mask_slice = valid_batch_masks[i * 200:(i + 1) * 200]
+        output_slice = valid_output[i * 400:(i + 1) * 400]
+        mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
         
-        stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 200:(i + 1) * 200]
+        stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 400:(i + 1) * 400]
         edge_features = hetero_batch.edge_index_dict['stroke', 'represents', 'loop']
         edge_features_slice = Encoders.helper.find_edge_features_slice(edge_features, i)
 
