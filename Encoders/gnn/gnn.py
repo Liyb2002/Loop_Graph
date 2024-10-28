@@ -119,7 +119,8 @@ class Program_Decoder(nn.Module):
         super(Program_Decoder, self).__init__()
         # Cross-attention layer
         self.cross_attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout)
-        
+        self.self_attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout)
+
         # Feed-forward layers and normalization
         self.ff = nn.Sequential(
             nn.Linear(embed_dim, ff_dim),
@@ -160,7 +161,8 @@ class Program_Decoder(nn.Module):
         ff_output_stroke = self.ff(out_stroke)
         out_stroke = self.norm2(out_stroke + ff_output_stroke)
         out_stroke = self.dropout(out_stroke)
-        out_mean_stroke = out_stroke.mean(dim=0)  # Averaging over the sequence dimension
+        cls_attn_stroke, _ = self.self_attn(out_stroke, out_stroke, out_stroke)
+        cls_stroke = out_stroke[0]  # Take the CLS token representation
 
         # Cross-attention for loop nodes
         attn_output_loop, _ = self.cross_attn(program_embedding, node_features_loop, node_features_loop)
@@ -168,10 +170,12 @@ class Program_Decoder(nn.Module):
         ff_output_loop = self.ff(out_loop)
         out_loop = self.norm2(out_loop + ff_output_loop)
         out_loop = self.dropout(out_loop)
-        out_mean_loop = out_loop.mean(dim=0)  # Averaging over the sequence dimension
+        cls_attn_loop, _ = self.self_attn(out_loop, out_loop, out_loop)
+
+        cls_loop = out_loop[0]  # Take the CLS token representation
 
         # Concatenate outputs from stroke and loop
-        combined_output = torch.cat([out_mean_stroke, out_mean_loop], dim=-1)
+        combined_output = torch.cat([cls_stroke, cls_loop], dim=-1)
 
         # Classification
         logits = self.classifier(combined_output)
@@ -197,14 +201,10 @@ class FocalLoss(nn.Module):
 
 
 class ProgramEncoder(nn.Module):
-    def __init__(self, vocab_size=20, embedding_dim=16, hidden_dim=128):
+    def __init__(self, vocab_size=20, embedding_dim=128):
         super(ProgramEncoder, self).__init__()
         # Set padding_idx to -1 to ignore -1 in embeddings
         self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=-1)
-        self.lstm = nn.LSTM(embedding_dim, hidden_dim, batch_first=True)
-        self.fc = nn.Linear(hidden_dim, hidden_dim)
-        
+
     def forward(self, x):
-        embedded = self.embedding(x)
-        lstm_out, _ = self.lstm(embedded)
-        return lstm_out
+        return self.embedding(x)

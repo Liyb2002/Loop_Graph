@@ -146,6 +146,7 @@ def program_mapping(program, device):
     
     # Map each operation in the program list to its corresponding value
     mapped_program = [operation_map.get(op, -1) for op in program] 
+    mapped_program.insert(0,9)
     
     for i in range (20 - len(mapped_program)):
         mapped_program.append(10)

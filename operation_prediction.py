@@ -28,7 +28,7 @@ graph_encoder.to(device)
 graph_decoder.to(device)
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(list(program_encoder.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
+optimizer = optim.Adam(list(program_encoder.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0002)
 
 # ------------------------------------------------------------------------------# 
 
@@ -141,7 +141,7 @@ def train():
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
-    epochs = 30
+    epochs = 80
     
     graphs = []
     existing_programs = []
@@ -170,6 +170,9 @@ def train():
         
         existing_programs.append(Encoders.helper.program_mapping(program[:-1], device))
         gt_programs.append(Encoders.helper.program_gt_mapping([program[-1]], device))
+
+        if len(graphs) > 20000:
+            break
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -289,7 +292,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -320,6 +323,10 @@ def eval():
         
         existing_programs.append(Encoders.helper.program_mapping(program[:-1], device))
         gt_tokens.append(Encoders.helper.program_gt_mapping([program[-1]], device))
+        
+
+        if len(graphs) > 200:
+            break
 
 
 
@@ -392,4 +399,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()
