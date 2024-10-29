@@ -344,6 +344,54 @@ def clean_mask(sketch_selection_mask, selected_loop_idx):
 
     return cleaned_mask
     
+# --------------------------------------------------------------------------- #
+
+
+def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
+    fillet_stroke_idx =  (fillet_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+
+    stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
+    fillet_strokes = stroke_features[fillet_stroke_idx]
+
+    print("fillet_strokes", fillet_strokes)
+
+
+# --------------------------------------------------------------------------- #
+
+
+
+def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
+    chamfer_stroke_idx = (chamfer_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+    stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7)
+    chamfer_strokes = stroke_features[chamfer_stroke_idx]
+
+    # Step 1: Extract all unique 3D points from chamfer_strokes
+    points = chamfer_strokes[:, :6].reshape(-1, 3)
+    chamfer_points = torch.unique(points, dim=0)
+
+    # Convert brep_edges to a PyTorch tensor
+    if isinstance(brep_edges, (np.ndarray, list)):
+        brep_edges = torch.tensor(brep_edges, dtype=points.dtype)
+
+    # Step 2 and 3: Iterate over brep_edges to find the matching edge
+    for edge in brep_edges:
+        edge_point1 = edge[:3]
+        edge_point2 = edge[3:6]
+        edge_mid_point = (edge_point1 + edge_point2) / 2
+
+        # Compute distances from edge_mid_point to all chamfer_points
+        distances = torch.norm(chamfer_points - edge_mid_point, dim=1)
+
+        # Check if all distances are the same within a small tolerance
+        if torch.allclose(distances, distances[0], atol=1e-6):
+            # Compute chamfer_amount
+            chamfer_point = chamfer_points[0]
+            dist1 = torch.norm(edge_point1 - chamfer_point)
+            dist2 = torch.norm(edge_point2 - chamfer_point)
+            chamfer_amount = min(dist1.item(), dist2.item())
+            return edge, chamfer_amount
+
+    return None, None
 
 # --------------------------------------------------------------------------- #
 

@@ -86,7 +86,7 @@ def create_face_node(face):
 
 
 # What this code does:
-# 1)Circles: Center (3 value), normal (3 value), 0, radius
+# 1)Cicles: Center (3 value), normal (3 value), 0, radius
 # 2)Cylinder face: Center (3 value), normal (3 value), height, radius
 def create_face_node_gnn(face):
     
@@ -169,7 +169,10 @@ def create_face_node_gnn(face):
     return circle_features
 
 
-    
+
+# What this code does:
+# 1)Arc: Point_1 (3 value), Point_2 (3 value), Center (3 value)
+# 2)Cylinder face: Point_1 (3 value), Point_2 (3 value)
 def create_edge_node(edge):
 
     # Get the underlying geometry of the edge
