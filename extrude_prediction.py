@@ -49,12 +49,12 @@ def save_models():
 
 
 def compute_accuracy(valid_output, valid_batch_masks):
-    batch_size = valid_output.shape[0] // 200
+    batch_size = valid_output.shape[0] // 400
     correct = 0
 
     for i in range(batch_size):
-        output_slice = valid_output[i * 200:(i + 1) * 200]
-        mask_slice = valid_batch_masks[i * 200:(i + 1) * 200]
+        output_slice = valid_output[i * 400:(i + 1) * 400]
+        mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
 
         condition_1 = (mask_slice == 1) & (output_slice > 0.5)
         condition_2 = (mask_slice == 0) & (output_slice < 0.5)
@@ -67,19 +67,19 @@ def compute_accuracy(valid_output, valid_batch_masks):
 
 
 
-def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, padded_size=200):
+def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, padded_size=400):
     correct = 0
-    total_loops = loop_selection_mask.shape[0] // padded_size  # Determine how many (200,1) matrices there are
+    total_loops = loop_selection_mask.shape[0] // padded_size  # Determine how many (400,1) matrices there are
 
-    # Loop through each matrix of size (200, 1)
+    # Loop through each matrix of size (400, 1)
     for i in range(total_loops):
         start_idx = i * padded_size
         end_idx = start_idx + padded_size
 
-        # Extract the (200, 1) slice for both output and loop_selection_mask
+        # Extract the (400, 1) slice for both output and loop_selection_mask
         output_slice = output[start_idx:end_idx]
         mask_slice = loop_selection_mask[start_idx:end_idx]
-        stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 200:(i + 1) * 200]
+        stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 400:(i + 1) * 400]
 
 
         # Evaluate conditions for this slice
@@ -302,7 +302,7 @@ def eval():
     batch_size = 16
 
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/messy_order_eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole_eval')
     print(f"Total number of shape data: {len(dataset)}")
 
     graphs = []
@@ -337,6 +337,9 @@ def eval():
 
         if not (extrude_selection_mask == 1).any() and not (sketch_loop_selection_mask == 1).any():
             continue
+
+        if len(graphs) > 400:
+            break
 
 
 
@@ -414,4 +417,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-# train()
+train()

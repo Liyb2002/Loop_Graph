@@ -32,8 +32,8 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole_eval', return_data_path=True)
-data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/generate_CAD', return_data_path=True)
+data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 
 # --------------------- Directory --------------------- #
@@ -56,7 +56,7 @@ def predict_sketch(gnn_graph):
     sketch_selection_mask = sketch_graph_decoder(x_dict)
 
     selected_loop_idx = whole_process_helper.helper.find_valid_sketch(gnn_graph, sketch_selection_mask)
-    # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
+    Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
 
     return selected_loop_idx, sketch_selection_mask
 
@@ -85,14 +85,73 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
     extrude_selection_mask = extrude_graph_decoder(x_dict)
     extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
     
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
     return extrude_selection_mask
 
 def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges):
     extrude_selection_mask = predict_extrude(gnn_graph, sketch_selection_mask)
     extrude_amount, extrude_direction = whole_process_helper.helper.get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges)
-    
+    normalize_vector_one_line = lambda v: (np.array(v) / np.linalg.norm(v)).tolist() if np.linalg.norm(v) != 0 else [0, 0, 0]
+    extrude_direction = normalize_vector_one_line(extrude_direction)
+
     return extrude_amount, extrude_direction
+
+
+
+# --------------------- Fillet Network --------------------- #
+fillet_graph_encoder = Encoders.gnn.gnn.SemanticModule()
+fillet_graph_decoder = Encoders.gnn.gnn.Fillet_Decoder()
+fillet_dir = os.path.join(current_dir, 'checkpoints', 'fillet_prediction')
+fillet_graph_encoder.eval()
+fillet_graph_decoder.eval()
+fillet_graph_encoder.load_state_dict(torch.load(os.path.join(fillet_dir, 'graph_encoder.pth'), weights_only=True))
+fillet_graph_decoder.load_state_dict(torch.load(os.path.join(fillet_dir, 'graph_decoder.pth'), weights_only=True))
+
+
+def predict_fillet(gnn_graph):
+    x_dict = fillet_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+    fillet_selection_mask = fillet_graph_decoder(x_dict)
+
+    fillet_stroke_idx =  (fillet_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+    
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
+    return fillet_selection_mask
+
+
+def do_fillet(gnn_graph, brep_edges):
+    fillet_selection_mask = predict_fillet(gnn_graph)
+    whole_process_helper.helper.get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges)
+
+
+
+
+
+# --------------------- Chamfer Network --------------------- #
+chamfer_graph_encoder = Encoders.gnn.gnn.SemanticModule()
+chamfer_graph_decoder = Encoders.gnn.gnn.Chamfer_Decoder()
+chanfer_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction')
+chamfer_graph_encoder.eval()
+chamfer_graph_decoder.eval()
+chamfer_graph_encoder.load_state_dict(torch.load(os.path.join(chanfer_dir, 'graph_encoder.pth'), weights_only=True))
+chamfer_graph_decoder.load_state_dict(torch.load(os.path.join(chanfer_dir, 'graph_decoder.pth'), weights_only=True))
+
+
+def predict_chamfer(gnn_graph):
+    x_dict = chamfer_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+    chamfer_selection_mask = chamfer_graph_decoder(x_dict)
+
+    chamfer_stroke_idx =  (chamfer_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+    
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
+    return chamfer_selection_mask
+
+
+def do_chamfer(gnn_graph, brep_edges):
+    chamfer_selection_mask = predict_chamfer(gnn_graph)
+    chamfer_edge, chamfer_amount = whole_process_helper.helper.get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges)
+
+    return chamfer_edge, chamfer_amount
+
 
 
 
@@ -208,7 +267,7 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
             stroke_to_edge
         )
         gnn_graph.ensure_prev_selected_loops(selected_loop_indices)
-        
+                
         if len(past_programs) > 20:
             break
         if current_op == 0 and (not gnn_graph._has_circle_shape()) and (not gnn_graph._has_unused_circles()):
@@ -217,23 +276,38 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
 
         Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
         
+        # 3) Build, based on operation
 
-        # 3) Build operations
+        # Build Sketch
+        if current_op == 1:
+            print("Do sketch")
+            sketch_selection_mask, sketch_points, normal, selected_loop_idx = do_sketch(gnn_graph)
+            selected_loop_indices.append(selected_loop_idx)
+            if sketch_points.shape[0] == 1:
+                # do circle sketch
+                cur__brep_class.regular_sketch_circle(sketch_points[0, 3:6].tolist(), sketch_points[0, 7].item(), sketch_points[0, :3].tolist())
+            else: 
+                cur__brep_class._sketch_op(sketch_points, normal, sketch_points)
 
-        # 3.1) Do sketch
-        sketch_selection_mask, sketch_points, normal, selected_loop_idx = do_sketch(gnn_graph)
-        selected_loop_indices.append(selected_loop_idx)
 
-        if sketch_points.shape[0] == 1:
-            # do circle sketch
-            cur__brep_class.regular_sketch_circle(sketch_points[0, 3:6].tolist(), sketch_points[0, 7].item(), sketch_points[0, :3].tolist())
-        else: 
-            cur__brep_class._sketch_op(sketch_points, normal, sketch_points)
+        # Build Extrude
+        if current_op == 2:
+            print("Do extrude")
+            extrude_amount, extrude_direction = do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges)
+            cur__brep_class.extrude_op(extrude_amount, extrude_direction)
 
 
-        # 3.2) Do Extrude
-        extrude_amount, extrude_direction = do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges)
-        cur__brep_class.extrude_op(extrude_amount, extrude_direction)
+        # Build fillet
+        if current_op == 3:
+            print("Build Fillet")
+            do_fillet(gnn_graph, brep_edges)
+            pass
+
+        if current_op ==4:
+            print("Build Chamfer")
+            chamfer_edge, chamfer_amount = do_chamfer(gnn_graph, brep_edges)
+            cur__brep_class.random_chamfer(chamfer_edge, chamfer_amount)
+
 
         # 5.3) Write to brep
         cur__brep_class.write_to_json(cur_output_dir)
@@ -254,10 +328,9 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
 
         # 5.6) Update brep data
         brep_edges, brep_loops = cascade_brep(brep_files)
-        # Encoders.helper.vis_brep(brep_edges)
+        Encoders.helper.vis_brep(brep_edges)
         
-        past_programs.append(1)
-        past_programs.append(2)
+        past_programs.append(current_op)
         current_op = program_prediction(gnn_graph, past_programs)
 
 
@@ -274,10 +347,6 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
     gt_brep_edges = gt_brep_edges.squeeze(0)
     gt_brep_edges = torch.round(gt_brep_edges * 10000) / 10000
 
-    covered_chamfer_dist, _ = whole_process_evaluate.chamfer_distance(stroke_node_features, gt_brep_edges)
-    if covered_chamfer_dist > 0.05:
-        raise ValueError(f"Chamfer distance {covered_chamfer_dist} exceeds allowable threshold of 0.05")
-
 
 
 
@@ -289,7 +358,6 @@ if os.path.exists(output_dir):
     shutil.rmtree(output_dir)
 os.makedirs(output_dir, exist_ok=True)
 
-print("aaa")
 
 for data in tqdm(data_loader, desc="Generating CAD Programs"):
     program, stroke_node_features, data_path= data
@@ -302,26 +370,26 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     
     print("program", program)
 
-    try:
-        cur_output_dir = os.path.join(output_dir, f'data_{data_produced}')
-        if os.path.exists(cur_output_dir):
-            shutil.rmtree(cur_output_dir)
-        os.makedirs(cur_output_dir, exist_ok=True)
-        
+    # try:
+    cur_output_dir = os.path.join(output_dir, f'data_{data_produced}')
+    if os.path.exists(cur_output_dir):
+        shutil.rmtree(cur_output_dir)
+    os.makedirs(cur_output_dir, exist_ok=True)
+    
 
-        gt_brep_dir = os.path.join(data_path[0], 'canvas')
-        brep_files = [file_name for file_name in os.listdir(gt_brep_dir)
-                if file_name.startswith('brep_') and file_name.endswith('.step')]
-        brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
-        gt_brep_file_path = os.path.join(gt_brep_dir, brep_files[-1])
+    gt_brep_dir = os.path.join(data_path[0], 'canvas')
+    brep_files = [file_name for file_name in os.listdir(gt_brep_dir)
+            if file_name.startswith('brep_') and file_name.endswith('.step')]
+    brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+    gt_brep_file_path = os.path.join(gt_brep_dir, brep_files[-1])
 
-        generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, stroke_node_features)
+    generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, stroke_node_features)
 
 
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        if os.path.exists(cur_output_dir):
-            shutil.rmtree(cur_output_dir)
-        data_produced -= 1
+    # except Exception as e:
+    #     print(f"An error occurred: {e}")
+    #     if os.path.exists(cur_output_dir):
+    #         shutil.rmtree(cur_output_dir)
+    #     data_produced -= 1
 
     data_produced += 1

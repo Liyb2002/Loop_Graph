@@ -278,59 +278,6 @@ def clean_face_choice(predicted_index, node_features):
 
 
 #------------------------------------------------------------------------------------------------------#
-def vis_full_graph(gnn_graph):
-    """
-    Visualize all strokes in the graph, regardless of whether they are used (i.e., the 8th value is 0 or 1).
-    
-    Parameters:
-    gnn_graph (SketchLoopGraph): A single graph object containing loops and strokes.
-    """
-
-    # Extract stroke features
-    stroke_node_features = gnn_graph['stroke'].x.numpy()
-
-    # Initialize the 3D plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.grid(False)
-
-    # Initialize min and max limits
-    x_min, x_max = float('inf'), float('-inf')
-    y_min, y_max = float('inf'), float('-inf')
-    z_min, z_max = float('inf'), float('-inf')
-
-    # Plot all strokes, regardless of whether they are used
-    for stroke in stroke_node_features:
-        start, end = stroke[:3], stroke[3:6]
-
-        # Update the min and max limits for each axis
-        x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-        y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-        z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-
-        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
-
-    # Compute the center of the shape
-    x_center = (x_min + x_max) / 2
-    y_center = (y_min + y_max) / 2
-    z_center = (z_min + z_max) / 2
-
-    # Compute the maximum difference across x, y, z directions
-    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
-
-    # Set the same limits for x, y, and z axes centered around the computed center
-    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
-    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
-    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
-
-    # Set axis labels
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    # Show plot
-    plt.show()
-
 
 def vis_left_graph(stroke_node_features):
     """
@@ -357,7 +304,6 @@ def vis_left_graph(stroke_node_features):
     # Plot strokes based on the last value: 0 for blue, otherwise green
     for stroke in stroke_node_features:
         start, end = stroke[:3], stroke[3:6]
-        stroke_color = 'blue' if stroke[8] == 0 else 'green'  # Color based on the last value
 
         # Update the min and max limits for rescaling based only on strokes (ignoring circles)
         if stroke[7] == 0:
@@ -371,7 +317,35 @@ def vis_left_graph(stroke_node_features):
             ax.plot(x_values, y_values, z_values, color='blue')
             continue
 
-        if stroke[7] != 0 and stroke[8] != 0:
+        if stroke[7] != 0 or stroke[8] != 0 or stroke[9] != 0:
+            # Arc
+            x_values, y_values, z_values = plot_arc(stroke)
+            ax.plot(x_values, y_values, z_values, color='blue')
+            continue
+
+        else:
+            # Plot the stroke (in blue or green depending on the condition)
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+
+    for stroke in stroke_node_features:
+        if stroke[-1] == 0:
+            continue
+        start, end = stroke[:3], stroke[3:6]
+        stroke_color = 'green' 
+
+        # Update the min and max limits for rescaling based only on strokes (ignoring circles)
+        if stroke[7] == 0:
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+        if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
+            # Circle face
+            x_values, y_values, z_values = plot_circle(stroke)
+            ax.plot(x_values, y_values, z_values, color='blue')
+            continue
+
+        if stroke[7] != 0 or stroke[8] != 0 or stroke[9] != 0:
             # Arc
             x_values, y_values, z_values = plot_arc(stroke)
             ax.plot(x_values, y_values, z_values, color='blue')
@@ -436,7 +410,7 @@ def vis_brep(brep):
 
     # Plot all brep strokes and circle/cylinder faces in blue
     for stroke in brep:
-        if stroke[6] != 0 and stroke[7] != 0:
+        if stroke[6] != 0 and stroke[7] != 0 and stroke[8] == 0:
             # Cylinder face
             center = stroke[:3]
             normal = stroke[3:6]
@@ -501,8 +475,14 @@ def vis_brep(brep):
         elif stroke[6] == 0 and stroke[7] != 0:
             # Circle face (same rotation logic as shared)
             x_values, y_values, z_values = plot_circle(stroke)
-
             ax.plot(x_values, y_values, z_values, color='blue')
+        
+        elif stroke[6] != 0 or stroke[7] != 0 or stroke[8] != 0:
+            # plot arc 
+            x_values, y_values, z_values = plot_arc(stroke)
+            ax.plot(x_values, y_values, z_values, color='blue')
+
+
         else:
             # Plot the stroke
             start, end = stroke[:3], stroke[3:6]
@@ -568,14 +548,25 @@ def vis_selected_loops(stroke_node_features, strokes_to_loops, selected_loop_idx
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
         
-        if stroke[7] != 0:
+        if stroke[7] == 0:
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+        if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
             # Circle face
             x_values, y_values, z_values = plot_circle(stroke)
-
             ax.plot(x_values, y_values, z_values, color='blue')
+            continue
+
+        if stroke[7] != 0 or stroke[8] != 0 or stroke[9] != 0:
+            # Arc
+            x_values, y_values, z_values = plot_arc(stroke)
+            ax.plot(x_values, y_values, z_values, color='blue')
+            continue
 
         else:
-            # Plot the stroke
+            # Plot the stroke (in blue or green depending on the condition)
             ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
 
 
@@ -717,6 +708,9 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx):
     # Show plot
     plt.show()
 
+
+
+#------------------------------------------------------------------------------------------------------#
 
 
 def feature_depad(feature_matrix):

@@ -136,6 +136,7 @@ class Brep:
             self.Vertices.append(new_vertex)
             new_vertices.append(new_vertex)
 
+
         num_vertices = len(new_vertices)
         for i in range(num_vertices):
             edge_id = f"edge_{self.idx}_{i}"
@@ -250,22 +251,28 @@ class Brep:
                         ])
     
 
-    def random_chamfer(self):
+    def random_chamfer(self, target_edge_tensor = None, amount = 0):
         # Chamfer is just non-linear version of fillet
         # so we copy fillet code for it
         available_fillet_edges = [edge for edge in self.Edges if edge.fillet_permited]
         if not available_fillet_edges:
             return False
         
-        target_edge = None
-        while not self.check_fillet_validity(target_edge):
-            target_edge = random.choice(available_fillet_edges)
+
+        if target_edge_tensor is None:
+            while not self.check_fillet_validity(target_edge):
+                target_edge = random.choice(available_fillet_edges)
+        else:
+            # find target_edge based on target_edge_tensor value
+            target_edge = self.find_target_edge(target_edge_tensor)
 
 
-        
-        amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
-        safe_amount = self.safe_fillet_check([vert.position for vert in target_edge.vertices])
-        amount = min(amount * 0.3, safe_amount * 0.3)
+
+        if amount == 0:
+            amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
+            safe_amount = self.safe_fillet_check([vert.position for vert in target_edge.vertices])
+            amount = min(amount * 0.3, safe_amount * 0.3)
+
 
         target_edge.disable_fillet()
 
@@ -515,4 +522,23 @@ class Brep:
                             max_dist = dist
 
         return max_dist if max_dist != float('inf') else None  # Return None if no valid distance was found
+    
+
+    def find_target_edge(self, edge_tensor):
+        point_1 = edge_tensor[:3].tolist()
+        point_2 = edge_tensor[3:6].tolist()
+
+        def is_close(p1, p2, tol=1e-6):
+            return all(abs(a - b) < tol for a, b in zip(p1, p2))
+
+        for edge in self.Edges:
+            pos_1 = edge.vertices[0].position
+            pos_2 = edge.vertices[1].position
+
+            # Check if the points match (considering floating point tolerance)
+            if (is_close(point_1, pos_1) and is_close(point_2, pos_2)) or \
+            (is_close(point_1, pos_2) and is_close(point_2, pos_1)):
+                return edge
+
+        return None
 
