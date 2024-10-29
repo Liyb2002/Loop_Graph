@@ -27,8 +27,8 @@ program_encoder.to(device)
 graph_encoder.to(device)
 graph_decoder.to(device)
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(list(program_encoder.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0002)
+criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+optimizer = optim.Adam(list(program_encoder.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=1e-4)
 
 # ------------------------------------------------------------------------------# 
 
@@ -60,7 +60,7 @@ def compute_accuracy(output, program_gt_batch):
     program_gt_batch = program_gt_batch.view(-1)
     
     # Create a mask to ignore cases where the ground truth is 2
-    valid_mask = (program_gt_batch != 2)
+    valid_mask = (program_gt_batch != -1)
     
     # Apply the mask to both the predicted and ground truth tensors
     filtered_predicted_classes = predicted_classes[valid_mask]
@@ -141,7 +141,7 @@ def train():
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
-    epochs = 80
+    epochs = 50
     
     graphs = []
     existing_programs = []
@@ -171,7 +171,7 @@ def train():
         existing_programs.append(Encoders.helper.program_mapping(program[:-1], device))
         gt_programs.append(Encoders.helper.program_gt_mapping([program[-1]], device))
 
-        if len(graphs) > 20000:
+        if len(graphs) > 5000:
             break
 
 
@@ -186,8 +186,8 @@ def train():
     # Convert train and validation graphs to HeteroData
     hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]
     hetero_val_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in val_graphs]
-    graph_train_loader = GraphDataLoader(hetero_train_graphs, batch_size=16, shuffle=False)
-    graph_val_loader = GraphDataLoader(hetero_val_graphs, batch_size=16, shuffle=False)
+    graph_train_loader = GraphDataLoader(hetero_train_graphs, batch_size=64, shuffle=False)
+    graph_val_loader = GraphDataLoader(hetero_val_graphs, batch_size=64, shuffle=False)
 
 
     train_existing_tensor = torch.stack(train_existing_programs).to(device)
@@ -198,8 +198,8 @@ def train():
     val_existing_dataset = TensorDataset(val_existing_tensor)
 
     # Create DataLoaders for the existing programs dataset
-    program_train_existing_loader = DataLoader(train_existing_dataset, batch_size=16, shuffle=False)
-    program_val_existing_loader = DataLoader(val_existing_dataset, batch_size=16, shuffle=False)
+    program_train_existing_loader = DataLoader(train_existing_dataset, batch_size=64, shuffle=False)
+    program_val_existing_loader = DataLoader(val_existing_dataset, batch_size=64, shuffle=False)
 
     # Move ground truth programs to the GPU
     train_gt_programs_tensor = torch.tensor(train_gt_programs, dtype=torch.float32).to(device)
@@ -210,8 +210,8 @@ def train():
     val_gt_dataset = TensorDataset(val_gt_programs_tensor)
 
     # Create DataLoaders for the ground truth programs dataset
-    program_train_gt_loader = DataLoader(train_gt_dataset, batch_size=16, shuffle=False)
-    program_val_gt_loader = DataLoader(val_gt_dataset, batch_size=16, shuffle=False)
+    program_train_gt_loader = DataLoader(train_gt_dataset, batch_size=64, shuffle=False)
+    program_val_gt_loader = DataLoader(val_gt_dataset, batch_size=64, shuffle=False)
 
 
     # Training loop
@@ -243,8 +243,15 @@ def train():
             train_correct += tempt_correct
             train_total += tempt_total
 
+            # print("output", torch.argmax(output, dim=1))
+            # print("output", output)
+            # print("program_gt_batch.long())", program_gt_batch.long())
 
             loss.backward()
+            # Clip gradients based on parameters passed to optimizer
+            torch.nn.utils.clip_grad_norm_(
+                list(program_encoder.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder.parameters()),
+                1.0)
             optimizer.step()
 
             train_loss += loss.item()
@@ -399,4 +406,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

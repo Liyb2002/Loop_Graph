@@ -114,73 +114,89 @@ class Chamfer_Decoder(nn.Module):
 
 
 
-class Program_Decoder(nn.Module):
-    def __init__(self, embed_dim=128, num_heads=8, ff_dim=256, num_classes=10, dropout=0.1):
-        super(Program_Decoder, self).__init__()
-        # Cross-attention layer
-        self.cross_attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout)
-        self.self_attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout)
 
-        # Feed-forward layers and normalization
-        self.ff = nn.Sequential(
-            nn.Linear(embed_dim, ff_dim),
-            nn.ReLU(),
-            nn.Linear(ff_dim, embed_dim)
-        )
-        self.norm1 = nn.LayerNorm(embed_dim)
-        self.norm2 = nn.LayerNorm(embed_dim)
+class Program_Decoder(nn.Module):
+    def __init__(self, embed_dim=128, num_heads=8, ff_dim=256, num_classes=10, dropout=0.1, num_layers=4):
+        super(Program_Decoder, self).__init__()
+        
+        # Cross-attention layers for stroke and loop nodes
+        self.cross_attn_blocks_stroke = nn.ModuleList([
+            nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, batch_first=True) for _ in range(num_layers)
+        ])
+        self.cross_attn_blocks_loop = nn.ModuleList([
+            nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, batch_first=True) for _ in range(num_layers)
+        ])
+        
+        # Feed-forward and normalization layers for each block
+        self.ff_blocks_stroke = nn.ModuleList([self._build_ff_block(embed_dim, ff_dim, dropout) for _ in range(num_layers)])
+        self.norm_blocks_stroke = nn.ModuleList([nn.LayerNorm(embed_dim) for _ in range(num_layers)])
+        
+        self.ff_blocks_loop = nn.ModuleList([self._build_ff_block(embed_dim, ff_dim, dropout) for _ in range(num_layers)])
+        self.norm_blocks_loop = nn.ModuleList([nn.LayerNorm(embed_dim) for _ in range(num_layers)])
+
+        # Self-attention for program and concatenated graph features
+        self.self_attn_program = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, batch_first=True)
+        self.self_attn_graph = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, batch_first=True)
         
         self.dropout = nn.Dropout(dropout)
-        self.classifier = nn.Linear(embed_dim * 2, num_classes)  # Adjusting for concatenated output
-        
-        # Program encoder
+        self.classifier = nn.Linear(embed_dim, num_classes)
+
+        # Program encoder with a CLS token
         self.program_encoder = ProgramEncoder()
+        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))  # CLS token as a learnable parameter
+
+    def _build_ff_block(self, embed_dim, ff_dim, dropout):
+        """Creates a feed-forward block with dropout."""
+        return nn.Sequential(
+            nn.Linear(embed_dim, ff_dim),
+            nn.ReLU(),
+            nn.Linear(ff_dim, embed_dim),
+            nn.Dropout(dropout)
+        )
 
     def forward(self, x_dict, program_tokens):
-        # Encode the program tokens to get their embeddings
+        # Encode the program tokens and prepend the CLS token
         program_embedding = self.program_encoder(program_tokens)  # (batch_size, seq_len, embed_dim)
+        attn_output_program, _ = self.self_attn_program(program_embedding, program_embedding, program_embedding)
+        program_cls_output = attn_output_program[:, 0, :]  # CLS token for program
 
         # Process stroke node embeddings
         num_strokes = x_dict['stroke'].shape[0]
         batch_size_stroke = max(1, num_strokes // 400)  # Ensure batch_size is at least 1
         node_features_stroke = x_dict['stroke'].view(batch_size_stroke, min(400, num_strokes), 128)
-        node_features_stroke = node_features_stroke.transpose(0, 1)  # Transpose for MultiheadAttention
 
         # Process loop node embeddings
         num_loops = x_dict['loop'].shape[0]
         batch_size_loop = max(1, num_loops // 400)  # Ensure batch_size is at least 1
         node_features_loop = x_dict['loop'].view(batch_size_loop, min(400, num_loops), 128)
-        node_features_loop = node_features_loop.transpose(0, 1)  # Transpose for MultiheadAttention
 
-        # Transpose program embeddings
-        program_embedding = program_embedding.transpose(0, 1)  # (seq_len, batch_size, embed_dim)
+        # Pass through each cross-attention and feed-forward block for stroke nodes
+        out_stroke = program_embedding
+        for attn_layer, ff_layer, norm_layer in zip(self.cross_attn_blocks_stroke, self.ff_blocks_stroke, self.norm_blocks_stroke):
+            attn_output_stroke, _ = attn_layer(out_stroke, node_features_stroke, node_features_stroke)
+            out_stroke = norm_layer(out_stroke + attn_output_stroke)
+            out_stroke = norm_layer(out_stroke + ff_layer(out_stroke))
+        
+        # Pass through each cross-attention and feed-forward block for loop nodes
+        out_loop = program_embedding
+        for attn_layer, ff_layer, norm_layer in zip(self.cross_attn_blocks_loop, self.ff_blocks_loop, self.norm_blocks_loop):
+            attn_output_loop, _ = attn_layer(out_loop, node_features_loop, node_features_loop)
+            out_loop = norm_layer(out_loop + attn_output_loop)
+            out_loop = norm_layer(out_loop + ff_layer(out_loop))
 
-        # Cross-attention for stroke nodes
-        attn_output_stroke, _ = self.cross_attn(program_embedding, node_features_stroke, node_features_stroke)
-        out_stroke = self.norm1(program_embedding + attn_output_stroke)
-        ff_output_stroke = self.ff(out_stroke)
-        out_stroke = self.norm2(out_stroke + ff_output_stroke)
-        out_stroke = self.dropout(out_stroke)
-        cls_attn_stroke, _ = self.self_attn(out_stroke, out_stroke, out_stroke)
-        cls_stroke = out_stroke[0]  # Take the CLS token representation
+        # Concatenate stroke and loop embeddings for graph self-attention
+        combined_graph_features = torch.cat([out_stroke, out_loop], dim=1)  # (batch_size, combined_seq_len, embed_dim)
+        attn_output_graph, _ = self.self_attn_graph(combined_graph_features, combined_graph_features, combined_graph_features)
+        graph_cls_output = attn_output_graph[:, 0, :]  # CLS token output from graph features
 
-        # Cross-attention for loop nodes
-        attn_output_loop, _ = self.cross_attn(program_embedding, node_features_loop, node_features_loop)
-        out_loop = self.norm1(program_embedding + attn_output_loop)
-        ff_output_loop = self.ff(out_loop)
-        out_loop = self.norm2(out_loop + ff_output_loop)
-        out_loop = self.dropout(out_loop)
-        cls_attn_loop, _ = self.self_attn(out_loop, out_loop, out_loop)
-
-        cls_loop = out_loop[0]  # Take the CLS token representation
-
-        # Concatenate outputs from stroke and loop
-        combined_output = torch.cat([cls_stroke, cls_loop], dim=-1)
+        # Weighted combination of program and graph CLS outputs
+        combined_output = 0.8 * program_cls_output + 0.2 * graph_cls_output
 
         # Classification
         logits = self.classifier(combined_output)
 
         return logits
+
 
 #---------------------------------- Loss Function ----------------------------------#
 
@@ -201,10 +217,23 @@ class FocalLoss(nn.Module):
 
 
 class ProgramEncoder(nn.Module):
-    def __init__(self, vocab_size=20, embedding_dim=128):
+    def __init__(self, vocab_size=20, embedding_dim=64, hidden_dim=128):
         super(ProgramEncoder, self).__init__()
-        # Set padding_idx to -1 to ignore -1 in embeddings
         self.embedding = nn.Embedding(vocab_size, embedding_dim, padding_idx=-1)
+        self.positional_encoding = nn.Parameter(torch.randn(20, embedding_dim))  # Add learnable positional encoding
+        self.lstm = nn.LSTM(embedding_dim, hidden_dim, batch_first=True)
+        self.fc = nn.Linear(hidden_dim, hidden_dim)
 
     def forward(self, x):
-        return self.embedding(x)
+        embedded = self.embedding(x) + self.positional_encoding[:x.size(1)]
+        lstm_out, _ = self.lstm(embedded)
+        final_output = self.fc(lstm_out)  # Transform each timestep for cross-attention
+        return final_output
+
+
+
+def entropy_penalty(logits):
+    probs = torch.softmax(logits, dim=-1)
+    entropy = -torch.sum(probs * torch.log(probs + 1e-8), dim=-1)
+    return entropy.mean()
+
