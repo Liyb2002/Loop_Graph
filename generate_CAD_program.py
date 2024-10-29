@@ -17,7 +17,7 @@ import Encoders.gnn_stroke.gnn
 import Encoders.helper
 
 
-import whole_process_evaluate
+# import whole_process_evaluate
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -32,7 +32,7 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole_eval', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 
@@ -96,26 +96,22 @@ def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges):
 
 
 
-# --------------------- Program Prediction Network --------------------- #
-program_graph_encoder = Encoders.gnn.gnn.SemanticModule()
-program_graph_decoder_stroke = Encoders.gnn.gnn.Program_Decoder('stroke')
-program_graph_decoder_loop = Encoders.gnn.gnn.Program_Decoder('loop')
-program_dir = os.path.join(current_dir, 'checkpoints', 'program_prediction')
-program_graph_encoder.eval()
-program_graph_decoder_stroke.eval()
-program_graph_decoder_loop.eval()
-program_graph_encoder.load_state_dict(torch.load(os.path.join(program_dir, 'graph_encoder.pth'), weights_only=True))
-program_graph_decoder_stroke.load_state_dict(torch.load(os.path.join(program_dir, 'graph_decoder.pth'), weights_only=True))
-program_graph_decoder_loop.load_state_dict(torch.load(os.path.join(program_dir, 'graph_decoder.pth'), weights_only=True))
+# --------------------- Operation Prediction Network --------------------- #
+operation_graph_encoder = Encoders.gnn.gnn.SemanticModule()
+operation_graph_decoder= Encoders.gnn.gnn.Program_Decoder()
+program_dir = os.path.join(current_dir, 'checkpoints', 'operation_prediction')
+operation_graph_encoder.eval()
+operation_graph_decoder.eval()
+operation_graph_encoder.load_state_dict(torch.load(os.path.join(program_dir, 'graph_encoder.pth'), weights_only=True))
+operation_graph_decoder.load_state_dict(torch.load(os.path.join(program_dir, 'graph_decoder.pth'), weights_only=True))
 
 
 def program_prediction(gnn_graph, past_programs):
     past_programs = whole_process_helper.helper.padd_program(past_programs)
     gnn_graph.padding()
-    x_dict = program_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
-    output_loop = program_graph_decoder_loop(x_dict, past_programs)
-    output_stroke = program_graph_decoder_loop(x_dict, past_programs)
-    predicted_class = torch.argmax(output_stroke + output_loop, dim=1)
+    x_dict = operation_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+    output = operation_graph_decoder(x_dict, past_programs)
+    predicted_class = torch.argmax(output, dim=1)
 
     return predicted_class
 
@@ -165,7 +161,6 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
 
     # Program State Init
     cur__brep_class = Preprocessing.proc_CAD.generate_program.Brep()
-    cur_program = torch.tensor([], dtype=torch.int64)
 
 
     # Strokes / Loops in the Graph
@@ -183,7 +178,7 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
 
     # Operation prediction
     current_op = 1
-    past_programs = []
+    past_programs = [9]
 
 
     # Iteration infos
@@ -220,7 +215,7 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
             break
         
 
-        # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+        Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
         
 
         # 3) Build operations
@@ -294,6 +289,8 @@ if os.path.exists(output_dir):
     shutil.rmtree(output_dir)
 os.makedirs(output_dir, exist_ok=True)
 
+print("aaa")
+
 for data in tqdm(data_loader, desc="Generating CAD Programs"):
     program, stroke_node_features, data_path= data
     
@@ -302,6 +299,8 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
 
     if program[-1][0] != 'terminate':
         continue
+    
+    print("program", program)
 
     try:
         cur_output_dir = os.path.join(output_dir, f'data_{data_produced}')

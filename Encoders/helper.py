@@ -365,11 +365,17 @@ def vis_left_graph(stroke_node_features):
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
 
-        if stroke[7] != 0:
-            # Circle face (plot in green)
+        if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
+            # Circle face
             x_values, y_values, z_values = plot_circle(stroke)
+            ax.plot(x_values, y_values, z_values, color='blue')
+            continue
 
-            ax.plot(x_values, y_values, z_values, color=stroke_color)
+        if stroke[7] != 0 and stroke[8] != 0:
+            # Arc
+            x_values, y_values, z_values = plot_arc(stroke)
+            ax.plot(x_values, y_values, z_values, color='blue')
+            continue
 
         else:
             # Plot the stroke (in blue or green depending on the condition)

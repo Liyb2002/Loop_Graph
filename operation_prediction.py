@@ -19,16 +19,14 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.metrics import confusion_matrix
 
-program_encoder = Encoders.gnn.gnn.ProgramEncoder()
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
 graph_decoder= Encoders.gnn.gnn.Program_Decoder()
 
-program_encoder.to(device)
 graph_encoder.to(device)
 graph_decoder.to(device)
 
 criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-optimizer = optim.Adam(list(program_encoder.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=1e-4)
+optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=1e-4)
 
 # ------------------------------------------------------------------------------# 
 
@@ -37,13 +35,11 @@ save_dir = os.path.join(current_dir, 'checkpoints', 'operation_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
-    program_encoder.load_state_dict(torch.load(os.path.join(save_dir, 'program_encoder.pth')))
     graph_encoder.load_state_dict(torch.load(os.path.join(save_dir, 'graph_encoder.pth')))
     graph_decoder.load_state_dict(torch.load(os.path.join(save_dir, 'graph_decoder.pth')))
 
 
 def save_models():
-    torch.save(program_encoder.state_dict(), os.path.join(save_dir, 'program_encoder.pth'))
     torch.save(graph_encoder.state_dict(), os.path.join(save_dir, 'graph_encoder.pth'))
     torch.save(graph_decoder.state_dict(), os.path.join(save_dir, 'graph_decoder.pth'))
 
@@ -171,7 +167,7 @@ def train():
         existing_programs.append(Encoders.helper.program_mapping(program[:-1], device))
         gt_programs.append(Encoders.helper.program_gt_mapping([program[-1]], device))
 
-        if len(graphs) > 5000:
+        if len(graphs) > 10000:
             break
 
 
@@ -218,7 +214,6 @@ def train():
     for epoch in range(epochs):
         train_loss = 0.0
 
-        program_encoder.train()
         graph_encoder.train()
         graph_decoder.train()
 
@@ -250,7 +245,7 @@ def train():
             loss.backward()
             # Clip gradients based on parameters passed to optimizer
             torch.nn.utils.clip_grad_norm_(
-                list(program_encoder.parameters()) + list(graph_encoder.parameters()) + list(graph_decoder.parameters()),
+                list(graph_encoder.parameters()) + list(graph_decoder.parameters()),
                 1.0)
             optimizer.step()
 
@@ -262,7 +257,6 @@ def train():
         val_correct = 0
         val_total = 0
 
-        program_encoder.eval()
         graph_encoder.eval()
         graph_decoder.eval()
         with torch.no_grad():
@@ -355,7 +349,6 @@ def eval():
     program_train_gt_loader = DataLoader(train_gt_dataset, batch_size=16, shuffle=False)
 
     # Eval
-    program_encoder.eval()
     graph_encoder.eval()
     graph_decoder.eval()
 
@@ -406,4 +399,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+# train()
