@@ -92,27 +92,42 @@ def compute_accuracy_confusionMatrix(output, program_gt_batch):
     return total, correct_predictions, conf_matrix
 
 
-def compute_accuracy_eval(output,  program_gt_batch, program_existing_batch):
+def compute_accuracy_eval(output, program_gt_batch, program_existing_batch, program_wholes_batch):
+
     # Get the predicted classes from the output
-    predicted_classes = torch.argmax(output, dim=1)
-    
-    # Flatten the ground truth labels for comparison
-    program_gt_batch = program_gt_batch.view(-1)
-    
-    # Create a mask to ignore cases where the ground truth is 2
-    valid_mask = (program_gt_batch != 2)
-    
-    # Apply the mask to both the predicted and ground truth tensors
-    filtered_program_existing_batch = program_existing_batch[valid_mask]
-    filtered_predicted_classes = predicted_classes[valid_mask]
-    filtered_program_gt_batch = program_gt_batch[valid_mask]
-    
-    # Calculate the number of correct predictions
-    correct_predictions = (filtered_predicted_classes == filtered_program_gt_batch).sum().item()
-    
-    # Calculate the total number of valid cases
-    total = filtered_program_gt_batch.shape[0]
-    
+    predicted_classes = torch.argmax(output, dim=1)  # Shape: (batch_size,)
+
+    batch_size = predicted_classes.size(0)
+    correct_predictions = 0
+    total = 0
+
+    for i in range(batch_size):
+        # Get the i-th programs from the batches
+        existing_program = program_existing_batch[i]    # Shape: (20,)
+        whole_program = program_wholes_batch[i]         # Shape: (20,)
+        gt_program = program_gt_batch[i]                # Ground truth labels
+
+        # Find the valid length of existing_program (until token 10)
+        existing_length_indices = (existing_program == 10).nonzero(as_tuple=False)
+        existing_length = existing_length_indices[0].item() if existing_length_indices.numel() > 0 else 20
+
+        # Find the valid length of whole_program (until token 10)
+        whole_length_indices = (whole_program == 10).nonzero(as_tuple=False)
+        whole_length = whole_length_indices[0].item() if whole_length_indices.numel() > 0 else 20
+
+        # Remaining tokens in whole_program after removing existing_program tokens
+        remaining_tokens = whole_program[existing_length:whole_length]
+
+        # Ensure remaining_tokens is not empty
+        if remaining_tokens.numel() == 0:
+            continue  # Skip if there are no remaining tokens
+
+        # Check if the predicted class is in the remaining tokens
+        if predicted_classes[i].item() in remaining_tokens.tolist():
+            correct_predictions += 1
+
+        total += 1
+    print("total", total, "correct", correct_predictions)
     # Output the total and the correct number of predictions
     return total, correct_predictions
 
@@ -300,6 +315,7 @@ def eval():
     graphs = []
     existing_programs = []
     gt_tokens = []
+    program_wholes = []
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
@@ -324,6 +340,7 @@ def eval():
         
         existing_programs.append(Encoders.helper.program_mapping(program[:-1], device))
         gt_tokens.append(Encoders.helper.program_gt_mapping([program[-1]], device))
+        program_wholes.append(Encoders.helper.program_mapping(program_whole, device))
         
 
         if len(graphs) > 200:
@@ -336,10 +353,13 @@ def eval():
     graph_train_loader = GraphDataLoader(hetero_train_graphs, batch_size=16, shuffle=False)
 
     train_existing_programs_tensor = torch.stack(existing_programs).to(device)
+    program_wholes_tensor = torch.stack(program_wholes).to(device)
 
     # Create TensorDataset for existing programs (inputs)
     train_existing_dataset = TensorDataset(train_existing_programs_tensor)
+    program_wholes_dataset = TensorDataset(program_wholes_tensor)
     program_train_existing_loader = DataLoader(train_existing_dataset, batch_size=16, shuffle=False)
+    program_wholes_loader = DataLoader(program_wholes_dataset, batch_size=16, shuffle=False)
 
     # Convert ground truth tokens to long (integer class indices)
     train_gt_programs_tensor = torch.tensor(gt_tokens, dtype=torch.long).to(device)
@@ -347,6 +367,7 @@ def eval():
     # Create TensorDataset for ground truth programs (targets)
     train_gt_dataset = TensorDataset(train_gt_programs_tensor)
     program_train_gt_loader = DataLoader(train_gt_dataset, batch_size=16, shuffle=False)
+
 
     # Eval
     graph_encoder.eval()
@@ -360,7 +381,7 @@ def eval():
 
     with torch.no_grad():
         total_iterations = min(len(graph_train_loader), len(program_train_existing_loader))
-        for hetero_batch, (program_existing_batch,),  (program_gt_batch,) in tqdm(zip(graph_train_loader, program_train_existing_loader, program_train_gt_loader), 
+        for hetero_batch, (program_existing_batch,),  (program_gt_batch,), (program_wholes_batch, ) in tqdm(zip(graph_train_loader, program_train_existing_loader, program_train_gt_loader, program_wholes_loader), 
                                               desc=f"Evaluating", 
                                               dynamic_ncols=True, 
                                               total=total_iterations):
@@ -377,12 +398,15 @@ def eval():
             loss = criterion(output, program_gt_batch.long())
 
             # Calculate accuracy and confusion matrix for this batch
-            tempt_total, tempt_correct, conf_matrix = compute_accuracy_confusionMatrix(output, program_gt_batch)
+            _, _, conf_matrix = compute_accuracy_confusionMatrix(output, program_gt_batch)
+            tempt_total, tempt_correct = compute_accuracy_eval(output, program_gt_batch, program_existing_batch, program_wholes_batch)
             eval_correct += tempt_correct
             eval_total += tempt_total
 
             # Accumulate the confusion matrix for the current batch
             all_confusion_matrices += torch.tensor(conf_matrix)
+
+            
 
     # Calculate overall accuracy
     overall_accuracy = eval_correct / eval_total
@@ -399,4 +423,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-# train()
+eval()

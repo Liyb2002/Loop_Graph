@@ -120,7 +120,11 @@ def predict_fillet(gnn_graph):
 
 def do_fillet(gnn_graph, brep_edges):
     fillet_selection_mask = predict_fillet(gnn_graph)
-    whole_process_helper.helper.get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges)
+    fillet_edge, fillet_amount = whole_process_helper.helper.get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges)
+
+    print("fillet_edge", fillet_edge)
+    print("fillet_amount", fillet_amount)
+    return fillet_edge, fillet_amount
 
 
 
@@ -300,8 +304,9 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
         # Build fillet
         if current_op == 3:
             print("Build Fillet")
-            do_fillet(gnn_graph, brep_edges)
-            pass
+            fillet_edge, fillet_amount = do_fillet(gnn_graph, brep_edges)
+            cur__brep_class.random_fillet(fillet_edge, fillet_amount)
+
 
         if current_op ==4:
             print("Build Chamfer")
@@ -332,6 +337,9 @@ def generate_CAD_program(cur_output_dir, gt_brep_file_path, data_produced, strok
         
         past_programs.append(current_op)
         current_op = program_prediction(gnn_graph, past_programs)
+
+        print("past_programs", past_programs)
+        print("next op", current_op)
 
 
     # 6) Write the stroke_cloud data to pkl file

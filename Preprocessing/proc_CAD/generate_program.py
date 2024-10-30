@@ -173,22 +173,27 @@ class Brep:
         self.op.append(['extrude', sketch_face.id, amount])
 
 
-    def random_fillet(self):
-        
+    def random_fillet(self, target_edge_tensor = None, amount = 0):        
+
         available_fillet_edges = [edge for edge in self.Edges if edge.fillet_permited]
         if not available_fillet_edges:
             return False
         
-        target_edge = None
-        if not self.check_fillet_validity(target_edge):
-            target_edge = random.choice(available_fillet_edges)
+        if target_edge_tensor is None:
+            target_edge = None
+            while not self.check_fillet_validity(target_edge):
+                target_edge = random.choice(available_fillet_edges)
+        else:
+            # find target_edge based on target_edge_tensor value
+            target_edge = self.find_target_edge(target_edge_tensor)
 
+
+        if amount == 0:
+            amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
+            safe_amount = self.safe_fillet_check([vert.position for vert in target_edge.vertices])
+            amount = min(amount * 0.3, safe_amount * 0.3)
 
         
-        amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
-        safe_amount = self.safe_fillet_check([vert.position for vert in target_edge.vertices])
-        amount = min(amount, safe_amount * 0.4)
-
         target_edge.disable_fillet()
 
         verts_pos = []
@@ -260,6 +265,7 @@ class Brep:
         
 
         if target_edge_tensor is None:
+            target_edge = None
             while not self.check_fillet_validity(target_edge):
                 target_edge = random.choice(available_fillet_edges)
         else:

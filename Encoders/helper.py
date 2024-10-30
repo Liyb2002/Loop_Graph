@@ -582,9 +582,19 @@ def vis_selected_loops(stroke_node_features, strokes_to_loops, selected_loop_idx
         if loop_idx in selected_loop_idx:  # Plot only the selected loop
             for idx in stroke_indices:
                 stroke = stroke_node_features[idx]
-                if stroke[7] != 0:
+            
+                if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
+                    # Circle face
                     x_values, y_values, z_values = plot_circle(stroke)
                     ax.plot(x_values, y_values, z_values, color='red')
+                    continue
+
+                if stroke[7] != 0 or stroke[8] != 0 or stroke[9] != 0:
+                    # Arc
+                    x_values, y_values, z_values = plot_arc(stroke)
+                    ax.plot(x_values, y_values, z_values, color='red')
+                    continue
+
                 else:
                     start, end = stroke[:3], stroke[3:6]
                     ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='red', linewidth=1)
