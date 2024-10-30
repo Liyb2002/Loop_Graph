@@ -104,6 +104,7 @@ class SketchLoopGraph(HeteroData):
                 self[edge_type].edge_index = self[edge_type].edge_index.to(device)
 
 
+
     def to_device(self, device):
         for node_type in self.node_types:
             if 'x' in self[node_type]:
@@ -112,6 +113,12 @@ class SketchLoopGraph(HeteroData):
         for edge_type in self.edge_types:
             if 'edge_index' in self[edge_type]:
                 self[edge_type].edge_index = self[edge_type].edge_index.to(device)
+
+
+    def remove_stroke_type(self):
+        self['stroke'].x[:, -1] = 0
+        self['loop'].x.zero_()
+
 
 
     def _compute_loop_features(self, stroke_cloud_loops, loop_to_brep):
@@ -137,6 +144,7 @@ class SketchLoopGraph(HeteroData):
 
         self['loop'].x = torch.tensor(loop_features, dtype=torch.float)
         return 
+
 
     def set_loop_features(self, loop_to_brep):
         # Erase the current loop features
@@ -483,13 +491,13 @@ class SketchLoopGraph(HeteroData):
 
 
 # Edge Feature: 10 values
-# 0-3: point1, 3-6:point2, 6-7:alpha_value
+# 0-2: point1, 3-5:point2, 6:alpha_value
 
 # Circle Feature:
-# 0-3: center, 3-6:normal, 6-7:alpha_value, 7-8:radius
+# 0-2: center, 3-5:normal, 6:alpha_value, 7:radius
 
 # Arc Feature:
-# 0-3: point1, 3-6:point2, 6-7:alpha_value, 7-10:center
+# 0-2: point1, 3-5:point2, 6:alpha_value, 7-9:center
 
 def build_graph(stroke_dict, messy = False):
     num_strokes = len(stroke_dict)
@@ -545,6 +553,18 @@ def build_graph(stroke_dict, messy = False):
 
     return node_features, operations_order_matrix
 
+def build_stroke_type(stroke_dict, messy=False):
+    num_strokes = len(stroke_dict)
+    node_features = np.zeros((num_strokes, 1))
+    
+    # Iterate over sorted keys of stroke_dict
+    for i, key in enumerate(sorted(stroke_dict.keys())):
+        stroke = stroke_dict[key]
+        # Set value to 1 if stroke's edge_type is 'feature_line'
+        if stroke.edge_type == 'feature_line':
+            node_features[i] = 1
+    
+    return node_features
 
 
 

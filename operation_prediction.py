@@ -343,10 +343,6 @@ def eval():
         program_wholes.append(Encoders.helper.program_mapping(program_whole, device))
         
 
-        if len(graphs) > 200:
-            break
-
-
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
     hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in graphs]

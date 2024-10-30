@@ -40,6 +40,19 @@ def get_all_operation_strokes(stroke_operations_order_matrix, program_whole, ope
     # Return the result as a column vector of shape (op_to_index.shape[0], 1)
     return result_strokes
 
+def get_feature_strokes(gnn_graph):
+
+    features_strokes = gnn_graph['stroke'].x[:, -1]
+
+    # Iterate over each stroke and modify features_strokes based on the condition
+    for i, stroke in enumerate(gnn_graph['stroke'].x):
+        if stroke[7] > 0:
+            features_strokes[i] = 1
+
+    return features_strokes
+
+
+
 
 def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features):
     """
@@ -680,12 +693,12 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx):
     for idx, stroke in enumerate(stroke_node_features):
         if idx in selected_stroke_idx:
             stroke = stroke_node_features[idx]
-            if stroke[7] != 0 and stroke[8] == 0:
-                # Circle
+            if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
+                # Circle face
                 x_values, y_values, z_values = plot_circle(stroke)
                 ax.plot(x_values, y_values, z_values, color='red')
                 continue
-            
+
             if stroke[7] != 0 and stroke[8] != 0:
                 # Arc
                 x_values, y_values, z_values = plot_arc(stroke)

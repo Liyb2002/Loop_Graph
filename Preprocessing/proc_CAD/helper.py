@@ -853,7 +853,7 @@ def loop_neighboring_complex(loops, stroke_node_features, loop_neighboring_all):
         # Compute the cross product to get the normal
         normal = np.cross(vec1, vec2)
         
-        if np.isnan(normal).any():
+        if np.isnan(normal).any() or np.all(normal == 0):
             return np.array([0,0,0])
         normal = normal / np.linalg.norm(normal)
         

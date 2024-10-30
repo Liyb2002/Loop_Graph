@@ -114,6 +114,26 @@ class Chamfer_Decoder(nn.Module):
 
 
 
+class Stroke_type_Decoder(nn.Module):
+    def __init__(self, hidden_channels=256):
+        super(Stroke_type_Decoder, self).__init__()
+
+        self.decoder = nn.Sequential(
+            nn.Linear(128, hidden_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.1),
+            nn.Linear(hidden_channels, 64),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.1),
+            nn.Linear(64, 1),
+
+        )
+
+    def forward(self, x_dict):
+        return torch.sigmoid(self.decoder(x_dict['stroke']))
+
+
+
 
 class Program_Decoder(nn.Module):
     def __init__(self, embed_dim=128, num_heads=8, ff_dim=256, num_classes=10, dropout=0.1, num_layers=4):
