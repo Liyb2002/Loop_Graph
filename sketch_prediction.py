@@ -17,6 +17,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+import stroke_type_prediction
+
+graph_encoder = Encoders.gnn.gnn.SemanticModule()
+graph_decoder = Encoders.gnn.gnn.Sketch_Decoder()
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
 graph_decoder = Encoders.gnn.gnn.Sketch_Decoder()
 
@@ -141,6 +145,7 @@ def train():
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+
         if program[-1] != 'sketch':
             continue
 
@@ -171,16 +176,21 @@ def train():
             stroke_to_edge
         )
 
-        gnn_graph.to_device_withPadding(device)
-        loop_selection_mask = loop_selection_mask.to(device)
+        feature_lines_mask = stroke_type_prediction.predict_stroke_type(gnn_graph)
+        gnn_graph.set_feature_lines_mask(feature_lines_mask)
+
+
 
         # Encoders.helper.vis_stroke_with_order(stroke_node_features)
         # Encoders.helper.vis_brep(output_brep_edges)
         # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(loop_selection_mask)])
 
         # Prepare the pair
+        gnn_graph.to_device_withPadding(device)
         graphs.append(gnn_graph)
+        loop_selection_mask = loop_selection_mask.to(device)
         loop_selection_masks.append(loop_selection_mask)
+
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
     # Split the dataset into training and validation sets (80-20 split)
@@ -197,11 +207,11 @@ def train():
     padded_val_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in val_masks]
 
     # Create DataLoaders for training and validation graphs/masks
-    graph_train_loader = DataLoader(hetero_train_graphs, batch_size=16, shuffle=False)
-    mask_train_loader = DataLoader(padded_train_masks, batch_size=16, shuffle=False)
+    graph_train_loader = DataLoader(hetero_train_graphs, batch_size=16, shuffle=True)
+    mask_train_loader = DataLoader(padded_train_masks, batch_size=16, shuffle=True)
 
-    graph_val_loader = DataLoader(hetero_val_graphs, batch_size=16, shuffle=False)
-    mask_val_loader = DataLoader(padded_val_masks, batch_size=16, shuffle=False)
+    graph_val_loader = DataLoader(hetero_val_graphs, batch_size=16, shuffle=True)
+    mask_val_loader = DataLoader(padded_val_masks, batch_size=16, shuffle=True)
 
 
 
@@ -363,9 +373,9 @@ def eval():
     padded_eval_all_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in eval_all_loop_selection_masks]
 
     # Create DataLoaders for training and validation graphs/masks
-    graph_eval_loader = DataLoader(hetero_eval_graphs, batch_size=16, shuffle=False)
-    mask_eval_loader = DataLoader(padded_eval_masks, batch_size=16, shuffle=False)
-    mask_eval_all_loader = DataLoader(padded_eval_all_masks, batch_size=16, shuffle=False)
+    graph_eval_loader = DataLoader(hetero_eval_graphs, batch_size=16, shuffle=True)
+    mask_eval_loader = DataLoader(padded_eval_masks, batch_size=16, shuffle=True)
+    mask_eval_all_loader = DataLoader(padded_eval_all_masks, batch_size=16, shuffle=True)
 
 
 
@@ -433,4 +443,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-# train()
+train()

@@ -116,11 +116,13 @@ class SketchLoopGraph(HeteroData):
 
 
     def remove_stroke_type(self):
-        # self['stroke'].x[:, 6] = 0
         self['stroke'].x[:, -1] = 0
-
         self['loop'].x.zero_()
 
+
+    def set_feature_lines_mask(self, feature_lines_mask):
+        mask = feature_lines_mask < 0.5
+        self['stroke'].x[mask.squeeze(), :] = -1
 
 
     def _compute_loop_features(self, stroke_cloud_loops, loop_to_brep):

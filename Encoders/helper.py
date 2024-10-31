@@ -695,6 +695,9 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx):
 
     # Plot the chosen loop in red
     for idx, stroke in enumerate(stroke_node_features):
+        if stroke[-2] == -1 and stroke[-3] == -1 and stroke[-4] == -1:
+            continue
+
         if idx in selected_stroke_idx:
             stroke = stroke_node_features[idx]
             if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:

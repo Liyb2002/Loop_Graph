@@ -122,8 +122,6 @@ def do_fillet(gnn_graph, brep_edges):
     fillet_selection_mask = predict_fillet(gnn_graph)
     fillet_edge, fillet_amount = whole_process_helper.helper.get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges)
 
-    print("fillet_edge", fillet_edge)
-    print("fillet_amount", fillet_amount)
     return fillet_edge, fillet_amount
 
 
