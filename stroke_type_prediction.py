@@ -312,10 +312,6 @@ def eval():
 
         graphs.append(gnn_graph)
         stroke_selection_masks.append(features_strokes)
-
-        if len(graphs) > 20:
-            break
-
     
         
     print(f"Total number of preprocessed graphs: {len(graphs)}")

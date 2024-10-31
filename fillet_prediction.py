@@ -19,8 +19,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-import stroke_type_prediction
-
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
 graph_decoder = Encoders.gnn.gnn.Fillet_Decoder()
 
@@ -303,15 +301,14 @@ def eval():
             stroke_to_edge
         )
 
-        feature_lines_mask = stroke_type_prediction.predict_stroke_type(gnn_graph)
-        gnn_graph.set_feature_lines_mask(feature_lines_mask)
-
         gnn_graph.to_device_withPadding(device)
         stroke_selection_matrix = stroke_selection_matrix.to(device)
 
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
+        if len(graphs) > 200:
+            break
     
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
 
