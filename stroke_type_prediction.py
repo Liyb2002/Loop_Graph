@@ -68,6 +68,8 @@ def compute_accuracy(valid_output, valid_batch_masks):
 def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
     batch_size = valid_output.shape[0] // 400
     correct = 0
+    total = 0
+
 
     for i in range(batch_size):
         output_slice = valid_output[i * 400:(i + 1) * 400]
@@ -75,27 +77,28 @@ def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
         stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 400:(i + 1) * 400]
 
 
-        condition_1 = (mask_slice == 1) & (output_slice > 0.5)
-        condition_2 = (mask_slice == 0) & (output_slice < 0.5)
+        mask_indices = (mask_slice > 0.5).nonzero(as_tuple=True)[0]
+        
+        # Count correct predictions at the indices where mask_slice is 1
+        correct += (output_slice[mask_indices] > 0.5).sum().item()
+        
+        # Update total with the count of 1s in mask_slice
+        total += mask_indices.numel()
 
         predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
         gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of ground truth strokes
+        # Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
+        # Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
 
-        if torch.all(condition_1 | condition_2):
-            correct += 1
-        else:
-            # Visualization for debugging
-            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
-            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
 
-    return correct
+    return total, correct
 
 
 # ------------------------------------------------------------------------------# 
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole_eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0
@@ -213,6 +216,7 @@ def train():
 
         # Validation loop
         val_loss = 0.0
+        best_loss = 1.0
         correct = 0
         total = 0
         graph_encoder.eval()
@@ -251,8 +255,8 @@ def train():
         print(f"Validation Loss: {val_loss / total_iterations_val:.5f}, Validation Accuracy: {val_accuracy:.4f}")
 
         # Save the model if validation accuracy improves
-        if val_accuracy > best_accuracy:
-            best_accuracy = val_accuracy
+        if val_loss < best_loss:
+            best_loss = val_loss
             print(f"New best accuracy: {best_accuracy:.4f}, saved model")
             save_models()
 
@@ -337,8 +341,9 @@ def eval():
             batch_masks = batch_masks.to(output.device).view(-1, 1)
 
 
-            correct += compute_accuracy_eval(output, batch_masks, hetero_batch)    
-            total += batch_size
+            tempt_total, tempt_correct = compute_accuracy_eval(output, batch_masks, hetero_batch)    
+            total += tempt_total
+            correct += tempt_correct
 
             # Compute loss
             loss = criterion(output, batch_masks)
@@ -347,7 +352,7 @@ def eval():
 
     # Calculate and print overall average accuracy
     overall_accuracy = correct / total
-    print(f"Overall Average Accuracy: {overall_accuracy:.2f}")
+    print(f"Percentage of correct strokes: {overall_accuracy:.2f}")
 
 
 #---------------------------------- Public Functions ----------------------------------#

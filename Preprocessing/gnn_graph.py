@@ -33,40 +33,29 @@ class SketchLoopGraph(HeteroData):
 
         # Create edges between loops and strokes
         stroke_loop_edges, loop_stroke_edges= self._create_loop_stroke_edges(stroke_cloud_loops)
-        self['stroke', 'represents', 'loop'].edge_index = torch.zeros((2, 1), dtype=torch.long)
-
-        self['loop', 'represented_by', 'stroke'].edge_index = torch.zeros((2, 1), dtype=torch.long)
-
+        self['stroke', 'represents', 'loop'].edge_index = torch.tensor(stroke_loop_edges, dtype=torch.long)
+        self['loop', 'represented_by', 'stroke'].edge_index = torch.tensor(loop_stroke_edges, dtype=torch.long)
 
         # Create neighboring_vertical edges
         self.loop_neighboring_vertical = loop_neighboring_vertical
         vertical_edge_indices = self._create_loop_vertical_neighbor_edges(loop_neighboring_vertical)
-        self['loop', 'neighboring_vertical', 'loop'].edge_index = torch.zeros((2, 1), dtype=torch.long)
-
+        self['loop', 'neighboring_vertical', 'loop'].edge_index = torch.tensor(vertical_edge_indices, dtype=torch.long)
 
         # Create neighboring_horizontal edges
         horizontal_edge_indices = self._create_loop_neighbor_edges(loop_neighboring_horizontal)
-        self['loop', 'neighboring_horizontal', 'loop'].edge_index = torch.zeros((2, 1), dtype=torch.long)
-
-
+        self['loop', 'neighboring_horizontal', 'loop'].edge_index = torch.tensor(horizontal_edge_indices, dtype=torch.long)
 
         # Create directed edges for contained loops
         contains_edges, is_contained_by_edges = self._create_containment_edges(loop_neighboring_contained)
-        self['loop', 'contains', 'loop'].edge_index = torch.zeros((2, 1), dtype=torch.long)
-
-
+        self['loop', 'contains', 'loop'].edge_index = torch.tensor(contains_edges, dtype=torch.long)
 
         # Create stroke order edges
         stroke_order_edges = self._create_stroke_order_edges(stroke_node_features)
-        self['stroke', 'order', 'stroke'].edge_index = torch.zeros((2, 1), dtype=torch.long)
-
-
+        self['stroke', 'order', 'stroke'].edge_index = torch.tensor(stroke_order_edges, dtype=torch.long)
 
         # Create stroke connect edges from connected_stroke_nodes
         strokes_perpendicular_edges = self._create_stroke_connect_edges(strokes_perpendicular)
-        self['stroke', 'perpendicular', 'stroke'].edge_index = torch.zeros((2, 1), dtype=torch.long)
-
-
+        self['stroke', 'perpendicular', 'stroke'].edge_index = torch.tensor(strokes_perpendicular_edges, dtype=torch.long)
 
 
     def padding(self):
@@ -127,7 +116,7 @@ class SketchLoopGraph(HeteroData):
 
 
     def remove_stroke_type(self):
-        self['stroke'].x[:, 6] = 0
+        # self['stroke'].x[:, 6] = 0
         self['stroke'].x[:, -1] = 0
 
         self['loop'].x.zero_()

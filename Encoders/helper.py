@@ -668,6 +668,8 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx):
     for stroke in stroke_node_features:
         start, end = stroke[:3], stroke[3:6]
 
+        if stroke[-2] == -1 and stroke[-3] == -1 and stroke[-4] == -1:
+            continue
         # Update the min and max limits for rescaling based only on strokes (ignoring circles)
         if stroke[7] == 0:
             x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
