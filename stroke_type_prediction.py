@@ -65,11 +65,37 @@ def compute_accuracy(valid_output, valid_batch_masks):
     return correct
 
 
+def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
+    batch_size = valid_output.shape[0] // 400
+    correct = 0
+
+    for i in range(batch_size):
+        output_slice = valid_output[i * 400:(i + 1) * 400]
+        mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
+        stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 400:(i + 1) * 400]
+
+
+        condition_1 = (mask_slice == 1) & (output_slice > 0.5)
+        condition_2 = (mask_slice == 0) & (output_slice < 0.5)
+
+        predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of ground truth strokes
+
+        if torch.all(condition_1 | condition_2):
+            correct += 1
+        else:
+            # Visualization for debugging
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
+
+    return correct
+
+
 # ------------------------------------------------------------------------------# 
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole_eval')
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0
@@ -86,9 +112,6 @@ def train():
         if program[-1] != 'terminate':
             continue
         
-
-
-
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
             stroke_node_features, 
@@ -254,19 +277,9 @@ def eval():
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
-        if program[-1] != 'chamfer'or len(program) > stroke_operations_order_matrix.shape[1]:
+        if program[-1] != 'terminate':
             continue
         
-        kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)        
-        all_chamfer_strokes = Encoders.helper.get_all_operation_strokes(stroke_operations_order_matrix, program_whole, 'chamfer')
-        
-        if kth_operation is None or all_chamfer_strokes is None:
-            continue
-
-
-        chamfer_stroke_idx = (kth_operation == 1).nonzero(as_tuple=True)[0] 
-
-
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
             stroke_node_features, 
@@ -279,14 +292,20 @@ def eval():
         )
 
         gnn_graph.to_device_withPadding(device)
-        stroke_selection_matrix = kth_operation.to(device)
+
+        features_strokes = Encoders.helper.get_feature_strokes(gnn_graph)
+        features_stroke_idx = (features_strokes == 1).nonzero(as_tuple=True)[0] 
+
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), features_stroke_idx)
+        gnn_graph.remove_stroke_type()
 
         graphs.append(gnn_graph)
-        stroke_selection_masks.append(stroke_selection_matrix)
+        stroke_selection_masks.append(features_strokes)
+
+        if len(graphs) > 20:
+            break
 
     
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
-
         
     print(f"Total number of preprocessed graphs: {len(graphs)}")
 
@@ -317,17 +336,12 @@ def eval():
             # Ensure masks are on the correct device and reshape them
             batch_masks = batch_masks.to(output.device).view(-1, 1)
 
-            # Create a valid mask for non-zero values (padding values are -1)
-            valid_mask = (batch_masks != -1).float()
-            valid_output = output * valid_mask
-            valid_batch_masks = batch_masks * valid_mask
 
-
-            correct += compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch)    
+            correct += compute_accuracy_eval(output, batch_masks, hetero_batch)    
             total += batch_size
 
             # Compute loss
-            loss = criterion(valid_output, valid_batch_masks)
+            loss = criterion(output, batch_masks)
             eval_loss += loss.item()
 
 

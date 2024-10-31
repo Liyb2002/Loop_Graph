@@ -48,8 +48,10 @@ def get_feature_strokes(gnn_graph):
     for i, stroke in enumerate(gnn_graph['stroke'].x):
         if stroke[7] > 0:
             features_strokes[i] = 1
+        elif features_strokes[i] != 0 and features_strokes[i] != 1:
+            features_strokes[i] = 0
 
-    return features_strokes
+    return features_strokes.clone()
 
 
 
