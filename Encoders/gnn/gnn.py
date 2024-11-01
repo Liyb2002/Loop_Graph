@@ -210,7 +210,7 @@ class Program_Decoder(nn.Module):
         graph_cls_output = attn_output_graph[:, 0, :]  # CLS token output from graph features
 
         # Weighted combination of program and graph CLS outputs
-        combined_output = 0.8 * program_cls_output + 0.2 * graph_cls_output
+        combined_output =  program_cls_output + graph_cls_output
 
         # Classification
         logits = self.classifier(combined_output)
