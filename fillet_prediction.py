@@ -100,8 +100,7 @@ def train():
     dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
 
-    best_val_accuracy = 0
-    epochs = 30
+    epochs = 15
 
     graphs = []
     stroke_selection_masks = []
@@ -364,4 +363,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-# eval()
+train()

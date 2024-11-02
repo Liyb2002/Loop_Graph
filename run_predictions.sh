@@ -1,9 +1,9 @@
 #!/bin/bash
 
 
-python sketch_prediction.py
+# python sketch_prediction.py
 
-python extrude_prediction.py
+# python extrude_prediction.py
 
 python fillet_prediction.py
 

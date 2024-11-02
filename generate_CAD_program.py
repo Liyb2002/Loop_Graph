@@ -80,6 +80,9 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
 
 
     new_particle = particle.Particle(cur_output_dir, gt_brep_file_path, data_produced, stroke_node_features)
+    while new_particle.is_valid_particle():
+        new_particle.generate_next_step()
+        print("next generate")
 
 
     # except Exception as e:

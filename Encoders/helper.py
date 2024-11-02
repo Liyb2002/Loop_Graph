@@ -529,118 +529,6 @@ def vis_brep(brep):
     plt.show()
 
 
-def vis_selected_loops(stroke_node_features, strokes_to_loops, selected_loop_idx):
-    """
-    Visualize the graph with loops and strokes in 3D space, including circles for strokes where stroke[7] != 0.
-    
-    Parameters:
-    graph (SketchLoopGraph): A single graph object containing loops and strokes.
-    selected_loop_idx (int): The index of the loop that is chosen to be highlighted (not used yet).
-    """
-
-    # Extract stroke features
-    # stroke_node_features = graph['stroke'].x.cpu().numpy()
-    print("stroke_node_features", stroke_node_features.shape)
-
-    # Initialize the 3D plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.grid(False)
-
-    # Initialize min and max limits
-    x_min, x_max = float('inf'), float('-inf')
-    y_min, y_max = float('inf'), float('-inf')
-    z_min, z_max = float('inf'), float('-inf')
-
-    # Plot all strokes in blue
-    for stroke in stroke_node_features:
-        start, end = stroke[:3], stroke[3:6]
-
-        if stroke[7] == 0:
-            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-
-        if stroke[-2] == -1 and stroke[-3] == -1 and stroke[-4] == -1:
-            continue
-        
-        # Update the min and max limits for rescaling based only on strokes (ignoring circles)
-        if stroke[7] == 0:
-            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-        
-        if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
-            # Circle face
-            x_values, y_values, z_values = plot_circle(stroke)
-            ax.plot(x_values, y_values, z_values, color='blue')
-            continue
-
-        if stroke[7] != 0 and stroke[8] != 0:
-            # Arc
-            x_values, y_values, z_values = plot_arc(stroke)
-            ax.plot(x_values, y_values, z_values, color='blue')
-            continue
-
-
-    # Plot the chosen loop in red
-    # strokes_to_loops = graph['stroke', 'represents', 'loop'].edge_index
-    stroke_to_loops = {}
-    for stroke_idx, loop_idx in zip(strokes_to_loops[0], strokes_to_loops[1]):
-        if loop_idx.item() not in stroke_to_loops:
-            stroke_to_loops[loop_idx.item()] = []
-        stroke_to_loops[loop_idx.item()].append(stroke_idx.item())
-
-    for loop_idx, stroke_indices in stroke_to_loops.items():
-        if loop_idx in selected_loop_idx:  # Plot only the selected loop
-            for idx in stroke_indices:
-                stroke = stroke_node_features[idx]
-            
-                if stroke[-2] == -1 and stroke[-3] == -1 and stroke[-4] == -1:
-                    continue
-                # Update the min and max limits for rescaling based only on strokes (ignoring circles)
-                if stroke[7] == 0:
-                    x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-                    y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-                    z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-                
-                if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
-                    # Circle face
-                    x_values, y_values, z_values = plot_circle(stroke)
-                    ax.plot(x_values, y_values, z_values, color='blue')
-                    continue
-
-                if stroke[7] != 0 and stroke[8] != 0:
-                    # Arc
-                    x_values, y_values, z_values = plot_arc(stroke)
-                    ax.plot(x_values, y_values, z_values, color='blue')
-                    continue
-
-                else:
-                    start, end = stroke[:3], stroke[3:6]
-                    ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='red', linewidth=1)
-
-
-    # Compute the center of the shape based on the strokes only (ignoring circles)
-    x_center = (x_min + x_max) / 2
-    y_center = (y_min + y_max) / 2
-    z_center = (z_min + z_max) / 2
-
-    # Compute the maximum difference across x, y, z directions
-    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
-
-    # Set the same limits for x, y, and z axes centered around the computed center
-    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
-    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
-    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
-
-    # Set axis labels
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    # Show plot
-    plt.show()
 
 
 
@@ -672,7 +560,6 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx):
     # Plot all strokes in blue
     for stroke in stroke_node_features:
         start, end = stroke[:3], stroke[3:6]
-        print("stroke", stroke)
         if stroke[-2] == -1 and stroke[-3] == -1 and stroke[-4] == -1:
             continue
         # Update the min and max limits for rescaling based only on strokes (ignoring circles)
@@ -744,6 +631,16 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx):
     # Show plot
     plt.show()
 
+
+#------------------------------------------------------------------------------------------------------#
+
+def find_selected_strokes_from_loops(strokes_to_loops, selected_loop_idx):
+    selected_stroke_idx = []
+    for stroke_idx, loop_idx in zip(strokes_to_loops[0], strokes_to_loops[1]):
+        if loop_idx.item() == selected_loop_idx[0]:
+            selected_stroke_idx.append(stroke_idx)
+
+    return selected_stroke_idx
 
 
 #------------------------------------------------------------------------------------------------------#

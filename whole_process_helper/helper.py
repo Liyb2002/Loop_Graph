@@ -6,11 +6,9 @@ from itertools import combinations, permutations
 import torch
 from collections import Counter
 
-# --------------------------------------------------------------------------- #
+import torch.nn.functional as F
 
-import numpy as np
-import networkx as nx
-from itertools import combinations, permutations
+# --------------------------------------------------------------------------- #
 
 def face_aggregate_addStroke(stroke_matrix):
     """
@@ -496,3 +494,26 @@ def find_valid_sketch(gnn_graph, sketch_selection_mask):
 
     # If no valid sketch is found, return -1
     return [-1]
+
+
+# --------------------------------------------------------------------------- #
+
+
+def sample_operation(operation_predictions):
+    positive_mask = operation_predictions > 0
+    positive_logits = operation_predictions[positive_mask]
+    
+    if positive_logits.numel() == 0:
+        raise ValueError("No positive logits available to sample from.")
+    
+    # Apply softmax to convert positive logits into probabilities
+    positive_probs = F.softmax(positive_logits, dim=0)
+    
+    # Sample an index from the positive logits using the calculated probabilities
+    sampled_index = torch.multinomial(positive_probs, num_samples=1)
+    
+    # Map back to the original class indices
+    positive_indices = positive_mask.nonzero(as_tuple=True)[1]
+    sampled_class = positive_indices[sampled_index.item()].item()
+    
+    return sampled_class
