@@ -78,7 +78,6 @@ def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
         condition_1 = (mask_slice == 1) & (output_slice > 0.5)
         condition_2 = (mask_slice == 0) & (output_slice < 0.5)
 
-
         if torch.all(condition_1 | condition_2):
             correct += 1
 
@@ -335,7 +334,9 @@ def eval():
         stroke_selection_masks.append(stroke_selection_matrix)
 
     
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
+        if len(graphs) > 20:
+            break
 
         
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -389,4 +390,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()
