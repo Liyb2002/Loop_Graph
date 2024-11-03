@@ -526,3 +526,31 @@ def sample_operation(operation_predictions):
     sampled_class = positive_indices[sampled_index.item()].item()
     
     return sampled_class
+
+
+
+# --------------------------------------------------------------------------- #
+
+def sample_program_termination(stroke_nodes, feature_stroke_mask):
+
+    # 2) Find all feature strokes with mask values > 0.5
+    num_feature_strokes = (feature_stroke_mask > 0.5).sum().item()
+
+    # 3) Count used feature strokes among valid strokes
+    used_feature_strokes = 0.0
+    untouched_feature_idx = []
+    for i in range(0, feature_stroke_mask.shape[0]):
+        stroke_node = stroke_nodes[i]
+
+        if stroke_node[-1] == 1:
+            used_feature_strokes += 1.0
+
+        elif feature_stroke_mask[i] > 0.5:
+            untouched_feature_idx.append(i)
+    
+    termination_prob = used_feature_strokes / num_feature_strokes
+
+    if termination_prob < 0.8:
+        termination_prob = 0
+
+    return termination_prob, untouched_feature_idx

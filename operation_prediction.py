@@ -33,7 +33,7 @@ optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.par
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'operation_prediction')
+save_dir = os.path.join(current_dir, 'checkpoints', 'operation_prediction2')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -165,6 +165,9 @@ def train():
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
         
+        if program[-1] == 'terminate':
+            continue
+
         # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
@@ -184,7 +187,7 @@ def train():
         existing_programs.append(Encoders.helper.program_mapping(program[:-1], device))
         gt_programs.append(Encoders.helper.program_gt_mapping([program[-1]], device))
 
-        if len(graphs) > 10000:
+        if len(graphs) > 20000:
             break
 
 
