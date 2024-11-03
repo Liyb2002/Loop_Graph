@@ -16,12 +16,12 @@ def random_program(data_directory = None):
         canvas_class.random_fillet()
     
     #random gen for n steps
-    steps = random.randint(3, 4)
+    steps = random.randint(3, 3)
     for _ in range(steps - 1):
         canvas_class.regular_sketch_op()
         canvas_class.extrude_op()
 
-        fillet_times = random.randint(1, 2)
+        fillet_times = random.randint(1, 1)
         for _ in range(fillet_times):
             if random.random() < 0.5:
                 canvas_class.random_chamfer()

@@ -58,6 +58,69 @@ class SketchLoopGraph(HeteroData):
         self['stroke', 'perpendicular', 'stroke'].edge_index = torch.tensor(strokes_perpendicular_edges, dtype=torch.long)
 
 
+    def graph_info(self):
+        """
+        Outputs information about the graph, including the number of nodes and edges
+        for each type and any relevant features of the nodes.
+        """
+        info = {
+            'num_stroke_nodes': self['stroke'].x.shape[0],
+            'num_loop_nodes': self['loop'].x.shape[0],
+            'stroke_features_shape': self['stroke'].x.shape[1],
+            'loop_features_shape': self['loop'].x.shape[1] if 'loop' in self.node_types else 'None',
+            'edge_types': {}
+        }
+
+        for edge_type in self.edge_types:
+            src, rel, dst = edge_type
+            edge_index = self[edge_type].edge_index
+            num_edges = edge_index.shape[1]
+            info['edge_types'][f"{src} -> {rel} -> {dst}"] = {
+                'num_edges': num_edges,
+                'source_node': src,
+                'destination_node': dst,
+                'relation': rel
+            }
+
+        # Print the information in a structured format
+        print("Graph Information:")
+        print(f"Number of stroke nodes: {info['num_stroke_nodes']}")
+        print(f"Number of loop nodes: {info['num_loop_nodes']}")
+        print(f"Stroke features shape: {info['stroke_features_shape']}")
+        print(f"Loop features shape: {info['loop_features_shape']}")
+        print("\nEdge Types and Counts:")
+        for edge, edge_info in info['edge_types'].items():
+            print(f"  {edge}:")
+            print(f"    Number of edges: {edge_info['num_edges']}")
+            print(f"    Source node type: {edge_info['source_node']}")
+            print(f"    Destination node type: {edge_info['destination_node']}")
+            print(f"    Relation type: {edge_info['relation']}")
+
+
+
+    def move_graph(self, gt_graph):
+        """
+        Copies all nodes and edges from gt_graph to self, including node features and edge indices.
+        
+        Parameters:
+        gt_graph (SketchLoopGraph): The source graph to copy data from.
+        """
+        # Copy node features for each node type
+        for node_type in gt_graph.node_types:
+            if node_type in gt_graph:
+                self[node_type].x = gt_graph[node_type].x
+
+        # Copy edges for each edge type
+        for edge_type in gt_graph.edge_types:
+            src, rel, dst = edge_type
+            print(f"Processing edge type: {src} -> {rel} -> {dst}")
+
+            if edge_type in gt_graph.edge_types:
+                self[edge_type].edge_index = gt_graph[edge_type].edge_index
+                num_edges = self[edge_type].edge_index.shape[1]
+                print(f"Copied {num_edges} edges of type {rel} from {src} to {dst}")
+    
+    
     def padding(self):
     
         target_shape = (400, 11)

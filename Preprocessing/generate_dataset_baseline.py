@@ -23,10 +23,10 @@ class dataset_generator():
         # if os.path.exists('dataset'):
         #     shutil.rmtree('dataset')
 
-        self.dataset_name = 'dataset/stroke_type_predict'
+        self.dataset_name = 'dataset/eval2'
         os.makedirs(self.dataset_name, exist_ok=True)
 
-        self.generate_dataset(self.dataset_name, number_data = 500, start =self.compute_start_idx())
+        self.generate_dataset(self.dataset_name, number_data = 20, start =self.compute_start_idx())
     
 
     def compute_start_idx(self):

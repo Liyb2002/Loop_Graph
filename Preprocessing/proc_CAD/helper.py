@@ -1252,6 +1252,7 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
     num_brep_loops = len(brep_loops)
     correspondence_matrix = np.zeros((num_stroke_cloud_loops, num_brep_loops), dtype=np.float32)
 
+
     # Step 1: Find matching between stroke_node_features and final_brep_edges
     stroke_to_brep_map = {}
     for stroke_idx, stroke in enumerate(stroke_node_features):

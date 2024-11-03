@@ -15,8 +15,7 @@ import Encoders.gnn.gnn
 import Encoders.gnn_stroke.gnn
 import Encoders.helper
 
-
-# import whole_process_evaluate
+from Preprocessing.config import device
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -50,11 +49,9 @@ class Particle():
         self.data_produced = data_produced
         self.particle_id = particle_id
 
-
         self.brep_edges = torch.zeros(0)
         self.brep_loops = []
         self.file_path = os.path.join(cur_output_dir, 'Program.json')
-        print("self.file_path", self.file_path)
         self.cur__brep_class = Preprocessing.proc_CAD.generate_program.Brep()
 
 
@@ -65,7 +62,7 @@ class Particle():
         self.strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, self.connected_stroke_nodes)
 
         self.loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(self.stroke_cloud_loops)
-        self.loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(self.stroke_cloud_loops, stroke_node_features, self.loop_neighboring_all)
+        self.loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(self.stroke_cloud_loops, self.stroke_node_features, self.loop_neighboring_all)
         self.loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(self.loop_neighboring_all, self.loop_neighboring_vertical)
         self.loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(self.stroke_cloud_loops, stroke_node_features)
 
@@ -98,6 +95,7 @@ class Particle():
         stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
         stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
         
+
         stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(self.stroke_node_features, self.brep_edges)
         stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(self.stroke_node_features, self.brep_edges)
         stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
@@ -165,11 +163,14 @@ class Particle():
 
         # 5.6) Update brep data
         brep_path = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
-        self.brep_edges, _ = cascade_brep(brep_files, self.data_produced, brep_path)
+        self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
         Encoders.helper.vis_brep(self.brep_edges)
         
         self.past_programs.append(self.current_op)
-        self.current_op = program_prediction(gnn_graph, self.past_programs)
+        if self.current_op == 2:
+            self.current_op =3
+        else:
+            self.current_op = program_prediction(gnn_graph, self.past_programs)
 
         # 6) Write the stroke_cloud data to pkl file
         output_file_path = os.path.join(self.cur_output_dir, f'shape_info.pkl')
@@ -209,6 +210,7 @@ sketch_graph_encoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_
 sketch_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_decoder.pth'), weights_only=True))
 
 def predict_sketch(gnn_graph):
+        
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     sketch_selection_mask = sketch_graph_decoder(x_dict)
 
@@ -268,11 +270,13 @@ fillet_graph_decoder.load_state_dict(torch.load(os.path.join(fillet_dir, 'graph_
 
 
 def predict_fillet(gnn_graph):
-    gnn_graph.padding()
+    
     x_dict = fillet_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     fillet_selection_mask = fillet_graph_decoder(x_dict)
 
-    fillet_stroke_idx =  (fillet_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+    fillet_stroke_idx =  (fillet_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
+    print("fillet_selection_mask", fillet_selection_mask)
+    print("fillet_stroke_idx", fillet_stroke_idx)
     
     Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
     return fillet_selection_mask
@@ -299,11 +303,14 @@ chamfer_graph_decoder.load_state_dict(torch.load(os.path.join(chanfer_dir, 'grap
 
 
 def predict_chamfer(gnn_graph):
-    gnn_graph.padding()
+    # gnn_graph.padding()
     x_dict = chamfer_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     chamfer_selection_mask = chamfer_graph_decoder(x_dict)
 
-    chamfer_stroke_idx =  (chamfer_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+    chamfer_stroke_idx =  (chamfer_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
+    print("chamfer_selection_mask", chamfer_selection_mask)
+    print("chamfer_stroke_idx", chamfer_stroke_idx)
+
     Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
     return chamfer_selection_mask
 

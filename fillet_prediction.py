@@ -61,7 +61,6 @@ def compute_accuracy(valid_output, valid_batch_masks):
 
         if torch.all(condition_1 | condition_2):
             correct += 1
-
     return correct
 
 
@@ -69,16 +68,21 @@ def compute_accuracy(valid_output, valid_batch_masks):
 def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
     batch_size = valid_output.shape[0] // 400
     correct = 0
+    total = 0
 
     for i in range(batch_size):
         output_slice = valid_output[i * 400:(i + 1) * 400]
         mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
         stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 400:(i + 1) * 400]
 
-        condition_1 = (mask_slice == 1) & (output_slice > 0.5)
-        condition_2 = (mask_slice == 0) & (output_slice < 0.5)
+        condition_1 = (mask_slice > 0.5) & (output_slice > 0.5)
+        condition_2 = (mask_slice < 0.5) & (output_slice < 0.5)
 
+        predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
 
+        print("")
+        total += 1
         if torch.all(condition_1 | condition_2):
             correct += 1
 
@@ -90,7 +94,7 @@ def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
             Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
 
 
-    return correct
+    return total, correct
 
 
 # ------------------------------------------------------------------------------# 
@@ -100,7 +104,7 @@ def train():
     dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
 
-    epochs = 15
+    epochs = 30
 
     graphs = []
     stroke_selection_masks = []
@@ -165,7 +169,6 @@ def train():
 
 
     # Training and validation loop
-    epochs = 30  # Number of epochs
     best_accuracy = 0.0
 
     for epoch in range(epochs):
@@ -270,7 +273,7 @@ def eval():
     batch_size = 16
 
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole_eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/generate_CAD')
     print(f"Total number of shape data: {len(dataset)}")
 
     graphs = []
@@ -300,16 +303,15 @@ def eval():
             stroke_to_edge
         )
 
+        # gnn_graph.graph_info()
+
         gnn_graph.to_device_withPadding(device)
         stroke_selection_matrix = stroke_selection_matrix.to(device)
 
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
-        if len(graphs) > 200:
-            break
-    
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
 
         
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -347,8 +349,9 @@ def eval():
             valid_batch_masks = batch_masks * valid_mask
 
 
-            correct += compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch)           
-            total += batch_size
+            tempt_total, tempt_correct = compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch)           
+            total += tempt_total
+            correct += tempt_correct
 
             # Compute loss
             loss = criterion(valid_output, valid_batch_masks)
@@ -357,10 +360,10 @@ def eval():
 
     # Calculate and print overall average accuracy
     overall_accuracy = correct / total
-    print(f"Overall Average Accuracy: {overall_accuracy:.2f}%")
+    print(f"Overall Average Accuracy: {overall_accuracy:.2f}")
 
 
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

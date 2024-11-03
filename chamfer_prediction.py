@@ -122,7 +122,7 @@ def train():
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0
-    epochs = 15
+    epochs = 30
 
     graphs = []
     stroke_selection_masks = []
@@ -390,4 +390,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()
