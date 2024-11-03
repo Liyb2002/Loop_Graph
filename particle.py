@@ -275,9 +275,7 @@ def predict_fillet(gnn_graph):
     fillet_selection_mask = fillet_graph_decoder(x_dict)
 
     fillet_stroke_idx =  (fillet_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
-    print("fillet_selection_mask", fillet_selection_mask)
-    print("fillet_stroke_idx", fillet_stroke_idx)
-    
+        
     Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
     return fillet_selection_mask
 
@@ -308,9 +306,6 @@ def predict_chamfer(gnn_graph):
     chamfer_selection_mask = chamfer_graph_decoder(x_dict)
 
     chamfer_stroke_idx =  (chamfer_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
-    print("chamfer_selection_mask", chamfer_selection_mask)
-    print("chamfer_stroke_idx", chamfer_stroke_idx)
-
     Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
     return chamfer_selection_mask
 

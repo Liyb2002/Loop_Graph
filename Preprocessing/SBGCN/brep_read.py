@@ -86,8 +86,8 @@ def create_face_node(face):
 
 
 # What this code does:
-# 1)Cicles: Center (3 value), normal (3 value), 0, radius
-# 2)Cylinder face: Center (3 value), normal (3 value), height, radius
+# 1)Cicles: Center (3 value), normal (3 value), 0, radius, 0, 2
+# 2)Cylinder face: Center (3 value), normal (3 value), height, radius, 0, 3
 def create_face_node_gnn(face):
     
     adaptor_surface = BRepAdaptor_Surface(face)
@@ -134,7 +134,7 @@ def create_face_node_gnn(face):
 
         height_vector = gp_Vec(point_start, point_end)
         height = height_vector.Magnitude()
-        cylinder_data = axis_location + axis_direction + [height, radius]
+        cylinder_data = axis_location + axis_direction + [height, radius] + [0, 3]
         circle_features.append(cylinder_data)
 
 
@@ -150,19 +150,22 @@ def create_face_node_gnn(face):
             # Check if the curve is a circle
             if curve_type == GeomAbs_Circle:
                 geom_circle = adaptor_curve.Circle()
+                angle_radians = abs(last - first)
+                
+                if abs(angle_radians - 6.283) < 0.1:  # Full circle (approximately 2π)
+                    # Extract circle parameters
+                    circle_axis = geom_circle.Axis()
+                    circle_center = geom_circle.Location()
+                    circle_radius = geom_circle.Radius()
+                    circle_normal = circle_axis.Direction()
+                
 
-                # Extract circle parameters
-                circle_axis = geom_circle.Axis()
-                circle_center = geom_circle.Location()
-                circle_radius = geom_circle.Radius()
-                circle_normal = circle_axis.Direction()
+                    center_coords = [circle_center.X(), circle_center.Y(), circle_center.Z()]
+                    normal_coords = [circle_normal.X(), circle_normal.Y(), circle_normal.Z()]
+                    radius = circle_radius
 
-                center_coords = [circle_center.X(), circle_center.Y(), circle_center.Z()]
-                normal_coords = [circle_normal.X(), circle_normal.Y(), circle_normal.Z()]
-                radius = circle_radius
-
-                cylinder_data = center_coords + normal_coords + [0, circle_radius]
-                circle_features.append(cylinder_data)
+                    cylinder_data = center_coords + normal_coords + [0, circle_radius] + [0, 2]
+                    circle_features.append(cylinder_data)
             
             edge_explorer.Next()
 
@@ -171,8 +174,8 @@ def create_face_node_gnn(face):
 
 
 # What this code does:
-# 1)Arc: Point_1 (3 value), Point_2 (3 value), Center (3 value)
-# 2)Cylinder face: Point_1 (3 value), Point_2 (3 value)
+# 1)Arc: Point_1 (3 value), Point_2 (3 value), Center (3 value), 4
+# 2)Straight Line: Point_1 (3 value), Point_2 (3 value), 0, 0, 0, 1
 def create_edge_node(edge):
 
     # Get the underlying geometry of the edge
@@ -187,7 +190,7 @@ def create_edge_node(edge):
         center = adaptor.Circle().Location()
 
 
-        return [start_point.X(), start_point.Y(), start_point.Z(), end_point.X(), end_point.Y(), end_point.Z(), center.X(),center.Y(), center.Z() ]
+        return [start_point.X(), start_point.Y(), start_point.Z(), end_point.X(), end_point.Y(), end_point.Z(), center.X(),center.Y(), center.Z() , 4]
  
 
 
@@ -204,7 +207,7 @@ def create_edge_node(edge):
         vertices.append([vertex_coords.X(), vertex_coords.Y(), vertex_coords.Z()])
         vertex_explorer.Next()
 
-    return [vertices[0][0], vertices[0][1], vertices[0][2], vertices[1][0], vertices[1][1], vertices[1][2], 0, 0, 0]
+    return [vertices[0][0], vertices[0][1], vertices[0][2], vertices[1][0], vertices[1][1], vertices[1][2], 0, 0, 0, 1]
 
 def create_vertex_node(vertex):
     pt = BRep_Tool.Pnt(vertex)
