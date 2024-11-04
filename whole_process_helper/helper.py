@@ -489,6 +489,7 @@ def find_valid_sketch(gnn_graph, sketch_selection_mask):
     
     # Get the indices sorted by the values in sketch_selection_mask (from largest to smallest)
     sorted_indices = torch.argsort(sketch_selection_mask.squeeze(), descending=True)
+    valid_indices = []
 
     # Iterate over the sorted indices and check corresponding loop node values
     for idx in sorted_indices:
@@ -499,10 +500,24 @@ def find_valid_sketch(gnn_graph, sketch_selection_mask):
 
         # Check if the loop node value is 0
         if loop_node_value == 0:
-            return [idx]  # Return the index of the valid sketch
+            valid_indices.append(idx)
 
-    # If no valid sketch is found, return -1
-    return [-1]
+        if len(valid_indices) == 3:
+            break
+
+    if len(valid_indices) == 0:
+        return [-1], -1
+
+    top_probs = sketch_selection_mask[valid_indices]
+    
+    normalized_probs = top_probs / top_probs.sum()
+    
+    # Sample an index based on the normalized probabilities
+    sampled_index = torch.multinomial(normalized_probs, num_samples=1)[0].item() 
+    final_index = valid_indices[sampled_index]
+    final_prob = normalized_probs[sampled_index].item()
+
+    return [final_index], final_prob
 
 
 # --------------------------------------------------------------------------- #
@@ -520,12 +535,13 @@ def sample_operation(operation_predictions):
     
     # Sample an index from the positive logits using the calculated probabilities
     sampled_index = torch.multinomial(positive_probs, num_samples=1)
-    
+    sampled_class_prob = positive_probs[sampled_index].item()
+
     # Map back to the original class indices
     positive_indices = positive_mask.nonzero(as_tuple=True)[1]
     sampled_class = positive_indices[sampled_index.item()].item()
     
-    return sampled_class
+    return sampled_class, sampled_class_prob
 
 
 

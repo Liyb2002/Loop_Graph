@@ -136,9 +136,11 @@ def train():
             continue
         
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
-        all_chamfer_strokes = Encoders.helper.get_all_operation_strokes(stroke_operations_order_matrix, program_whole, 'chamfer')
+        raw_chamfer_stroke_idx = (kth_operation == 1).nonzero(as_tuple=True)[0] 
+        chamfer_stroke_idx, stroke_selection_matrix= Encoders.helper.choose_chamfer_strokes(raw_chamfer_stroke_idx, stroke_node_features)
 
-        chamfer_stroke_idx = (all_chamfer_strokes == 1).nonzero(as_tuple=True)[0] 
+
+        # all_chamfer_strokes = Encoders.helper.get_all_operation_strokes(stroke_operations_order_matrix, program_whole, 'chamfer')
 
 
 

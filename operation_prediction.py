@@ -33,7 +33,7 @@ optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.par
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'operation_prediction2')
+save_dir = os.path.join(current_dir, 'checkpoints', 'operation_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -426,4 +426,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

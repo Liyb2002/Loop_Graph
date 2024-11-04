@@ -85,10 +85,11 @@ def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
         # Update total with the count of 1s in mask_slice
         total += mask_indices.numel()
 
-        predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-        gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of ground truth strokes
-        Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
-        Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
+        if total - correct > 10:
+            predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+            gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of ground truth strokes
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
 
 
     return total, correct
@@ -136,7 +137,6 @@ def train():
         gnn_graph.remove_stroke_type()
         graphs.append(gnn_graph)
         stroke_selection_masks.append(features_strokes)
-
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -270,7 +270,7 @@ def eval():
     batch_size = 16
 
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole_eval')
     print(f"Total number of shape data: {len(dataset)}")
 
     graphs = []
@@ -281,8 +281,8 @@ def eval():
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
-        # if program[-1] != 'terminate':
-        #     continue
+        if program[-1] != 'terminate':
+            continue
         
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
@@ -299,12 +299,7 @@ def eval():
 
         features_strokes = Encoders.helper.get_feature_strokes(gnn_graph)
         # features_stroke_idx = (features_strokes == 1).nonzero(as_tuple=True)[0] 
-
-
-        feature_lines_type = predict_stroke_type(gnn_graph)
-        predicted_stroke_idx = (feature_lines_type > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), predicted_stroke_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), predicted_stroke_idx)
 
 
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), features_stroke_idx)
@@ -312,6 +307,9 @@ def eval():
 
         graphs.append(gnn_graph)
         stroke_selection_masks.append(features_strokes)
+
+        if len(graphs) > 200:
+            break
     
         
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -358,16 +356,8 @@ def eval():
     print(f"Percentage of correct strokes: {overall_accuracy:.2f}")
 
 
-def predict_stroke_type(gnn_graph):
-    load_models()
-    graph_encoder.eval()
-    graph_decoder.eval()
-    x_dict = graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
-    stroke_selection_mask = graph_decoder(x_dict)
-
-    return stroke_selection_mask
 
 #---------------------------------- Public Functions ----------------------------------#
 
 
-# eval()
+train()
