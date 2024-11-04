@@ -1175,6 +1175,10 @@ def pad_brep_features(final_brep_edges):
 
 
 #----------------------------------------------------------------------------------#
+def points_match(point1, point2, tolerance=0.05):
+    return all(abs(a - b) < tolerance for a, b in zip(point1, point2))
+
+
 def stroke_to_edge(stroke_node_features, final_brep_edges):
     """
     Determines if each stroke is used in the final BRep edges.
@@ -1199,8 +1203,18 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
         for brep_edge in final_brep_edges:
             brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))  # Get the start and end points of the BRep edge
             
+            stroke_match = all(
+                any(points_match(stroke_point, brep_point) for brep_point in brep_points)
+                for stroke_point in stroke_points
+            )
+
+            brep_match = all(
+                any(points_match(brep_point, stroke_point) for stroke_point in stroke_points)
+                for brep_point in brep_points
+            )
+
             # Check if stroke points are part of any brep edge
-            if stroke_points.issubset(brep_points) or brep_points.issubset(stroke_points):
+            if stroke_match or brep_match:
                 stroke_used_matrix[stroke_idx] = 1  # Mark this stroke as used
                 break  # No need to check further once a match is found
     

@@ -99,113 +99,110 @@ class Particle():
 
     def generate_next_step(self):
 
-        # try:
+        try:
 
-        stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
-        stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
-        stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
-        
+            stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
+            stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
+            stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
+            
 
-        stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(self.stroke_node_features, self.brep_edges)
-        stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(self.stroke_node_features, self.brep_edges)
-        stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
-        
-        # 2) Build graph
-        gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
-            self.stroke_cloud_loops, 
-            self.stroke_node_features, 
-            self.strokes_perpendicular, 
-            self.loop_neighboring_vertical, 
-            self.loop_neighboring_horizontal, 
-            self.loop_neighboring_contained,
-            stroke_to_loop,
-            stroke_to_edge
-        )
-
-
-        if len(self.past_programs) == 1:
-            # Find all feature edges
-            self.predicted_feature_strokes = do_stroke_type_prediction(gnn_graph)
+            stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(self.stroke_node_features, self.brep_edges)
+            stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(self.stroke_node_features, self.brep_edges)
+            stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
+            
+            # 2) Build graph
+            gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
+                self.stroke_cloud_loops, 
+                self.stroke_node_features, 
+                self.strokes_perpendicular, 
+                self.loop_neighboring_vertical, 
+                self.loop_neighboring_horizontal, 
+                self.loop_neighboring_contained,
+                stroke_to_loop,
+                stroke_to_edge
+            )
 
 
-        if self.program_terminated(gnn_graph):
-            self.valid_particle = False
-            self.success_terminate = True
+            if len(self.past_programs) == 1:
+                # Find all feature edges
+                self.predicted_feature_strokes = do_stroke_type_prediction(gnn_graph)
+
+
+            if self.program_terminated(gnn_graph):
+                self.valid_particle = False
+                self.success_terminate = True
 
 
 
-        if self.current_op == 1:
-            print("Do sketch")
-            self.sketch_selection_mask, self.sketch_points, normal, selected_loop_idx = do_sketch(gnn_graph)
-            self.selected_loop_indices.append(selected_loop_idx)
-            if self.sketch_points.shape[0] == 1:
-                # do circle sketch
-                self.cur__brep_class.regular_sketch_circle(self.sketch_points[0, 3:6].tolist(), self.sketch_points[0, 7].item(), self.sketch_points[0, :3].tolist())
-            else: 
-                self.cur__brep_class._sketch_op(self.sketch_points, normal, self.sketch_points)
+            if self.current_op == 1:
+                print("Do sketch")
+                self.sketch_selection_mask, self.sketch_points, normal, selected_loop_idx = do_sketch(gnn_graph)
+                self.selected_loop_indices.append(selected_loop_idx)
+                if self.sketch_points.shape[0] == 1:
+                    # do circle sketch
+                    self.cur__brep_class.regular_sketch_circle(self.sketch_points[0, 3:6].tolist(), self.sketch_points[0, 7].item(), self.sketch_points[0, :3].tolist())
+                else: 
+                    self.cur__brep_class._sketch_op(self.sketch_points, normal, self.sketch_points)
 
 
-        # Build Extrude
-        if self.current_op == 2:
-            print("Do extrude")
-            extrude_amount, extrude_direction = do_extrude(gnn_graph, self.sketch_selection_mask, self.sketch_points, self.brep_edges)
-            self.cur__brep_class.extrude_op(extrude_amount, extrude_direction)
+            # Build Extrude
+            if self.current_op == 2:
+                print("Do extrude")
+                extrude_amount, extrude_direction = do_extrude(gnn_graph, self.sketch_selection_mask, self.sketch_points, self.brep_edges)
+                self.cur__brep_class.extrude_op(extrude_amount, extrude_direction)
 
 
-        # Build fillet
-        if self.current_op == 3:
-            print("Build Fillet")
-            fillet_edge, fillet_amount = do_fillet(gnn_graph, self.brep_edges)
-            self.cur__brep_class.random_fillet(fillet_edge, fillet_amount)
+            # Build fillet
+            if self.current_op == 3:
+                print("Build Fillet")
+                fillet_edge, fillet_amount = do_fillet(gnn_graph, self.brep_edges)
+                self.cur__brep_class.random_fillet(fillet_edge, fillet_amount)
 
 
-        if self.current_op ==4:
-            print("Build Chamfer")
-            chamfer_edge, chamfer_amount = do_chamfer(gnn_graph, self.brep_edges)
-            self.cur__brep_class.random_chamfer(chamfer_edge, chamfer_amount)
+            if self.current_op ==4:
+                print("Build Chamfer")
+                chamfer_edge, chamfer_amount = do_chamfer(gnn_graph, self.brep_edges)
+                self.cur__brep_class.random_chamfer(chamfer_edge, chamfer_amount)
 
 
-        # 5.3) Write to brep
-        self.cur__brep_class.write_to_json(self.cur_output_dir)
+            # 5.3) Write to brep
+            self.cur__brep_class.write_to_json(self.cur_output_dir)
 
 
-        # 5.4) Read the program and produce the brep file
-        parsed_program_class = Preprocessing.proc_CAD.Program_to_STL.parsed_program(self.file_path, self.cur_output_dir)
-        parsed_program_class.read_json_file()
+            # 5.4) Read the program and produce the brep file
+            parsed_program_class = Preprocessing.proc_CAD.Program_to_STL.parsed_program(self.file_path, self.cur_output_dir)
+            parsed_program_class.read_json_file()
 
 
-        # 5.5) Read brep file
-        cur_relative_output_dir = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}')
+            # 5.5) Read brep file
+            cur_relative_output_dir = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}')
 
-        brep_files = [file_name for file_name in os.listdir(os.path.join(cur_relative_output_dir, 'canvas'))
-                if file_name.startswith('brep_') and file_name.endswith('.step')]
-        brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+            brep_files = [file_name for file_name in os.listdir(os.path.join(cur_relative_output_dir, 'canvas'))
+                    if file_name.startswith('brep_') and file_name.endswith('.step')]
+            brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
 
 
-        # 5.6) Update brep data
-        brep_path = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
-        self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
-        Encoders.helper.vis_brep(self.brep_edges)
-        
-        self.past_programs.append(self.current_op)
-        if len(self.past_programs) == 3:
-            self.current_op = 3
-        else:
+            # 5.6) Update brep data
+            brep_path = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
+            self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
+            # Encoders.helper.vis_brep(self.brep_edges)
+            
+            self.past_programs.append(self.current_op)
             self.current_op = program_prediction(gnn_graph, self.past_programs)
 
-        # 6) Write the stroke_cloud data to pkl file
-        output_file_path = os.path.join(self.cur_output_dir, f'shape_info.pkl')
-        with open(output_file_path, 'wb') as f:
-            pickle.dump({
-                'stroke_node_features': self.stroke_node_features,
-            }, f)
-        
+            # 6) Write the stroke_cloud data to pkl file
+            output_file_path = os.path.join(self.cur_output_dir, f'shape_info.pkl')
+            with open(output_file_path, 'wb') as f:
+                pickle.dump({
+                    'stroke_node_features': self.stroke_node_features,
+                }, f)
+            
 
-        # 7) Also copy the gt brep file
-        shutil.copy(self.gt_brep_file_path, os.path.join(self.cur_output_dir, 'gt_brep.step'))
-        
-        # except Exception as e:
-        #     self.valid_particle = False
+            # 7) Also copy the gt brep file
+            shutil.copy(self.gt_brep_file_path, os.path.join(self.cur_output_dir, 'gt_brep.step'))
+            
+        except Exception as e:
+            self.valid_particle = False
  
 
 

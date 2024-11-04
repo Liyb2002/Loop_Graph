@@ -189,7 +189,6 @@ def create_edge_node(edge):
         radius = adaptor.Circle().Radius()
         center = adaptor.Circle().Location()
 
-
         return [start_point.X(), start_point.Y(), start_point.Z(), end_point.X(), end_point.Y(), end_point.Z(), center.X(),center.Y(), center.Z() , 4]
  
 
