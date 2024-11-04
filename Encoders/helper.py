@@ -3,6 +3,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
+from math import inf
+from numpy.linalg import norm
+
 
 def get_kth_operation(op_to_index_matrix, k):    
     squeezed_matrix = op_to_index_matrix.squeeze(0)
@@ -128,6 +131,37 @@ def choose_fillet_strokes(raw_fillet_stroke_idx, stroke_node_features):
         stroke_selection_matrix[idx] = 1.0  # Use 1.0 to ensure float32 type
     
     return filtered_strokes, stroke_selection_matrix
+
+
+def dist(point1, point2):
+    # Calculate the Euclidean distance between two points
+    return norm([p1 - p2 for p1, p2 in zip(point1, point2)])
+
+def choose_chamfer_strokes(raw_chamfer_stroke_idx, stroke_node_features):
+    # Filter `raw_chamfer_stroke_idx` based on conditions in `stroke_node_features`
+    min_stroke_length = inf
+    chamfer_strokes = []
+
+    # Find the minimum stroke length among the specified strokes
+    for idx in raw_chamfer_stroke_idx:
+        stroke_length = dist(stroke_node_features[idx][0:3], stroke_node_features[idx][3:6])
+        if stroke_length < min_stroke_length:
+            min_stroke_length = stroke_length
+
+    # Collect strokes with the minimum length found
+    for idx in raw_chamfer_stroke_idx:
+        if dist(stroke_node_features[idx][0:3], stroke_node_features[idx][3:6]) == min_stroke_length:
+            chamfer_strokes.append(idx)  # Fix: `append` is a method and should use parentheses
+
+    # Create a selection matrix with the same number of strokes as in stroke_node_features
+    num_strokes = stroke_node_features.shape[0]
+    stroke_selection_matrix = torch.zeros((num_strokes, 1), dtype=torch.float32)
+
+    # Set the value to 1 for the selected strokes
+    for idx in chamfer_strokes:
+        stroke_selection_matrix[idx] = 1.0  # Use 1.0 to ensure float32 type
+
+    return chamfer_strokes, stroke_selection_matrix
 #------------------------------------------------------------------------------------------------------#
 
 
