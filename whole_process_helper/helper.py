@@ -355,18 +355,28 @@ def clean_mask(sketch_selection_mask, selected_loop_idx):
 
 
 def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
-    _, fillet_stroke_idx = torch.topk(fillet_selection_mask.flatten(), k=2)
+
+    top2_vals, top2_idxs = torch.topk(fillet_selection_mask.view(-1), 1)
+    total_sum = top2_vals.sum()
+    relative_probs = top2_vals / total_sum
+    sampled_idx = torch.multinomial(relative_probs, 1).item()
+
+    selected_idx = top2_idxs[sampled_idx].item()
+    selected_prob = top2_vals[sampled_idx].item()
 
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
-    fillet_strokes = stroke_features[fillet_stroke_idx]
+    fillet_stroke = stroke_features[selected_idx]
     
+
+
     # Step 1: Extract all unique 3D points from chamfer_strokes
-    points = fillet_strokes[:, :6].reshape(-1, 3)
-    fillet_points = torch.unique(points, dim=0)
+    point1 = fillet_stroke[:3]
+    point2 = fillet_stroke[3:6]
+
 
     # Convert brep_edges to a PyTorch tensor
     if isinstance(brep_edges, (np.ndarray, list)):
-        brep_edges = torch.tensor(brep_edges, dtype=points.dtype)
+        brep_edges = torch.tensor(brep_edges, dtype=point1.dtype)
 
 
     min_distance = 100
@@ -379,26 +389,26 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
         edge_mid_point = (edge_point1 + edge_point2) / 2
 
         # Compute distances from edge_mid_point to all fillet_points
-        distances = torch.norm(fillet_points - edge_mid_point, dim=1)
+        distance1 = torch.norm(point1 - edge_mid_point)
+        distance2 = torch.norm(point2 - edge_mid_point)
 
         # Check if all distances are the same within a small tolerance
-        if torch.allclose(distances, distances[0], atol=1e-2):
-
-            if distances[0] < min_distance:
-                min_distance = distances[0]
+        if torch.allclose(distance1, distance2, atol=1e-2):
+            
+            if distance1 < min_distance:
+                min_distance = distance1
                 fillet_edge = edge
 
 
     if fillet_edge is not None:
         # Compute chamfer_amount
-        fillet_arc = fillet_strokes[0]
-        example_point = fillet_arc[0:3]
-        example_center = fillet_arc[7:10]
+        example_point = fillet_stroke[0:3]
+        example_center = fillet_stroke[7:10]
 
         dist = torch.norm(example_point - example_center)
-        return fillet_edge, dist
+        return fillet_edge, dist, selected_prob
 
-    return None, None
+    return None, None, 0
 
 
 # --------------------------------------------------------------------------- #
@@ -406,7 +416,7 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
 
 
 def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
-    _, chamfer_stroke_idx = torch.topk(chamfer_selection_mask.flatten(), k=2)
+    _, chamfer_stroke_idx = torch.topk(chamfer_selection_mask.flatten(), k=1)
     
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7)
     chamfer_strokes = stroke_features[chamfer_stroke_idx]
