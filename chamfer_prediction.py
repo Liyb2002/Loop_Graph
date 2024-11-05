@@ -31,7 +31,7 @@ batch_size = 16
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction')
+save_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction2')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -78,15 +78,19 @@ def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
         condition_1 = (mask_slice == 1) & (output_slice > 0.5)
         condition_2 = (mask_slice == 0) & (output_slice < 0.5)
 
+        predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+
+        Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
+        Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
+
+
         if torch.all(condition_1 | condition_2):
             correct += 1
 
-        else:
-            predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-            gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-
-            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
-            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
+        # else:
+        #     Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
+        #     Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
 
 
     return correct
@@ -107,10 +111,10 @@ def compute_accuracy_eval_whole(valid_output, valid_batch_masks, hetero_batch):
         # Check if all predicted indices are in ground truth indices
         if torch.all(torch.isin(predicted_stroke_idx, gt_stroke_idx)):
             correct += 1
-        else:
-            # Visualization for debugging
-            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
-            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
+        # else:
+        #     # Visualization for debugging
+        #     Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
+        #     Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
 
     return correct
 
@@ -140,9 +144,6 @@ def train():
         chamfer_stroke_idx, stroke_selection_matrix= Encoders.helper.choose_chamfer_strokes(raw_chamfer_stroke_idx, stroke_node_features)
 
 
-        # all_chamfer_strokes = Encoders.helper.get_all_operation_strokes(stroke_operations_order_matrix, program_whole, 'chamfer')
-
-
 
 
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
@@ -157,7 +158,6 @@ def train():
         )
 
         gnn_graph.to_device_withPadding(device)
-        stroke_selection_matrix = kth_operation.to(device)
 
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
@@ -308,14 +308,9 @@ def eval():
         if program[-1] != 'chamfer'or len(program) > stroke_operations_order_matrix.shape[1]:
             continue
         
-        kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)        
-        all_chamfer_strokes = Encoders.helper.get_all_operation_strokes(stroke_operations_order_matrix, program_whole, 'chamfer')
-        
-        if kth_operation is None or all_chamfer_strokes is None:
-            continue
-
-
-        chamfer_stroke_idx = (kth_operation == 1).nonzero(as_tuple=True)[0] 
+        kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
+        raw_chamfer_stroke_idx = (kth_operation == 1).nonzero(as_tuple=True)[0] 
+        chamfer_stroke_idx, stroke_selection_matrix= Encoders.helper.choose_chamfer_strokes(raw_chamfer_stroke_idx, stroke_node_features)
 
 
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
@@ -330,14 +325,14 @@ def eval():
         )
 
         gnn_graph.to_device_withPadding(device)
-        stroke_selection_matrix = kth_operation.to(device)
 
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
     
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
-        if len(graphs) > 20:
+
+        if len(graphs) > 500:
             break
 
         

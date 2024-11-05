@@ -212,11 +212,20 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
     """
 
     # 1. Find the stroke with the highest value in extrude_selection_mask
-    max_prob_stroke_idx = torch.argmax(extrude_selection_mask).item()
+    top3_vals, top3_idxs = torch.topk(extrude_selection_mask.view(-1), 3)
+    total_sum = top3_vals.sum()
+    relative_probs = top3_vals / total_sum
+    sampled_idx = torch.multinomial(relative_probs, 1).item()
+
+    selected_idx = top3_idxs[sampled_idx].item()
+    selected_prob = top3_vals[sampled_idx].item()
+
+
+
 
     # 2. Extract stroke node features for the selected stroke
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
-    stroke_feature = stroke_features[max_prob_stroke_idx]
+    stroke_feature = stroke_features[selected_idx]
 
 
 
@@ -304,7 +313,7 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
         # If directions are opposite (dot product < 0), stroke_length should be positive, otherwise negative
         stroke_length = abs(stroke_length) if dot_product < 0 else -abs(stroke_length)
 
-    return stroke_length, direction_vector
+    return stroke_length, direction_vector, selected_prob
 
 
 
@@ -509,14 +518,13 @@ def find_valid_sketch(gnn_graph, sketch_selection_mask):
         return [-1], -1
 
     top_probs = sketch_selection_mask[valid_indices]
-    
     normalized_probs = top_probs / top_probs.sum()
     
     # Sample an index based on the normalized probabilities
     sampled_index = torch.multinomial(normalized_probs, num_samples=1)[0].item() 
     final_index = valid_indices[sampled_index]
-    final_prob = normalized_probs[sampled_index].item()
-
+    final_prob = max(normalized_probs[sampled_index].item(), top_probs[sampled_index].item())
+    
     return [final_index], final_prob
 
 
