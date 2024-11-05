@@ -108,7 +108,6 @@ total = 0
 for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
     stroke_node_features, output_brep_edges, gt_brep_edges= data
 
-
     stroke_node_features = stroke_node_features.squeeze(0)
     stroke_node_features = torch.round(stroke_node_features * 10000) / 10000
 

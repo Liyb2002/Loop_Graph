@@ -416,18 +416,26 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
 
 
 def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
-    _, chamfer_stroke_idx = torch.topk(chamfer_selection_mask.flatten(), k=1)
     
-    stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7)
-    chamfer_strokes = stroke_features[chamfer_stroke_idx]
+    top2_vals, top2_idxs = torch.topk(chamfer_selection_mask.view(-1), 1)
+    total_sum = top2_vals.sum()
+    relative_probs = top2_vals / total_sum
+    sampled_idx = torch.multinomial(relative_probs, 1).item()
+
+    selected_idx = top2_idxs[sampled_idx].item()
+    selected_prob = top2_vals[sampled_idx].item()
+
+    stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
+    chamfer_stroke = stroke_features[selected_idx]
+
 
     # Step 1: Extract all unique 3D points from chamfer_strokes
-    points = chamfer_strokes[:, :6].reshape(-1, 3)
-    chamfer_points = torch.unique(points, dim=0)
+    point1 = chamfer_stroke[:3]
+    point2 = chamfer_stroke[3:6]
 
     # Convert brep_edges to a PyTorch tensor
     if isinstance(brep_edges, (np.ndarray, list)):
-        brep_edges = torch.tensor(brep_edges, dtype=points.dtype)
+        brep_edges = torch.tensor(brep_edges, dtype=point1.dtype)
 
     # Step 2 and 3: Iterate over brep_edges to find the matching edge
     min_distance = 100
@@ -438,24 +446,24 @@ def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
         edge_mid_point = (edge_point1 + edge_point2) / 2
 
         # Compute distances from edge_mid_point to all chamfer_points
-        distances = torch.norm(chamfer_points - edge_mid_point, dim=1)
+        distance1 = torch.norm(point1 - edge_mid_point)
+        distance2 = torch.norm(point2 - edge_mid_point)
 
         # Check if all distances are the same within a small tolerance
-        if torch.allclose(distances, distances[0], atol=1e-2):
-            if distances[0] < min_distance:
-                min_distance = distances[0]
+        if torch.allclose(distance1, distance2, atol=1e-2):
+            if distance1 < min_distance:
+                min_distance = distance1
                 chamfer_edge = edge
 
 
     if chamfer_edge is not None:
-        chamfer_point = chamfer_points[0]
-        dist1 = torch.norm(edge[:3] - chamfer_point)
-        dist2 = torch.norm(edge[3:6] - chamfer_point)
+        dist1 = torch.norm(edge[:3] - point1)
+        dist2 = torch.norm(edge[3:6] - point1)
 
         chamfer_amount = min(dist1.item(), dist2.item())
-        return edge, chamfer_amount
+        return edge, chamfer_amount, selected_prob
 
-    return None, None
+    return None, None, 0
 
 
 
@@ -588,3 +596,7 @@ def sample_program_termination(stroke_nodes, feature_stroke_mask):
         termination_prob = 0
 
     return termination_prob, untouched_feature_idx
+
+
+
+# --------------------------------------------------------------------------- #

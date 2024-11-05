@@ -141,8 +141,9 @@ class Particle():
 
         if self.current_op == 1:
             print("Do sketch")
-            self.sketch_selection_mask, self.sketch_points, normal, selected_loop_idx = do_sketch(gnn_graph)
+            self.sketch_selection_mask, self.sketch_points, normal, selected_loop_idx, prob = do_sketch(gnn_graph)
             self.selected_loop_indices.append(selected_loop_idx)
+            self.score = self.score * prob
             if self.sketch_points.shape[0] == 1:
                 # do circle sketch
                 self.cur__brep_class.regular_sketch_circle(self.sketch_points[0, 3:6].tolist(), self.sketch_points[0, 7].item(), self.sketch_points[0, :3].tolist())
@@ -153,21 +154,24 @@ class Particle():
         # Build Extrude
         if self.current_op == 2:
             print("Do extrude")
-            extrude_amount, extrude_direction = do_extrude(gnn_graph, self.sketch_selection_mask, self.sketch_points, self.brep_edges)
+            extrude_amount, extrude_direction, prob = do_extrude(gnn_graph, self.sketch_selection_mask, self.sketch_points, self.brep_edges)
             self.cur__brep_class.extrude_op(extrude_amount, extrude_direction)
+            self.score = self.score * prob
 
 
         # Build fillet
         if self.current_op == 3:
             print("Build Fillet")
-            fillet_edge, fillet_amount = do_fillet(gnn_graph, self.brep_edges)
+            fillet_edge, fillet_amount, prob = do_fillet(gnn_graph, self.brep_edges)
             self.cur__brep_class.random_fillet(fillet_edge, fillet_amount)
+            self.score = self.score * prob
 
 
         if self.current_op ==4:
             print("Build Chamfer")
-            chamfer_edge, chamfer_amount = do_chamfer(gnn_graph, self.brep_edges)
+            chamfer_edge, chamfer_amount, prob= do_chamfer(gnn_graph, self.brep_edges)
             self.cur__brep_class.random_chamfer(chamfer_edge, chamfer_amount)
+            self.score = self.score * prob
 
 
         # 5.3) Write to brep
@@ -333,10 +337,10 @@ def predict_chamfer(gnn_graph):
     x_dict = chamfer_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     chamfer_selection_mask = chamfer_graph_decoder(x_dict)
 
-    chamfer_stroke_idx =  (chamfer_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
-    _, chamfer_stroke_idx = torch.topk(chamfer_selection_mask.flatten(), k=2)
-
+    # chamfer_stroke_idx =  (chamfer_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
+    # _, chamfer_stroke_idx = torch.topk(chamfer_selection_mask.flatten(), k=2)
     # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
+    
     return chamfer_selection_mask
 
 
