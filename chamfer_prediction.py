@@ -31,7 +31,7 @@ batch_size = 16
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction2')
+save_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -385,4 +385,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

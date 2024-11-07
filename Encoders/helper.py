@@ -5,6 +5,7 @@ import numpy as np
 
 from math import inf
 from numpy.linalg import norm
+from scipy.interpolate import CubicSpline
 
 
 def get_kth_operation(op_to_index_matrix, k):    
@@ -327,103 +328,143 @@ def clean_face_choice(predicted_index, node_features):
 
 
 #------------------------------------------------------------------------------------------------------#
-
 def vis_left_graph(stroke_node_features):
     """
-    Visualize the graph with loops and strokes in 3D space, including circles for strokes where stroke[7] != 0.
-    
+    Visualizes strokes in 3D space with color coding based on the last feature.
+    Strokes are initially plotted in blue with a hand-drawn effect, 
+    and then strokes with stroke[-1] == 1 are highlighted in green.
+
     Parameters:
-    graph (SketchLoopGraph): A single graph object containing loops and strokes.
-    selected_loop_idx (int): The index of the loop that is chosen to be highlighted (not used yet).
+    - stroke_node_features: A numpy array or list containing the features of each stroke.
+      Each stroke should contain its start and end coordinates, with additional
+      flags indicating if it's a circle or arc and the color coding based on the last element.
     """
-
-    # Extract stroke features
-
+    
     # Initialize the 3D plot
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.grid(False)
+    ax.axis('off')
 
     # Initialize min and max limits
     x_min, x_max = float('inf'), float('-inf')
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
-    # Plot strokes based on the last value: 0 for blue, otherwise green
+    perturb_factor = 0.002  # Adjusted perturbation factor for hand-drawn effect
+
+    # First pass: Plot all strokes in blue with perturbations
     for stroke in stroke_node_features:
         start, end = stroke[:3], stroke[3:6]
+        alpha_value = stroke[6]
+        
+        # Ignore invalid strokes marked with specific values
+        if stroke[-2] == -1 and stroke[-3] == -1 and stroke[-4] == -1:
+            continue
+        
+        # Set color to blue for the initial pass
+        color = 'black'
 
-        # Update the min and max limits for rescaling based only on strokes (ignoring circles)
+        # Update min and max limits for rescaling (ignoring circles)
         if stroke[7] == 0:
             x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-
+        
         if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
             # Circle face
             x_values, y_values, z_values = plot_circle(stroke)
-            ax.plot(x_values, y_values, z_values, color='blue')
+            ax.plot(x_values, y_values, z_values, color=color, linewidth=0.5, alpha = alpha_value)
             continue
 
-        if stroke[7] != 0 or stroke[8] != 0 or stroke[9] != 0:
+        if stroke[7] != 0 and stroke[8] != 0:
             # Arc
             x_values, y_values, z_values = plot_arc(stroke)
-            ax.plot(x_values, y_values, z_values, color='blue')
+            ax.plot(x_values, y_values, z_values, color=color, linewidth=0.5, alpha = alpha_value)
             continue
 
         else:
-            # Plot the stroke (in blue or green depending on the condition)
-            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='blue', linewidth=1)
+            # Hand-drawn effect for regular stroke line
+            x_values = np.array([start[0], end[0]])
+            y_values = np.array([start[1], end[1]])
+            z_values = np.array([start[2], end[2]])
+            
+            # Perturb points along the line
+            perturbations = np.random.normal(0, perturb_factor, (10, 3))  # 10 intermediate points
+            t = np.linspace(0, 1, 10)
+            x_interpolated = np.linspace(x_values[0], x_values[1], 10) + perturbations[:, 0]
+            y_interpolated = np.linspace(y_values[0], y_values[1], 10) + perturbations[:, 1]
+            z_interpolated = np.linspace(z_values[0], z_values[1], 10) + perturbations[:, 2]
 
+            # Smooth with cubic splines
+            cs_x = CubicSpline(t, x_interpolated)
+            cs_y = CubicSpline(t, y_interpolated)
+            cs_z = CubicSpline(t, z_interpolated)
+            smooth_t = np.linspace(0, 1, 100)
+            smooth_x = cs_x(smooth_t)
+            smooth_y = cs_y(smooth_t)
+            smooth_z = cs_z(smooth_t)
+
+            # Plot with hand-drawn effect
+            ax.plot(smooth_x, smooth_y, smooth_z, color=color, linewidth=0.5, alpha = alpha_value)
+
+    # Second pass: Plot selected strokes in green with hand-drawn effect to overlay the blue ones
     for stroke in stroke_node_features:
-        if stroke[-1] == 0:
-            continue
-        start, end = stroke[:3], stroke[3:6]
-        stroke_color = 'green' 
+        if stroke[-1] == 1:
+            start, end = stroke[:3], stroke[3:6]
+            
+            # Ignore invalid strokes marked with specific values
+            if stroke[-2] == -1 and stroke[-3] == -1 and stroke[-4] == -1:
+                continue
+            
+            color = 'blue'
+            
+            if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
+                # Circle face
+                x_values, y_values, z_values = plot_circle(stroke)
+                ax.plot(x_values, y_values, z_values, color=color, linewidth=0.5, alpha = alpha_value)
+                continue
 
-        # Update the min and max limits for rescaling based only on strokes (ignoring circles)
-        if stroke[7] == 0:
-            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+            if stroke[7] != 0 and stroke[8] != 0:
+                # Arc
+                x_values, y_values, z_values = plot_arc(stroke)
+                ax.plot(x_values, y_values, z_values, color=color, linewidth=0.5, alpha = alpha_value)
+                continue
 
-        if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
-            # Circle face
-            x_values, y_values, z_values = plot_circle(stroke)
-            ax.plot(x_values, y_values, z_values, color='blue')
-            continue
+            else:
+                # Hand-drawn effect for selected green stroke line
+                x_values = np.array([start[0], end[0]])
+                y_values = np.array([start[1], end[1]])
+                z_values = np.array([start[2], end[2]])
+                
+                perturbations = np.random.normal(0, perturb_factor, (10, 3))
+                t = np.linspace(0, 1, 10)
+                x_interpolated = np.linspace(x_values[0], x_values[1], 10) + perturbations[:, 0]
+                y_interpolated = np.linspace(y_values[0], y_values[1], 10) + perturbations[:, 1]
+                z_interpolated = np.linspace(z_values[0], z_values[1], 10) + perturbations[:, 2]
 
-        if stroke[7] != 0 or stroke[8] != 0 or stroke[9] != 0:
-            # Arc
-            x_values, y_values, z_values = plot_arc(stroke)
-            ax.plot(x_values, y_values, z_values, color='blue')
-            continue
+                cs_x = CubicSpline(t, x_interpolated)
+                cs_y = CubicSpline(t, y_interpolated)
+                cs_z = CubicSpline(t, z_interpolated)
+                smooth_t = np.linspace(0, 1, 100)
+                smooth_x = cs_x(smooth_t)
+                smooth_y = cs_y(smooth_t)
+                smooth_z = cs_z(smooth_t)
 
-        else:
-            # Plot the stroke (in blue or green depending on the condition)
-            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color=stroke_color, linewidth=1)
+                ax.plot(smooth_x, smooth_y, smooth_z, color=color, linewidth=0.5, alpha = alpha_value)
 
-    # Compute the center of the shape based on the strokes only (ignoring circles)
+    # Compute the center and rescale
     x_center = (x_min + x_max) / 2
     y_center = (y_min + y_max) / 2
     z_center = (z_min + z_max) / 2
-
-    # Compute the maximum difference across x, y, z directions
     max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
-
-    # Set the same limits for x, y, and z axes centered around the computed center
     ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
     ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
     ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
 
-    # Set axis labels
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
 
     # Show plot
     plt.show()
-
 
 
 
