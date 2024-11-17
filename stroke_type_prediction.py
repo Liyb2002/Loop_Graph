@@ -88,6 +88,11 @@ def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
         if total - correct > 10:
             predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
             gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of ground truth strokes
+
+            drop_prob = 0.1
+            mask = torch.rand(predicted_stroke_idx.shape) > drop_prob
+            predicted_stroke_idx = predicted_stroke_idx[mask]
+
             Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
             Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
 
@@ -298,9 +303,7 @@ def eval():
         gnn_graph.to_device_withPadding(device)
 
         features_strokes = Encoders.helper.get_feature_strokes(gnn_graph)
-        # features_stroke_idx = (features_strokes == 1).nonzero(as_tuple=True)[0] 
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), predicted_stroke_idx)
-
+        features_stroke_idx = (features_strokes == 1).nonzero(as_tuple=True)[0] 
 
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), features_stroke_idx)
         gnn_graph.remove_stroke_type()
@@ -360,4 +363,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

@@ -8,3 +8,5 @@
 *.pyc
 *.pth
 *.DS_Store
+
+/dataset

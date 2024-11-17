@@ -200,7 +200,7 @@ class Particle():
 
         self.past_programs.append(self.current_op)
         if len(self.past_programs) ==3:
-            self.current_op = 3
+            self.current_op = 1
         else:
             self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
             self.score = self.score * op_prob
@@ -278,8 +278,8 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
     x_dict = extrude_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     extrude_selection_mask = extrude_graph_decoder(x_dict)
     
-    # extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
-    _, extrude_stroke_idx = torch.max(extrude_selection_mask, dim=0)
+    extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+    # _, extrude_stroke_idx = torch.max(extrude_selection_mask, dim=0)
     Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
     return extrude_selection_mask
 
@@ -308,9 +308,9 @@ def predict_fillet(gnn_graph):
     x_dict = fillet_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     fillet_selection_mask = fillet_graph_decoder(x_dict)
 
-    # fillet_stroke_idx =  (fillet_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
+    fillet_stroke_idx =  (fillet_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
     # _, fillet_stroke_idx = torch.topk(fillet_selection_mask.flatten(), k=1)
-    _, fillet_stroke_idx = torch.max(fillet_selection_mask, dim=0)
+    # _, fillet_stroke_idx = torch.max(fillet_selection_mask, dim=0)
 
     Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
     return fillet_selection_mask

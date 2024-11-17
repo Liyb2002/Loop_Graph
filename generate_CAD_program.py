@@ -32,7 +32,7 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/playground', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/generate_CAD', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 
