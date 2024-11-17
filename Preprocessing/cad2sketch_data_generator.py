@@ -21,10 +21,33 @@ import re
 class cad2sketch_dataset_generator():
 
     def __init__(self):
+        data_path = os.path.join(os.getcwd(), 'dataset', 'cad2sketch')
+        target_path = os.path.join(os.getcwd(), 'dataset', 'cad2sketch_annotated')
 
-        self.generate_dataset()
-        print('hey')
+        self.generate_dataset(data_path)
     
-    def generate_dataset(self):
-        pass
 
+    def generate_dataset(self, data_path):
+        folders = [folder for folder in os.listdir(data_path) if os.path.isdir(os.path.join(data_path, folder))]
+        
+
+        for folder in folders:
+            # folder_path = 'dataset/cad2sketch/201'
+            folder_path = os.path.join(data_path, folder)
+
+            subfolders = [sf for sf in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, sf))]
+            if not subfolders:
+                print(f"  No subfolders found in '{folder}'. Skipping...")
+                continue
+
+            for subfolder in subfolders:
+                # subfolder_path = 'dataset/cad2sketch/201/51.6_-136.85_1.4'
+                subfolder_path = os.path.join(folder_path, subfolder)
+                
+                self.process_subfolder(subfolder_path)
+    
+    
+    def process_subfolder(self, subfolder_path):
+        json_file_path = os.path.join(subfolder_path, 'final_edges.json')
+
+        print(f"  Processing json_file_path: {json_file_path}")
