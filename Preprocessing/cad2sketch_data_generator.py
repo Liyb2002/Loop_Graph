@@ -2,7 +2,6 @@
 import Preprocessing.proc_CAD.proc_gen
 import Preprocessing.proc_CAD.CAD_to_stroke_cloud
 import Preprocessing.proc_CAD.render_images
-import Preprocessing.proc_CAD.Program_to_STL
 import Preprocessing.proc_CAD.helper
 import Preprocessing.proc_CAD.render_images
 import Preprocessing.proc_CAD.draw_all_lines_baseline
@@ -21,19 +20,21 @@ import re
 class cad2sketch_dataset_generator():
 
     def __init__(self):
-        data_path = os.path.join(os.getcwd(), 'dataset', 'cad2sketch')
-        target_path = os.path.join(os.getcwd(), 'dataset', 'cad2sketch_annotated')
+        self.data_path = os.path.join(os.getcwd(), 'dataset', 'cad2sketch')
+        self.target_path = os.path.join(os.getcwd(), 'dataset', 'cad2sketch_annotated')
+        self.idx = 0
 
-        self.generate_dataset(data_path)
-    
 
-    def generate_dataset(self, data_path):
-        folders = [folder for folder in os.listdir(data_path) if os.path.isdir(os.path.join(data_path, folder))]
+        self.generate_dataset()
+
+
+    def generate_dataset(self):
+        folders = [folder for folder in os.listdir(self.data_path) if os.path.isdir(os.path.join(self.data_path, folder))]
         
 
         for folder in folders:
             # folder_path = 'dataset/cad2sketch/201'
-            folder_path = os.path.join(data_path, folder)
+            folder_path = os.path.join(self.data_path, folder)
 
             subfolders = [sf for sf in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, sf))]
             if not subfolders:
@@ -44,10 +45,42 @@ class cad2sketch_dataset_generator():
                 # subfolder_path = 'dataset/cad2sketch/201/51.6_-136.85_1.4'
                 subfolder_path = os.path.join(folder_path, subfolder)
                 
-                self.process_subfolder(subfolder_path)
+                self.process_subfolder(folder_path, subfolder_path)
     
     
-    def process_subfolder(self, subfolder_path):
+    def process_subfolder(self, folder_path, subfolder_path):
         json_file_path = os.path.join(subfolder_path, 'final_edges.json')
 
-        print(f"  Processing json_file_path: {json_file_path}")
+        if os.path.exists(json_file_path):
+
+            # Create a new folder 'data_{idx}' in the target path
+            new_folder_name = f"data_{self.idx}"
+            new_folder_path = os.path.join(self.target_path, new_folder_name)
+            os.makedirs(new_folder_path, exist_ok=True)
+            
+            
+            # Create '/canvas' and '/shape_info' subdirectories
+            canvas_folder = os.path.join(new_folder_path, 'canvas')
+            shape_info_folder = os.path.join(new_folder_path, 'shape_info')
+            os.makedirs(canvas_folder, exist_ok=True)
+            os.makedirs(shape_info_folder, exist_ok=True)
+
+            self.copy_shape_files(folder_path, canvas_folder)
+
+
+            self.idx += 1
+
+
+    def copy_shape_files(self, source_path, target_path):
+        print('source_path', source_path)
+        shape_files = [f for f in os.listdir(source_path) if f.lower().endswith('.stl')]
+        
+        if not shape_files:
+            print("  No .stl files found in the source folder.")
+            return
+        
+        for shape_file in shape_files:
+            source_file = os.path.join(source_path, shape_file)
+            target_file = os.path.join(target_path, shape_file)
+            shutil.copy(source_file, target_file)
+            print(f"  Copied {shape_file} to {target_path}")
