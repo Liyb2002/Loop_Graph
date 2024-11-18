@@ -9,6 +9,13 @@ import Preprocessing.proc_CAD.draw_all_lines_baseline
 import Preprocessing.gnn_graph
 import Preprocessing.SBGCN.brep_read
 
+from OCP.STEPControl import STEPControl_Writer, STEPControl_AsIs
+from OCP.StlAPI import StlAPI_Reader
+from OCP.TopoDS import TopoDS_Shape
+from OCP.BRepMesh import BRepMesh_IncrementalMesh
+from OCP.IFSelect import IFSelect_RetDone
+
+
 import shutil
 import os
 import pickle
@@ -79,8 +86,38 @@ class cad2sketch_dataset_generator():
             print("  No .stl files found in the source folder.")
             return
         
-        for shape_file in shape_files:
-            source_file = os.path.join(source_path, shape_file)
-            target_file = os.path.join(target_path, shape_file)
-            shutil.copy(source_file, target_file)
-            print(f"  Copied {shape_file} to {target_path}")
+        for stl_file in shape_files:
+            source_file = os.path.join(source_path, stl_file)
+            shutil.copy(source_file, target_path)
+
+            step_file_name = os.path.splitext(stl_file)[0] + ".step"
+            target_file = os.path.join(target_path, step_file_name)
+            
+            # Convert .stl to .step
+            if self.convert_stl_to_step(source_file, target_file):
+                print(f"Converted {stl_file} to {step_file_name}")
+            else:
+                print(f"Failed to convert {stl_file}")
+
+
+    def convert_stl_to_step(self, stl_file, step_file):
+        """
+        Converts an .stl file to .step using Open CASCADE.
+        """
+        # Read the STL file
+        stl_reader = StlAPI_Reader()
+        shape = TopoDS_Shape()
+        if not stl_reader.Read(shape, stl_file):
+            print(f"Error reading STL file: {stl_file}")
+            return False
+        
+        # Perform meshing (optional but recommended)
+        BRepMesh_IncrementalMesh(shape, 0.1)
+
+        # Write to STEP file
+        step_writer = STEPControl_Writer()
+        step_writer.Transfer(shape, STEPControl_AsIs)
+        status = step_writer.Write(step_file)
+        
+        return status == IFSelect_RetDone
+
