@@ -99,9 +99,22 @@ class cad2sketch_dataset_generator():
         stroke_node_features = Preprocessing.proc_CAD.cad2sketch_stroke_features.build_final_edges_json(json_data)
         stroke_operations_order_matrix = self.compute_opertations_order_matrix(json_data)
 
-
         strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, connected_stroke_nodes)
-        print("strokes_non_perpendicular", strokes_non_perpendicular)
+
+
+        # 2) Get the loops
+        stroke_cloud_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
+        stroke_cloud_loops = [list(loop) for loop in stroke_cloud_loops]
+
+        # 3) Compute Loop Neighboring Information
+        loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(stroke_cloud_loops)
+        loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(stroke_cloud_loops, stroke_node_features, loop_neighboring_all)
+        loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(loop_neighboring_all, loop_neighboring_vertical)
+        loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(stroke_cloud_loops, stroke_node_features)
+
+
+        # 4) Load Brep
+        
 
     def compute_connection_matrix(self, json_data):
         # Extract all unique IDs

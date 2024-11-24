@@ -708,7 +708,7 @@ def face_aggregate_circle(stroke_matrix):
     for i in range(stroke_matrix.shape[0]):
 
         # Is circle
-        if stroke_matrix[i, 7] != 0:
+        if stroke_matrix[i, -1] == 2 or stroke_matrix[i, -1] == 4:
             circle_loops.append(frozenset([i]))
 
     return circle_loops
