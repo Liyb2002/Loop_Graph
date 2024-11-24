@@ -84,14 +84,24 @@ class cad2sketch_dataset_generator():
 
         # Node connection_matrix
         strokes_dict_data = self.read_json(strokes_dict_path)
-        self.compute_connection_matrix(strokes_dict_data)
+        connected_stroke_nodes = self.compute_connection_matrix(strokes_dict_data)
 
         # Node Features
         json_data = self.read_json(json_file_path)
-        Preprocessing.proc_CAD.cad2sketch_stroke_features.vis_stroke_cloud(json_data)
-        self.compute_shape_info(json_data)
+        # Preprocessing.proc_CAD.cad2sketch_stroke_features.vis_stroke_cloud(json_data)
+        self.compute_shape_info(json_data, connected_stroke_nodes)
 
 
+
+    def compute_shape_info(self, json_data, connected_stroke_nodes):
+
+        # 1) Produce the Stroke Cloud features            
+        stroke_node_features = Preprocessing.proc_CAD.cad2sketch_stroke_features.build_final_edges_json(json_data)
+        stroke_operations_order_matrix = self.compute_opertations_order_matrix(json_data)
+
+
+        strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, connected_stroke_nodes)
+        print("strokes_non_perpendicular", strokes_non_perpendicular)
 
     def compute_connection_matrix(self, json_data):
         # Extract all unique IDs
@@ -124,9 +134,34 @@ class cad2sketch_dataset_generator():
         return connection_matrix
 
 
-    def compute_shape_info(self, json_data):
-        stroke_node_features = Preprocessing.proc_CAD.cad2sketch_stroke_features.build_final_edges_json(json_data)
-        # stroke_operations_order_matrix = ??
+    def compute_opertations_order_matrix(self, json_data):
+        all_feature_ids = set()
+        
+        for stroke in json_data.values():
+            feature_id = stroke['feature_id']
+            if isinstance(feature_id, list):
+                all_feature_ids.update(feature_id)
+            else:
+                all_feature_ids.add(feature_id)
+        
+        feature_list = sorted(all_feature_ids) 
+        feature_index = {feature: idx for idx, feature in enumerate(feature_list)}
+        
+        num_strokes = len(json_data)
+        num_features = len(feature_list)
+        matrix = np.zeros((num_strokes, num_features), dtype=int)
+        
+        # Populate the matrix 
+        for stroke_idx, stroke in enumerate(json_data.values()):
+            feature_id = stroke['feature_id']
+            if isinstance(feature_id, list):
+                for feature in feature_id:
+                    matrix[stroke_idx][feature_index[feature]] = 1
+            else:
+                matrix[stroke_idx][feature_index[feature_id]] = 1
+        
+        return matrix
+
 
 
     def copy_shape_files(self, source_path, target_path):
