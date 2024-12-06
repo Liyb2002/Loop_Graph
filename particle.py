@@ -47,8 +47,8 @@ class Particle():
         self.cur_output_dir = cur_output_dir
         
         self.gt_brep_file_path = gt_brep_file_path
-        edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(self.gt_brep_file_path)
-        self.gt_brep_features = Preprocessing.proc_CAD.helper.pad_brep_features(edge_features_list + cylinder_features)
+        self.get_gt_brep_history()
+
 
         self.data_produced = data_produced
         self.particle_id = particle_id
@@ -201,6 +201,10 @@ class Particle():
         self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
         # Encoders.helper.vis_brep(self.brep_edges)
 
+        mean_dist_gt_to_output, mean_dist_output_to_gt = chamfer_distance_brep(self.gt_brep_edges, self.brep_edges)
+        print("mean_dist_gt_to_output", mean_dist_gt_to_output)
+        print("mean_dist_output_to_gt", mean_dist_output_to_gt)
+
         self.past_programs.append(self.current_op)
         if len(self.past_programs) ==3:
             self.current_op = 1
@@ -221,7 +225,13 @@ class Particle():
             
         # except Exception as e:
         #     self.valid_particle = False
- 
+    
+
+    def get_gt_brep_history(self):
+        brep_path = os.path.dirname(self.gt_brep_file_path)
+        brep_files = [f for f in os.listdir(brep_path) if f.endswith('.step')]
+        
+        self.gt_brep_edges, _ = cascade_brep(brep_files, None, brep_path)
 
 
 
@@ -397,7 +407,7 @@ def do_stroke_type_prediction(gnn_graph):
     output_mask = strokeType_graph_decoder(x_dict)
 
     predicted_stroke_idx = (output_mask > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), predicted_stroke_idx)
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), predicted_stroke_idx)
     return output_mask
 
 
@@ -426,3 +436,53 @@ def cascade_brep(brep_files, data_produced, brep_path):
 
     return output_brep_edges, brep_loops
 
+
+
+# --------------------- Chamfer Distance --------------------- #
+def chamfer_distance_brep(gt_brep_edges, output_brep_edges):
+    """
+    Calculates the Chamfer distance between ground truth (GT) BREP edges and output BREP edges.
+
+    Parameters:
+    - gt_brep_edges (numpy.ndarray or torch.Tensor): Array or tensor of shape (num_gt_edges, 10),
+      where the first 6 values represent two 3D points defining a GT BREP edge (start and end points).
+    - output_brep_edges (numpy.ndarray or torch.Tensor): Array or tensor of shape (num_output_edges, 10),
+      where the first 6 values represent two 3D points defining an output BREP edge (start and end points).
+
+    Returns:
+    - dist_gt_to_output (torch.Tensor): Mean Chamfer distance from GT edges to output edges.
+    - dist_output_to_gt (torch.Tensor): Mean Chamfer distance from output edges to GT edges.
+    """
+    # Ensure inputs are tensors
+    if not isinstance(gt_brep_edges, torch.Tensor):
+        gt_brep_edges = torch.tensor(gt_brep_edges, dtype=torch.float32)
+    if not isinstance(output_brep_edges, torch.Tensor):
+        output_brep_edges = torch.tensor(output_brep_edges, dtype=torch.float32)
+
+    # Filter valid GT edges (where 8th column == 0)
+    valid_gt_edges = gt_brep_edges[gt_brep_edges[:, 7] == 0]
+    
+    # Extract start and end points for valid GT edges
+    gt_start_points = valid_gt_edges[:, :3]  # First 3 values
+    gt_end_points = valid_gt_edges[:, 3:6]  # Next 3 values
+    gt_points = torch.cat((gt_start_points, gt_end_points), dim=0)  # Combine start and end points
+
+    # Filter valid output edges (where 8th column == 0)
+    valid_output_edges = output_brep_edges[output_brep_edges[:, 7] == 0]
+    
+    # Extract start and end points for valid output edges
+    output_start_points = valid_output_edges[:, :3]  # First 3 values
+    output_end_points = valid_output_edges[:, 3:6]  # Next 3 values
+    output_points = torch.cat((output_start_points, output_end_points), dim=0)  # Combine start and end points
+
+    # Compute Chamfer distance (GT to Output)
+    dist_gt_to_output = torch.cdist(gt_points, output_points, p=2)  # Pairwise distances
+    min_dist_gt_to_output = torch.min(dist_gt_to_output, dim=1)[0]  # Minimum distance for each GT point
+    mean_dist_gt_to_output = torch.mean(min_dist_gt_to_output)  # Mean distance
+
+    # Compute Chamfer distance (Output to GT)
+    dist_output_to_gt = torch.cdist(output_points, gt_points, p=2)  # Pairwise distances
+    min_dist_output_to_gt = torch.min(dist_output_to_gt, dim=1)[0]  # Minimum distance for each Output point
+    mean_dist_output_to_gt = torch.mean(min_dist_output_to_gt)  # Mean distance
+
+    return mean_dist_gt_to_output, mean_dist_output_to_gt
