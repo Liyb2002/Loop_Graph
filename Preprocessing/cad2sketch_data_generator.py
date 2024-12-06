@@ -11,6 +11,8 @@ import Preprocessing.SBGCN.brep_read
 
 import Preprocessing.proc_CAD.cad2sketch_stroke_features
 
+import Preprocessing.generate_dataset_baseline
+
 from OCP.STEPControl import STEPControl_Writer, STEPControl_AsIs
 from OCP.StlAPI import StlAPI_Reader
 from OCP.TopoDS import TopoDS_Shape
@@ -52,7 +54,7 @@ class cad2sketch_dataset_generator():
             if not subfolders:
                 print(f"  No subfolders found in '{folder}'. Skipping...")
                 continue
-
+            
             for subfolder in subfolders:
                 # subfolder_path = 'dataset/cad2sketch/201/51.6_-136.85_1.4'
                 subfolder_path = os.path.join(folder_path, subfolder)
@@ -74,12 +76,12 @@ class cad2sketch_dataset_generator():
         
         
         # Create '/canvas' and '/shape_info' subdirectories
-        canvas_folder = os.path.join(new_folder_path, 'canvas')
+        target_path = os.path.join(new_folder_path, 'canvas')
         shape_info_folder = os.path.join(new_folder_path, 'shape_info')
-        os.makedirs(canvas_folder, exist_ok=True)
+        os.makedirs(target_path, exist_ok=True)
         os.makedirs(shape_info_folder, exist_ok=True)
 
-        # self.copy_shape_files(folder_path, canvas_folder)
+        self.copy_shape_files(folder_path, target_path)
         self.idx += 1
 
         # Node connection_matrix
@@ -89,11 +91,11 @@ class cad2sketch_dataset_generator():
         # Node Features
         json_data = self.read_json(json_file_path)
         # Preprocessing.proc_CAD.cad2sketch_stroke_features.vis_stroke_cloud(json_data)
-        self.compute_shape_info(json_data, connected_stroke_nodes)
+        self.compute_shape_info(json_data, connected_stroke_nodes, target_path, shape_info_folder)
 
 
 
-    def compute_shape_info(self, json_data, connected_stroke_nodes):
+    def compute_shape_info(self, json_data, connected_stroke_nodes, target_path, shape_info_folder):
 
         # 1) Produce the Stroke Cloud features            
         stroke_node_features = Preprocessing.proc_CAD.cad2sketch_stroke_features.build_final_edges_json(json_data)
@@ -114,7 +116,67 @@ class cad2sketch_dataset_generator():
 
 
         # 4) Load Brep
+        brep_files = [f for f in os.listdir(target_path) if f.lower().endswith('.step')]
+        brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+
+        final_brep_edges = []
+        final_cylinder_features = []
+        new_features = []
+        file_count = 0
+        for file_name in brep_files:
+            print("working on", file_name)
+            brep_file_path = os.path.join(target_path, file_name)
+            edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
+            print("edge_features_list", len(edge_features_list))
+
+            # If this is the first brep
+            if len(final_brep_edges) == 0:
+                final_brep_edges = edge_features_list
+                final_cylinder_features = cylinder_features
+            else:
+                # We already have brep
+                new_features= Preprocessing.generate_dataset_baseline.find_new_features(final_brep_edges, edge_features_list) 
+                final_brep_edges += new_features
+                final_cylinder_features += cylinder_features
+            
+            # Preprocessing.proc_CAD.helper.vis_brep(np.array(edge_features_list))
+            output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
+            brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(output_brep_edges) + Preprocessing.proc_CAD.helper.face_aggregate_circle_brep(output_brep_edges)
+            # brep_loops = [list(loop) for loop in brep_loops]
         
+            # # 5) Stroke_Cloud - Brep Connection
+            # stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, output_brep_edges)
+            # stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, output_brep_edges)
+            # stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
+            
+            # stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
+            # stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, output_brep_edges)
+            # stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
+
+            # # 7) Write the data to file
+            # output_file_path = os.path.join(shape_info_folder, f'shape_info_{file_count}.pkl')
+            # with open(output_file_path, 'wb') as f:
+            #     pickle.dump({
+            #         'stroke_cloud_loops': stroke_cloud_loops, 
+
+            #         'stroke_node_features': stroke_node_features,
+            #         'stroke_type_features': None,
+            #         'strokes_perpendicular': strokes_perpendicular,
+            #         'output_brep_edges': output_brep_edges,
+            #         'stroke_operations_order_matrix': stroke_operations_order_matrix, 
+
+            #         'loop_neighboring_vertical': loop_neighboring_vertical,
+            #         'loop_neighboring_horizontal': loop_neighboring_horizontal,
+            #         'loop_neighboring_contained': loop_neighboring_contained,
+
+            #         'stroke_to_loop': stroke_to_loop,
+            #         'stroke_to_edge': stroke_to_edge
+            #     }, f)
+            
+            # file_count += 1
+
+        print("DONE")
+
 
     def compute_connection_matrix(self, json_data):
         # Extract all unique IDs
@@ -178,85 +240,45 @@ class cad2sketch_dataset_generator():
 
 
     def copy_shape_files(self, source_path, target_path):
-        """
-        Copies all '.obj' files from the source folder to the target path, converts them to '.stl', 
-        and then converts them to '.step'. Keeps both '.stl' and '.step' files in the new folder.
-        """
-        shape_files = [f for f in os.listdir(source_path) if f.lower().endswith('.obj')]
+        shape_files = [f for f in os.listdir(source_path) if f.lower().endswith('.stl')]
+                
+        for stl_file in shape_files:
+            # Copy the .stl file
+            source_file = os.path.join(source_path, stl_file)
+            target_stl_file = os.path.join(target_path, stl_file)
+            shutil.copy(source_file, target_stl_file)
 
-        if not shape_files:
-            print("  No .obj files found in the source folder.")
-            return
+            step_file_name = os.path.splitext(stl_file)[0] + ".step"
+            target_step_file = os.path.join(target_path, step_file_name)
 
-        for obj_file in shape_files:
-            source_file = os.path.join(source_path, obj_file)
-
-            # Copy the .obj file to the target folder
-            shutil.copy(source_file, target_path)
-            print(f"Copied {obj_file} to {target_path}")
-
-            # Convert the .obj file to .stl
-            stl_file_name = os.path.splitext(obj_file)[0] + ".stl"
-            stl_file_path = os.path.join(target_path, stl_file_name)
-            if self.convert_obj_to_stl(source_file, stl_file_path):
-                print(f"Converted {obj_file} to {stl_file_name}")
+            if not self.convert_stl_to_step(target_stl_file, target_step_file):
+                print(f"Failed to convert {stl_file} to STEP format.")
             else:
-                print(f"Failed to convert {obj_file} to .stl")
-                continue
-
-            # Convert the .stl file to .step
-            step_file_name = os.path.splitext(obj_file)[0] + ".step"
-            step_file_path = os.path.join(target_path, step_file_name)
-            if self.convert_stl_to_step(stl_file_path, step_file_path):
-                print(f"Converted {stl_file_name} to {step_file_name}")
-            else:
-                print(f"Failed to convert {stl_file_name} to .step")
-
-
-    def convert_obj_to_stl(self, obj_file, stl_file):
-        """
-        Converts an .obj file to .stl using trimesh.
-        """
-        try:
-            # Load the OBJ file
-            mesh = trimesh.load(obj_file, force='mesh')
-            if not isinstance(mesh, trimesh.Trimesh):
-                print(f"No valid mesh found in {obj_file}")
-                return False
-
-            # Export the mesh to STL
-            mesh.export(stl_file, file_type='stl')
-            return True
-        except Exception as e:
-            print(f"Error converting OBJ to STL: {e}")
-            return False
+                print(f"Successfully converted {stl_file} to {step_file_name}.")
 
 
     def convert_stl_to_step(self, stl_file, step_file):
         """
         Converts an .stl file to .step using Open CASCADE.
         """
-        try:
-            # Read the STL file using Open CASCADE
-            stl_reader = StlAPI_Reader()
-            shape = TopoDS_Shape()
-            if not stl_reader.Read(shape, stl_file):
-                print(f"Error reading STL file: {stl_file}")
-                return False
-            
-            # Perform meshing (optional but recommended)
-            BRepMesh_IncrementalMesh(shape, 0.1)
-
-            # Write to STEP file
-            step_writer = STEPControl_Writer()
-            step_writer.Transfer(shape, STEPControl_AsIs)
-            status = step_writer.Write(step_file)
-            
-            return status == IFSelect_RetDone
-        except Exception as e:
-            print(f"Error converting STL to STEP: {e}")
+        # Read the STL file
+        stl_reader = StlAPI_Reader()
+        shape = TopoDS_Shape()
+        if not stl_reader.Read(shape, stl_file):
+            print(f"Error reading STL file: {stl_file}")
             return False
+        
+        # Perform meshing (optional but recommended)
+        BRepMesh_IncrementalMesh(shape, 0.1)
 
+        # Write to STEP file
+        step_writer = STEPControl_Writer()
+        step_writer.Transfer(shape, STEPControl_AsIs)
+        status = step_writer.Write(step_file)
+        
+        return status == IFSelect_RetDone
+    
+    
 
     def read_json(self, file_path):
         try:

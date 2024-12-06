@@ -642,6 +642,7 @@ def face_aggregate_networkx(stroke_matrix):
     # Remove duplicate loops by converting to a set of frozensets
     unique_groups = list(set(frozenset(group) for group in valid_groups))
 
+
     # Final check: Ensure each group has the same number of unique points as edges
     final_groups = []
     for group in unique_groups:
@@ -652,6 +653,7 @@ def face_aggregate_networkx(stroke_matrix):
             points.add(tuple(stroke[3:]))
         if len(points) == len(group):
             final_groups.append(group)
+
 
     return final_groups
 

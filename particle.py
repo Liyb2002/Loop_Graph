@@ -45,7 +45,11 @@ class Particle():
 
         self.stroke_node_features = stroke_node_features
         self.cur_output_dir = cur_output_dir
+        
         self.gt_brep_file_path = gt_brep_file_path
+        edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(self.gt_brep_file_path)
+        self.gt_brep_features = Preprocessing.proc_CAD.helper.pad_brep_features(edge_features_list + cylinder_features)
+
         self.data_produced = data_produced
         self.particle_id = particle_id
 
@@ -128,7 +132,7 @@ class Particle():
             stroke_to_edge
         )
 
-        Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+        # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
 
         if len(self.past_programs) == 1:
             # Find all feature edges
@@ -192,7 +196,6 @@ class Particle():
                 if file_name.startswith('brep_') and file_name.endswith('.step')]
         brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
 
-
         # 5.6) Update brep data
         brep_path = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
         self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
@@ -250,7 +253,7 @@ def predict_sketch(gnn_graph):
     selected_loop_idx, idx_prob = whole_process_helper.helper.find_valid_sketch(gnn_graph, sketch_selection_mask)
     sketch_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
 
-    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx)
 
     return selected_loop_idx, sketch_selection_mask, idx_prob
 
@@ -280,7 +283,7 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
     
     extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
     # _, extrude_stroke_idx = torch.max(extrude_selection_mask, dim=0)
-    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
     return extrude_selection_mask
 
 def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges):
@@ -312,7 +315,7 @@ def predict_fillet(gnn_graph):
     # _, fillet_stroke_idx = torch.topk(fillet_selection_mask.flatten(), k=1)
     # _, fillet_stroke_idx = torch.max(fillet_selection_mask, dim=0)
 
-    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
     return fillet_selection_mask
 
 
@@ -345,7 +348,7 @@ def predict_chamfer(gnn_graph):
     # chamfer_stroke_idx =  (chamfer_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
     # _, chamfer_stroke_idx = torch.topk(chamfer_selection_mask.flatten(), k=2)
     _, chamfer_stroke_idx = torch.max(chamfer_selection_mask, dim=0)
-    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
     
     return chamfer_selection_mask
 
