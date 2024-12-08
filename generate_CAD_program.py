@@ -79,7 +79,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     gt_brep_file_path = os.path.join(gt_brep_dir, brep_files[-1])
 
 
-    for particle_id in range (50):
+    for particle_id in range (500):
         new_particle = particle.Particle(cur_output_dir, gt_brep_file_path, data_produced, stroke_node_features, particle_id)
         while new_particle.is_valid_particle():
             new_particle.generate_next_step()

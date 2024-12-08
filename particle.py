@@ -131,7 +131,7 @@ class Particle():
                 stroke_to_edge
             )
 
-            # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+            Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
 
             if len(self.past_programs) == 1:
                 # Find all feature edges
@@ -200,22 +200,22 @@ class Particle():
             self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
             # Encoders.helper.vis_brep(self.brep_edges)
 
-            mean_dist_gt_to_output, mean_dist_output_to_gt = chamfer_distance_brep(self.gt_brep_edges, self.brep_edges)
-            print("mean_dist_gt_to_output", mean_dist_gt_to_output)
-            print("mean_dist_output_to_gt", mean_dist_output_to_gt)
+            max_dist_gt_to_output, max_dist_output_to_gt = chamfer_distance_brep(self.gt_brep_edges, self.brep_edges)
+            print("max_dist_gt_to_output", max_dist_gt_to_output)
+            print("max_dist_output_to_gt", max_dist_output_to_gt)
 
             self.past_programs.append(self.current_op)
-            if len(self.past_programs) ==3:
-                self.current_op = 3
-            else:
-                self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
-                self.score = self.score * op_prob
+            # if len(self.past_programs) ==3:
+            #     self.current_op = 3
+            # else:
+            self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
+            self.score = self.score * op_prob
 
             # 6) Write the stroke_cloud data to pkl file
             output_file_path = os.path.join(self.cur_output_dir, 'canvas', f'{len(brep_files)}_shape_info.pkl')
             with open(output_file_path, 'wb') as f:
                 pickle.dump({
-                    'chamfer_dist': mean_dist_output_to_gt,
+                    'chamfer_dist': max_dist_output_to_gt,
                 }, f)
             
 
@@ -440,7 +440,7 @@ def cascade_brep(brep_files, data_produced, brep_path):
 # --------------------- Chamfer Distance --------------------- #
 def chamfer_distance_brep(gt_brep_edges, output_brep_edges):
     """
-    Calculates the Chamfer distance between ground truth (GT) BREP edges and output BREP edges.
+    Calculates the maximum Chamfer distance between ground truth (GT) BREP edges and output BREP edges.
 
     Parameters:
     - gt_brep_edges (numpy.ndarray or torch.Tensor): Array or tensor of shape (num_gt_edges, 10),
@@ -449,8 +449,8 @@ def chamfer_distance_brep(gt_brep_edges, output_brep_edges):
       where the first 6 values represent two 3D points defining an output BREP edge (start and end points).
 
     Returns:
-    - dist_gt_to_output (torch.Tensor): Mean Chamfer distance from GT edges to output edges.
-    - dist_output_to_gt (torch.Tensor): Mean Chamfer distance from output edges to GT edges.
+    - max_dist_gt_to_output (torch.Tensor): Maximum Chamfer distance from GT edges to output edges.
+    - max_dist_output_to_gt (torch.Tensor): Maximum Chamfer distance from output edges to GT edges.
     """
     # Ensure inputs are tensors
     if not isinstance(gt_brep_edges, torch.Tensor):
@@ -477,11 +477,11 @@ def chamfer_distance_brep(gt_brep_edges, output_brep_edges):
     # Compute Chamfer distance (GT to Output)
     dist_gt_to_output = torch.cdist(gt_points, output_points, p=2)  # Pairwise distances
     min_dist_gt_to_output = torch.min(dist_gt_to_output, dim=1)[0]  # Minimum distance for each GT point
-    mean_dist_gt_to_output = torch.mean(min_dist_gt_to_output)  # Mean distance
+    max_dist_gt_to_output = torch.max(min_dist_gt_to_output)  # Maximum distance
 
     # Compute Chamfer distance (Output to GT)
     dist_output_to_gt = torch.cdist(output_points, gt_points, p=2)  # Pairwise distances
     min_dist_output_to_gt = torch.min(dist_output_to_gt, dim=1)[0]  # Minimum distance for each Output point
-    mean_dist_output_to_gt = torch.mean(min_dist_output_to_gt)  # Mean distance
+    max_dist_output_to_gt = torch.max(min_dist_output_to_gt)  # Maximum distance
 
-    return mean_dist_gt_to_output, mean_dist_output_to_gt
+    return max_dist_gt_to_output, max_dist_output_to_gt

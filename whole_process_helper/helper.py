@@ -550,22 +550,18 @@ def find_valid_sketch(gnn_graph, sketch_selection_mask):
 
 
 def sample_operation(operation_predictions):
-    positive_mask = operation_predictions > 0
-    positive_logits = operation_predictions[positive_mask]
-    
-    if positive_logits.numel() == 0:
-        raise ValueError("No positive logits available to sample from.")
-    
-    # Apply softmax to convert positive logits into probabilities
-    positive_probs = F.softmax(positive_logits, dim=0)
-    
-    # Sample an index from the positive logits using the calculated probabilities
-    sampled_index = torch.multinomial(positive_probs, num_samples=1)
-    sampled_class_prob = positive_probs[sampled_index].item()
+    logits_subset = operation_predictions[:, 1:5].squeeze(0)
 
-    # Map back to the original class indices
-    positive_indices = positive_mask.nonzero(as_tuple=True)[1]
-    sampled_class = positive_indices[sampled_index.item()].item()
+    
+    # Apply softmax to convert logits into probabilities
+    probabilities = F.softmax(logits_subset, dim=0)
+    
+    # Sample an index from the probabilities
+    sampled_index = torch.multinomial(probabilities, num_samples=1)
+    sampled_class_prob = probabilities[sampled_index].item()
+    
+    # Map back to the original class indices (1-5)
+    sampled_class = sampled_index.item() + 1
     
     return sampled_class, sampled_class_prob
 
