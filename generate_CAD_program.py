@@ -32,7 +32,7 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/generate_CAD', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 
@@ -88,6 +88,12 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         #     delete_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
         #     if os.path.exists(delete_dir):
         #         shutil.rmtree(delete_dir)
+
+        if new_particle.success_terminate:
+            old_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
+            new_dir = os.path.join(cur_output_dir, f'particle_{particle_id}_succeed')
+            if os.path.exists(old_dir):
+                os.rename(old_dir, new_dir)
 
     # except Exception as e:
     #     print(f"An error occurred: {e}")
