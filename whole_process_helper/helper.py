@@ -5,8 +5,17 @@ from itertools import combinations, permutations
 
 import torch
 from collections import Counter
+import os
+import shutil
 
 import torch.nn.functional as F
+
+
+from OCC.Core.STEPControl import STEPControl_Reader
+from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
+from OCC.Core.StlAPI import StlAPI_Writer
+from OCC.Core.BRep import BRep_Builder
+from OCC.Core.TopoDS import TopoDS_Compound
 
 # --------------------------------------------------------------------------- #
 
@@ -596,3 +605,44 @@ def sample_program_termination(stroke_nodes, feature_stroke_mask):
 
 
 # --------------------------------------------------------------------------- #
+
+
+def brep_to_stl_and_copy(gt_brep_file_path, output_dir, cur_brep_file_path):
+    try:
+        # Ensure the output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Define paths for output files
+        output_stl_path = os.path.join(output_dir, 'converted_brep.stl')
+        gt_brep_copy_path = os.path.join(output_dir, 'gt_brep.step')
+
+        # Copy the ground truth BREP file
+        shutil.copy(gt_brep_file_path, gt_brep_copy_path)
+
+        # Read the current BREP file and convert it to STL
+        step_reader = STEPControl_Reader()
+        status = step_reader.ReadFile(cur_brep_file_path)
+
+        if status != 1:
+            raise ValueError(f"Error: Failed to read the BREP file at {cur_brep_file_path}")
+
+        # Transfer the contents of the BREP file
+        step_reader.TransferRoots()
+        shape = step_reader.OneShape()
+
+        # Triangulate the shape for STL export
+        BRepMesh_IncrementalMesh(shape, 0.1)  # Adjust precision as needed
+
+        # Create a compound to store the shape
+        builder = BRep_Builder()
+        compound = TopoDS_Compound()
+        builder.MakeCompound(compound)
+        builder.Add(compound, shape)
+
+        # Write the triangulated shape to an STL file
+        stl_writer = StlAPI_Writer()
+        stl_writer.SetASCIIMode(False)  # Save as binary for smaller size
+        stl_writer.Write(compound, output_stl_path)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")

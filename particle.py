@@ -131,7 +131,7 @@ class Particle():
                 stroke_to_edge
             )
 
-            Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+            # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
 
             if len(self.past_programs) == 1:
                 # Find all feature edges
@@ -201,8 +201,16 @@ class Particle():
             # Encoders.helper.vis_brep(self.brep_edges)
 
             max_dist_gt_to_output, max_dist_output_to_gt = chamfer_distance_brep(self.gt_brep_edges, self.brep_edges)
-            print("max_dist_gt_to_output", max_dist_gt_to_output)
-            print("max_dist_output_to_gt", max_dist_output_to_gt)
+            if max_dist_gt_to_output < 0.05:
+                gt_to_output_same = 1
+            else:
+                gt_to_output_same = 0
+
+            if max_dist_output_to_gt < 0.05:
+                output_to_gt_same = 1
+            else:
+                output_to_gt_same = 0
+
 
             self.past_programs.append(self.current_op)
             # if len(self.past_programs) ==3:
@@ -215,12 +223,15 @@ class Particle():
             output_file_path = os.path.join(self.cur_output_dir, 'canvas', f'{len(brep_files)}_shape_info.pkl')
             with open(output_file_path, 'wb') as f:
                 pickle.dump({
-                    'chamfer_dist': max_dist_output_to_gt,
+                    'gt_to_output_same': gt_to_output_same,
+                    'output_to_gt_same': output_to_gt_same
                 }, f)
             
 
             # 7) Also copy the gt brep file
             shutil.copy(self.gt_brep_file_path, os.path.join(self.cur_output_dir, 'gt_brep.step'))
+            whole_process_helper.helper.brep_to_stl_and_copy(self.gt_brep_file_path, self.cur_output_dir,os.path.join(self.cur_output_dir, 'gt_brep.step'))
+
             
         except Exception as e:
             self.valid_particle = False
