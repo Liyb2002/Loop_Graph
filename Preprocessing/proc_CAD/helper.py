@@ -658,6 +658,40 @@ def face_aggregate_networkx(stroke_matrix):
     return final_groups
 
 
+
+def face_aggregate_networkx_accumulate(new_stroke_matrix, old_stroke_matrix):
+    """
+    Aggregates strokes from old and new stroke matrices to find loops,
+    considering at least one edge from the new stroke matrix.
+
+    Parameters:
+    - new_stroke_matrix (numpy.ndarray): Matrix of new strokes (num_new_strokes, 10).
+    - old_stroke_matrix (numpy.ndarray): Matrix of old strokes (num_old_strokes, 10).
+
+    Returns:
+    - combined_stroke_matrix: Combined matrix with shape (num_old_strokes + num_new_strokes, 6).
+    - num_old_strokes: Number of old strokes.
+    - num_new_strokes: Number of new strokes.
+    """
+    # Ensure old_stroke_matrix and new_stroke_matrix have consistent dimensions
+    if old_stroke_matrix.size == 0:
+        combined_stroke_matrix = new_stroke_matrix[:, :6]
+        num_old_strokes = 0
+        num_new_strokes = new_stroke_matrix.shape[0]
+    elif new_stroke_matrix.size == 0:
+        combined_stroke_matrix = old_stroke_matrix[:, :6]
+        num_old_strokes = old_stroke_matrix.shape[0]
+        num_new_strokes = 0
+    else:
+        if old_stroke_matrix.shape[1] != new_stroke_matrix.shape[1]:
+            raise ValueError("Mismatch in column dimensions between old and new stroke matrices.")
+        combined_stroke_matrix = np.vstack((old_stroke_matrix, new_stroke_matrix))[:, :6]
+        num_old_strokes = old_stroke_matrix.shape[0]
+        num_new_strokes = new_stroke_matrix.shape[0]
+
+    return combined_stroke_matrix, num_old_strokes, num_new_strokes
+
+
 def face_aggregate_direct(stroke_matrix):
     """
     This function finds all connected groups of strokes with size 3 or 4
