@@ -30,6 +30,7 @@ import os
 import shutil
 import numpy as np
 import random
+import copy
 
 # --------------------- Dataset --------------------- #
 dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/generate_CAD', return_data_path=True)
@@ -79,21 +80,33 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     gt_brep_file_path = os.path.join(gt_brep_dir, brep_files[-1])
 
 
+    # init all particles
+    base_particle = particle.Particle(gt_brep_file_path, data_produced, stroke_node_features)
+
+    particle_list = []
     for particle_id in range (50):
-        new_particle = particle.Particle(cur_output_dir, gt_brep_file_path, data_produced, stroke_node_features, particle_id)
-        while new_particle.is_valid_particle():
-            new_particle.generate_next_step()
-        
+        new_particle = copy.deepcopy(base_particle)
+        new_particle.set_particle_id(particle_id, cur_output_dir)
+        particle_list.append(new_particle)
+
+    # particle.next step 
+    for cur_particle in particle_list:
+        cur_particle.generate_next_step()
+
+    # resample particles
+    whole_process_helper.helper.resample_particles(particle_list)
+
+    # resample particles        
         # if not new_particle.success_terminate:
         #     delete_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
         #     if os.path.exists(delete_dir):
         #         shutil.rmtree(delete_dir)
 
-        if new_particle.success_terminate:
-            old_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
-            new_dir = os.path.join(cur_output_dir, f'particle_{particle_id}_succeed')
-            if os.path.exists(old_dir):
-                os.rename(old_dir, new_dir)
+        # if new_particle.success_terminate:
+        #     old_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
+        #     new_dir = os.path.join(cur_output_dir, f'particle_{particle_id}_succeed')
+        #     if os.path.exists(old_dir):
+        #         os.rename(old_dir, new_dir)
 
     # except Exception as e:
     #     print(f"An error occurred: {e}")

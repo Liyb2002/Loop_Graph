@@ -7,6 +7,7 @@ import torch
 from collections import Counter
 import os
 import shutil
+import particle
 
 import torch.nn.functional as F
 
@@ -646,3 +647,20 @@ def brep_to_stl_and_copy(gt_brep_file_path, output_dir, cur_brep_file_path):
 
     except Exception as e:
         print(f"An error occurred: {e}")
+
+
+# --------------------------------------------------------------------------- #
+
+def resample_particles(particle_list):
+    can_process_particles = []
+    success_terminate_particles = []
+
+    for cur_particle in particle_list:
+        if cur_particle.valid_particle:
+            can_process_particles.append(cur_particle)
+        if cur_particle.success_terminate:  
+            success_terminate_particles.append(cur_particle)
+    
+    print("particle_list", len(particle_list))
+    print("len can_process_particles", len(can_process_particles))
+    print("len success_terminate_particles", len(success_terminate_particles))
