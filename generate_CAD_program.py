@@ -89,29 +89,14 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         new_particle.set_particle_id(particle_id, cur_output_dir)
         particle_list.append(new_particle)
 
-    # particle.next step 
-    for cur_particle in particle_list:
-        cur_particle.generate_next_step()
 
-    # resample particles
-    whole_process_helper.helper.resample_particles(particle_list)
+    while len(particle_list) > 20:
+        # particle.next step 
+        for cur_particle in particle_list:
+            cur_particle.generate_next_step()
 
-    # resample particles        
-        # if not new_particle.success_terminate:
-        #     delete_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
-        #     if os.path.exists(delete_dir):
-        #         shutil.rmtree(delete_dir)
+        # resample particles
+        particle_list = whole_process_helper.helper.resample_particles(particle_list, cur_output_dir)
 
-        # if new_particle.success_terminate:
-        #     old_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
-        #     new_dir = os.path.join(cur_output_dir, f'particle_{particle_id}_succeed')
-        #     if os.path.exists(old_dir):
-        #         os.rename(old_dir, new_dir)
-
-    # except Exception as e:
-    #     print(f"An error occurred: {e}")
-    #     if os.path.exists(cur_output_dir):
-    #         shutil.rmtree(cur_output_dir)
-    #     data_produced -= 1
 
     data_produced += 1

@@ -8,6 +8,7 @@ from collections import Counter
 import os
 import shutil
 import particle
+import random
 
 import torch.nn.functional as F
 
@@ -651,7 +652,7 @@ def brep_to_stl_and_copy(gt_brep_file_path, output_dir, cur_brep_file_path):
 
 # --------------------------------------------------------------------------- #
 
-def resample_particles(particle_list):
+def resample_particles(particle_list, cur_output_dir):
     can_process_particles = []
     success_terminate_particles = []
 
@@ -661,6 +662,19 @@ def resample_particles(particle_list):
         if cur_particle.success_terminate:  
             success_terminate_particles.append(cur_particle)
     
-    print("particle_list", len(particle_list))
-    print("len can_process_particles", len(can_process_particles))
-    print("len success_terminate_particles", len(success_terminate_particles))
+
+    required_resampled_size = len(particle_list) - len(success_terminate_particles)
+    resampled_list = can_process_particles.copy()
+    while len(resampled_list) < required_resampled_size:
+        resampled_list.append(random.choice(can_process_particles))
+
+
+    for succeed_particle in success_terminate_particles:
+        particle_id = succeed_particle.success_terminate
+        old_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
+        new_dir = os.path.join(cur_output_dir, f'particle_{particle_id}_succeed')
+        if os.path.exists(old_dir):
+            os.rename(old_dir, new_dir)
+
+
+    return resampled_list
