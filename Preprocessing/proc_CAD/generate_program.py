@@ -259,11 +259,11 @@ class Brep:
     def random_chamfer(self, target_edge_tensor = None, amount = 0):
         # Chamfer is just non-linear version of fillet
         # so we copy fillet code for it
+
         available_fillet_edges = [edge for edge in self.Edges if edge.fillet_permited]
         if not available_fillet_edges:
             return False
         
-
         if target_edge_tensor is None:
             target_edge = None
             while not self.check_fillet_validity(target_edge):
@@ -271,7 +271,6 @@ class Brep:
         else:
             # find target_edge based on target_edge_tensor value
             target_edge = self.find_target_edge(target_edge_tensor)
-
 
 
         if amount == 0:

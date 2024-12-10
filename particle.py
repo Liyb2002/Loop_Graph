@@ -28,7 +28,9 @@ import os
 import shutil
 import numpy as np
 import random
-
+import copy
+import sys
+from contextlib import contextmanager
 
 class Particle():
     def __init__(self, gt_brep_file_path, data_produced, stroke_node_features):
@@ -90,6 +92,23 @@ class Particle():
         self.file_path = os.path.join(cur_output_dir, 'Program.json')
 
 
+    def change_particle_id(self, new_particle_id):
+
+        base_dir = os.path.dirname(self.cur_output_dir)
+        new_output_dir = os.path.join(base_dir, f'particle_{new_particle_id}')
+
+        # 1)remove the old particle info inside it
+        shutil.rmtree(new_output_dir)
+
+        # 2)copy the current particle info into the new dir
+        shutil.copytree(self.cur_output_dir, new_output_dir)
+
+
+        self.particle_id = new_particle_id
+        self.cur_output_dir = new_output_dir
+        self.file_path = os.path.join(new_output_dir, 'Program.json')
+
+
     def program_terminated(self, gnn_graph):
 
         if self.predicted_feature_strokes is None:
@@ -113,8 +132,7 @@ class Particle():
 
     def generate_next_step(self):
 
-        try:
-
+        try :
             stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
             stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
             stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
@@ -178,7 +196,6 @@ class Particle():
 
 
             if self.current_op ==4:
-                print("Build Chamfer")
                 chamfer_edge, chamfer_amount, prob= do_chamfer(gnn_graph, self.brep_edges)
                 self.cur__brep_class.random_chamfer(chamfer_edge, chamfer_amount)
                 self.score = self.score * prob
@@ -186,7 +203,6 @@ class Particle():
 
             # 5.3) Write to brep
             self.cur__brep_class.write_to_json(self.cur_output_dir)
-
 
             # 5.4) Read the program and produce the brep file
             parsed_program_class = Preprocessing.proc_CAD.Program_to_STL.parsed_program(self.file_path, self.cur_output_dir)
@@ -200,10 +216,12 @@ class Particle():
                     if file_name.startswith('brep_') and file_name.endswith('.step')]
             brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
 
+
             # 5.6) Update brep data
             brep_path = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
             self.brep_edges, self.brep_loops = cascade_brep_accumulate(self.brep_edges, self.brep_loops, brep_files, self.data_produced, brep_path)
             # Encoders.helper.vis_brep(self.brep_edges)
+
 
             max_dist_gt_to_output, max_dist_output_to_gt = chamfer_distance_brep(self.gt_brep_edges, self.brep_edges)
             if max_dist_gt_to_output < 0.05:
@@ -225,14 +243,13 @@ class Particle():
             self.score = self.score * op_prob
 
             # 6) Write the stroke_cloud data to pkl file
-            output_file_path = os.path.join(self.cur_output_dir, 'canvas', f'{len(brep_files)}_shape_info.pkl')
+            output_file_path = os.path.join(self.cur_output_dir, 'canvas', f'shape_info_{len(brep_files)}.pkl')
             with open(output_file_path, 'wb') as f:
                 pickle.dump({
                     'gt_to_output_same': gt_to_output_same,
                     'output_to_gt_same': output_to_gt_same
                 }, f)
             
-
             # 7) Also copy the gt brep file
             shutil.copy(self.gt_brep_file_path, os.path.join(self.cur_output_dir, 'gt_brep.step'))
             whole_process_helper.helper.brep_to_stl_and_copy(self.gt_brep_file_path, self.cur_output_dir,os.path.join(self.cur_output_dir, 'gt_brep.step'))
@@ -248,6 +265,27 @@ class Particle():
         
         self.gt_brep_edges, _ = cascade_brep(brep_files, None, brep_path)
 
+
+
+    def __deepcopy__(self, memo):
+        """
+        Custom deepcopy to handle torch.Tensor attributes explicitly.
+        """
+        # Create a new instance of the same class
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+
+        # Deep copy each attribute
+        for attr, value in self.__dict__.items():
+            if isinstance(value, torch.Tensor):
+                # Clone tensors explicitly to handle deepcopy limitations
+                setattr(result, attr, value.clone())
+            else:
+                # Use deepcopy for non-tensor attributes
+                setattr(result, attr, copy.deepcopy(value, memo))
+        
+        return result
 
 
 
@@ -555,3 +593,6 @@ def chamfer_distance_brep(gt_brep_edges, output_brep_edges):
     max_dist_output_to_gt = torch.max(min_dist_output_to_gt)  # Maximum distance
 
     return max_dist_gt_to_output, max_dist_output_to_gt
+
+
+

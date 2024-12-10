@@ -9,6 +9,8 @@ import os
 import shutil
 import particle
 import random
+import copy
+import sys
 
 import torch.nn.functional as F
 
@@ -654,27 +656,49 @@ def brep_to_stl_and_copy(gt_brep_file_path, output_dir, cur_brep_file_path):
 
 def resample_particles(particle_list, cur_output_dir):
     can_process_particles = []
+    failed_particles = []
     success_terminate_particles = []
 
     for cur_particle in particle_list:
         if cur_particle.valid_particle:
             can_process_particles.append(cur_particle)
-        if cur_particle.success_terminate:  
+        elif cur_particle.success_terminate:  
             success_terminate_particles.append(cur_particle)
+        else:
+            failed_particles.append(cur_particle)
+
+    if len(can_process_particles) < 10:
+        return []
     
 
-    required_resampled_size = len(particle_list) - len(success_terminate_particles)
     resampled_list = can_process_particles.copy()
-    while len(resampled_list) < required_resampled_size:
-        resampled_list.append(random.choice(can_process_particles))
+
+    for failed_particle in failed_particles:
+        donor_particle = random.choice(can_process_particles)
+        resampled_particle = copy.deepcopy(donor_particle)
+        resampled_particle.change_particle_id(failed_particle.particle_id)
+        resampled_list.append(resampled_particle)
+
 
 
     for succeed_particle in success_terminate_particles:
+        print("succeed_particle!!")
         particle_id = succeed_particle.success_terminate
         old_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
         new_dir = os.path.join(cur_output_dir, f'particle_{particle_id}_succeed')
         if os.path.exists(old_dir):
             os.rename(old_dir, new_dir)
+        
 
+
+    print('len success_terminate_particles', len(success_terminate_particles))
+    print('len failed_particle', len(failed_particles))
+    print('len can_process_particles', len(can_process_particles))
+    print('len resampled_list', len(resampled_list))
+    # breakpoint()
 
     return resampled_list
+
+# --------------------------------------------------------------------------- #
+
+

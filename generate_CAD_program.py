@@ -81,22 +81,41 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
 
 
     # init all particles
-    base_particle = particle.Particle(gt_brep_file_path, data_produced, stroke_node_features)
+    # base_particle = particle.Particle(gt_brep_file_path, data_produced, stroke_node_features)
 
-    particle_list = []
+    # particle_list = []
+    # for particle_id in range (50):
+    #     new_particle = copy.deepcopy(base_particle)
+    #     new_particle.set_particle_id(particle_id, cur_output_dir)
+    #     particle_list.append(new_particle)
+
+
+
     for particle_id in range (50):
-        new_particle = copy.deepcopy(base_particle)
+        new_particle = particle.Particle(gt_brep_file_path, data_produced, stroke_node_features)
         new_particle.set_particle_id(particle_id, cur_output_dir)
-        particle_list.append(new_particle)
 
+        while new_particle.is_valid_particle():
+            new_particle.generate_next_step()
+        
+        # if not new_particle.success_terminate:
+        #     delete_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
+        #     if os.path.exists(delete_dir):
+        #         shutil.rmtree(delete_dir)
 
-    while len(particle_list) > 20:
-        # particle.next step 
-        for cur_particle in particle_list:
-            cur_particle.generate_next_step()
+        if new_particle.success_terminate:
+            old_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
+            new_dir = os.path.join(cur_output_dir, f'particle_{particle_id}_succeed')
+            if os.path.exists(old_dir):
+                os.rename(old_dir, new_dir)
 
-        # resample particles
-        particle_list = whole_process_helper.helper.resample_particles(particle_list, cur_output_dir)
+    # while len(particle_list) > 20:
+    #     # particle.next step 
+    #     for cur_particle in particle_list:
+    #         cur_particle.generate_next_step()
+
+    #     # resample particles
+    #     particle_list = whole_process_helper.helper.resample_particles(particle_list, cur_output_dir)
 
 
     data_produced += 1
