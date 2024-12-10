@@ -3,12 +3,6 @@ from build123d import *
 import os
 import numpy as np
 
-import sys
-from contextlib import redirect_stdout
-
-def suppress_output():
-    return redirect_stdout(open(os.devnull, 'w'))
-
 
 def build_sketch(count, canvas, Points_list, output, data_dir):
     brep_dir = os.path.join(data_dir, "canvas", f"brep_{count}.step")

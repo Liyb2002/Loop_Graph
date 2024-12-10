@@ -7,10 +7,6 @@ import torch
 from collections import Counter
 import os
 import shutil
-import particle
-import random
-import copy
-import sys
 
 import torch.nn.functional as F
 
@@ -381,11 +377,10 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
     fillet_stroke = stroke_features[selected_idx]
     
 
-
+    print('fillet_stroke', fillet_stroke)
     # Step 1: Extract all unique 3D points from chamfer_strokes
     point1 = fillet_stroke[:3]
     point2 = fillet_stroke[3:6]
-
 
     # Convert brep_edges to a PyTorch tensor
     if isinstance(brep_edges, (np.ndarray, list)):
@@ -415,10 +410,11 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
 
     if fillet_edge is not None:
         # Compute chamfer_amount
-        example_point = fillet_stroke[0:3]
-        example_center = fillet_stroke[7:10]
+        example_point = fillet_stroke[:3]
+        example_center = fillet_stroke[3:6]
 
         dist = torch.norm(example_point - example_center)
+        print("dist", dist)
         return fillet_edge, dist, selected_prob
 
     return None, None, 0
@@ -650,55 +646,3 @@ def brep_to_stl_and_copy(gt_brep_file_path, output_dir, cur_brep_file_path):
 
     except Exception as e:
         print(f"An error occurred: {e}")
-
-
-# --------------------------------------------------------------------------- #
-
-def resample_particles(particle_list, cur_output_dir):
-    can_process_particles = []
-    failed_particles = []
-    success_terminate_particles = []
-
-    for cur_particle in particle_list:
-        if cur_particle.valid_particle:
-            can_process_particles.append(cur_particle)
-        elif cur_particle.success_terminate:  
-            success_terminate_particles.append(cur_particle)
-        else:
-            failed_particles.append(cur_particle)
-
-    if len(can_process_particles) < 10:
-        return []
-    
-
-    resampled_list = can_process_particles.copy()
-
-    for failed_particle in failed_particles:
-        donor_particle = random.choice(can_process_particles)
-        resampled_particle = copy.deepcopy(donor_particle)
-        resampled_particle.change_particle_id(failed_particle.particle_id)
-        resampled_list.append(resampled_particle)
-
-
-
-    for succeed_particle in success_terminate_particles:
-        print("succeed_particle!!")
-        particle_id = succeed_particle.success_terminate
-        old_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
-        new_dir = os.path.join(cur_output_dir, f'particle_{particle_id}_succeed')
-        if os.path.exists(old_dir):
-            os.rename(old_dir, new_dir)
-        
-
-
-    print('len success_terminate_particles', len(success_terminate_particles))
-    print('len failed_particle', len(failed_particles))
-    print('len can_process_particles', len(can_process_particles))
-    print('len resampled_list', len(resampled_list))
-    # breakpoint()
-
-    return resampled_list
-
-# --------------------------------------------------------------------------- #
-
-

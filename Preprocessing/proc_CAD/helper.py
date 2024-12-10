@@ -1041,7 +1041,7 @@ def loop_contained(loops, stroke_node_features):
         # Process each stroke in the loop
         for stroke in loop:
             stroke_coords = stroke_node_features[stroke]  # Each stroke has exactly 6 values: [x1, y1, z1, x2, y2, z2]
-            x1, y1, z1, x2, y2, z2, _,  _, _, _ = stroke_coords
+            x1, y1, z1, x2, y2, z2, _,  _, _, _, _ = stroke_coords
             
             # Update bounding box for the loop
             min_x, max_x = min(min_x, x1, x2), max(max_x, x1, x2)

@@ -6,8 +6,8 @@ import sys
 
 def run():
     
-    # d_generator = Preprocessing.generate_dataset_baseline.dataset_generator()
-    cad2sketch_generator = Preprocessing.cad2sketch_data_generator.cad2sketch_dataset_generator()
+    d_generator = Preprocessing.generate_dataset_baseline.dataset_generator()
+    # cad2sketch_generator = Preprocessing.cad2sketch_data_generator.cad2sketch_dataset_generator()
 
 
 

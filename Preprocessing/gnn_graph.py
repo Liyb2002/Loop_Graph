@@ -557,68 +557,77 @@ class SketchLoopGraph(HeteroData):
 
 
 
-# Edge Feature: 10 values
-# 0-2: point1, 3-5:point2, 6:alpha_value
+# Straight Line: 10 values + type 1
+# 0-2: point1, 3-5:point2, 6:alpha_value, 7-9: 0
 
-# Circle Feature:
-# 0-2: center, 3-5:normal, 6:alpha_value, 7:radius
+# Circle Feature: 10 values + type 2
+# 0-2: center, 3-5:normal, 6:alpha_value, 7:radius, 8-9: 0
 
-# Arc Feature:
+# Arc Feature: 10 values + type 3
 # 0-2: point1, 3-5:point2, 6:alpha_value, 7-9:center
 
-def build_graph(stroke_dict, messy = False):
+# Ellipse Feature: 10 values + type 4
+# 0-2: center, 3-5:normal, 6:alpha_value, 7: major axis, 8: minor axis, 9: orientation
+
+# Closed Line: 10 values + type 5
+# 0-2: point1, 3-5: point2, 6:alpha_value, 7-9: random point in the line
+
+# Curved Line: 10 values + type 6
+# 0-2: point1, 3-5: point2, 6:alpha_value, 7-9: random point in the line
+
+
+def build_graph(stroke_dict, messy=False):
     num_strokes = len(stroke_dict)
     num_operations = 0
 
+    # Find the maximum number of operations
+    for key in stroke_dict:
+        stroke = stroke_dict[key]
+        if len(stroke.Op) > 0 and num_operations < max(stroke.Op):
+            num_operations = max(stroke.Op)
+
+    node_features = np.zeros((num_strokes, 11))  # 10 feature values + 1 type
+    operations_order_matrix = np.zeros((num_strokes, num_operations + 1))
+
     for i, key in enumerate(sorted(stroke_dict.keys())):
         stroke = stroke_dict[key]
-        if len(stroke.Op) > 0 and num_operations < stroke.Op[0]:
-            num_operations = stroke.Op[0]
 
-    node_features = np.zeros((num_strokes, 10))
-    operations_order_matrix = np.zeros((num_strokes, num_operations+1))
-
-
-    for i, key in enumerate(sorted(stroke_dict.keys())):
-        stroke = stroke_dict[key]
-
-        # If it is a circle stroke
         if stroke.is_circle:
-            radius = stroke.radius
-            center = stroke.center
-            normal = stroke.normal
-            alpha_value = stroke.alpha_value
-            node_features[i, :3] = center
-            node_features[i, 3:6] = normal
-            node_features[i, 6:7] = alpha_value
-            node_features[i, 7:8] = radius
+            # Circle Feature
+            node_features[i, 0:3] = stroke.center
+            node_features[i, 3:6] = stroke.normal
+            node_features[i, 6] = stroke.alpha_value
+            node_features[i, 7] = stroke.radius
+            node_features[i, 8:10] = 0  # Padding
+            node_features[i, 10] = 2  # Type 2 for Circle
 
-            for stroke_op_count in stroke.Op:
-                operations_order_matrix[i, stroke_op_count] = 1
+        elif stroke.is_curve:
+            # Arc Feature
+            start_point = stroke.vertices[0].position
+            end_point = stroke.vertices[1].position
+            node_features[i, 0:3] = start_point
+            node_features[i, 3:6] = end_point
+            node_features[i, 6] = stroke.alpha_value
+            node_features[i, 7:10] = stroke.center
+            node_features[i, 10] = 3  # Type 3 for Arc
 
-            continue
+        else:
+            # Straight Line Feature
+            start_point = stroke.vertices[0].position
+            end_point = stroke.vertices[1].position
+            node_features[i, 0:3] = start_point
+            node_features[i, 3:6] = end_point
+            node_features[i, 6] = stroke.alpha_value
+            node_features[i, 7:10] = 0  # Padding
+            node_features[i, 10] = 1  # Type 1 for Straight Line
 
-        # build node_features
-        # node_features has shape num_strokes x 6, which is the starting and ending point
-        start_point = stroke.vertices[0].position
-        end_point = stroke.vertices[1].position
-        alpha_value = stroke.alpha_value
-        node_features[i, :3] = start_point
-        node_features[i, 3:6] = end_point
-        node_features[i, 6:7] = alpha_value
-        node_features[i, 7:] = 0
-
-        # build operation_order_matrix
-        # operation_order_matrix has shape num_strokes x num_ops
+        # Build the operations_order_matrix
         for stroke_op_count in stroke.Op:
             operations_order_matrix[i, stroke_op_count] = 1
 
-        # arc: 
-        if stroke.is_curve:
-            node_features[i, 7:] = stroke.center
-
-
     return node_features, operations_order_matrix
+
+
 
 def build_stroke_type(stroke_dict, messy=False):
     num_strokes = len(stroke_dict)
