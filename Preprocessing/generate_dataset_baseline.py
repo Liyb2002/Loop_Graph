@@ -23,7 +23,7 @@ class dataset_generator():
         # if os.path.exists('dataset'):
         #     shutil.rmtree('dataset')
 
-        self.dataset_name = 'dataset/new_dataset'
+        self.dataset_name = 'dataset/example'
         os.makedirs(self.dataset_name, exist_ok=True)
 
         self.generate_dataset(self.dataset_name, number_data = 1, start =self.compute_start_idx())
@@ -93,6 +93,7 @@ class dataset_generator():
 
         # 1) Produce the Stroke Cloud features            
         stroke_node_features, stroke_operations_order_matrix= Preprocessing.gnn_graph.build_graph(stroke_cloud_class.edges)
+
         stroke_type_features = Preprocessing.gnn_graph.build_stroke_type(stroke_cloud_class.edges)
         stroke_node_features, stroke_operations_order_matrix = Preprocessing.proc_CAD.helper.swap_rows_with_probability(stroke_node_features, stroke_operations_order_matrix)
         stroke_node_features = np.round(stroke_node_features, 4)

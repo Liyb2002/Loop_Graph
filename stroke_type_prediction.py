@@ -1,6 +1,5 @@
 import Preprocessing.dataloader
 import Preprocessing.gnn_graph
-import Preprocessing.gnn_graph_stroke
 
 import Encoders.gnn.gnn
 import Encoders.helper
@@ -363,4 +362,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

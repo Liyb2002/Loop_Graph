@@ -1,7 +1,6 @@
 import Preprocessing.dataloader
 import Preprocessing.generate_dataset_baseline
 import Preprocessing.gnn_graph
-import Preprocessing.gnn_graph_stroke
 
 import Preprocessing.proc_CAD.Program_to_STL
 import Preprocessing.proc_CAD.brep_read
@@ -198,7 +197,7 @@ class Particle():
         # 5.6) Update brep data
         brep_path = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
         self.brep_edges, self.brep_loops = cascade_brep_accumulate(self.brep_edges, self.brep_loops, brep_files, self.data_produced, brep_path)
-        # Encoders.helper.vis_brep(self.brep_edges)
+        Encoders.helper.vis_brep(self.brep_edges)
 
         max_dist_gt_to_output, max_dist_output_to_gt = chamfer_distance_brep(self.gt_brep_edges, self.brep_edges)
         if max_dist_gt_to_output < 0.05:
@@ -353,7 +352,7 @@ def do_fillet(gnn_graph, brep_edges):
 # --------------------- Chamfer Network --------------------- #
 chamfer_graph_encoder = Encoders.gnn.gnn.SemanticModule()
 chamfer_graph_decoder = Encoders.gnn.gnn.Chamfer_Decoder()
-chanfer_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction2')
+chanfer_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction')
 chamfer_graph_encoder.eval()
 chamfer_graph_decoder.eval()
 chamfer_graph_encoder.load_state_dict(torch.load(os.path.join(chanfer_dir, 'graph_encoder.pth'), weights_only=True))

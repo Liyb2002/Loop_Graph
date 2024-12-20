@@ -1,6 +1,5 @@
 import Preprocessing.dataloader
 import Preprocessing.gnn_graph
-import Preprocessing.gnn_graph_stroke
 
 import Encoders.gnn.gnn
 import Encoders.helper
@@ -154,7 +153,7 @@ def train():
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
-    epochs = 50
+    epochs = 30
     
     graphs = []
     existing_programs = []

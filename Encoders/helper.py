@@ -615,6 +615,25 @@ def vis_brep(brep):
 
 
 
+# Straight Line: 10 values + type 1
+# 0-2: point1, 3-5:point2, 6:alpha_value, 7-9: 0
+
+# Circle Feature: 10 values + type 2
+# 0-2: center, 3-5:normal, 6:alpha_value, 7:radius, 8-9: 0
+
+# Arc Feature: 10 values + type 3
+# 0-2: point1, 3-5:point2, 6:alpha_value, 7-9:center
+
+# Ellipse Feature: 10 values + type 4
+# 0-2: center, 3-5:normal, 6:alpha_value, 7: major axis, 8: minor axis, 9: orientation
+
+# Closed Line: 10 values + type 5
+# 0-2: point1, 3-5: point2, 6:alpha_value, 7-9: random point in the line
+
+# Curved Line: 10 values + type 6
+# 0-2: point1, 3-5: point2, 6:alpha_value, 7-9: random point in the line
+
+
 
 def vis_selected_strokes(stroke_node_features, selected_stroke_idx, alpha_value=0.7):
     """
@@ -651,18 +670,19 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, alpha_value=
         color = 'black'
 
         # Update min and max limits based on strokes (ignoring circles)
-        if stroke[7] == 0:
+        if stroke[-1] == 1:
+            # straight line
             x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
         
-        if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
+        if stroke[-1] == 2:
             # Circle face
             x_values, y_values, z_values = plot_circle(stroke)
             ax.plot(x_values, y_values, z_values, color=color, alpha=alpha_value)
             continue
 
-        if stroke[7] != 0 and stroke[8] != 0:
+        if stroke[-1] ==3:
             # Arc
             x_values, y_values, z_values = plot_arc(stroke)
             ax.plot(x_values, y_values, z_values, color=color, alpha=alpha_value)

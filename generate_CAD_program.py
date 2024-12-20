@@ -1,7 +1,6 @@
 import Preprocessing.dataloader
 import Preprocessing.generate_dataset_baseline
 import Preprocessing.gnn_graph
-import Preprocessing.gnn_graph_stroke
 
 import Preprocessing.proc_CAD.generate_program
 import Preprocessing.proc_CAD.Program_to_STL
@@ -32,7 +31,7 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/generate_CAD', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/example', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 
@@ -56,7 +55,7 @@ os.makedirs(output_dir, exist_ok=True)
 
 for data in tqdm(data_loader, desc="Generating CAD Programs"):
     program, stroke_node_features, data_path= data
-    print("data", data)
+    print("stroke_node_features", stroke_node_features)
     
     if data_produced >= data_limit:
         break
