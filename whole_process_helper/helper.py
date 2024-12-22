@@ -425,8 +425,22 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
 
 
 def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
-    
-    top2_vals, top2_idxs = torch.topk(chamfer_selection_mask.view(-1), 1)
+    """
+    Determines the chamfer edge and amount based on the selected chamfer stroke
+    and its proximity to BREP edges.
+
+    Parameters:
+    - gnn_graph: The GNN graph containing stroke features.
+    - chamfer_selection_mask: A tensor of shape (num_strokes, 1) containing probabilities for chamfer strokes.
+    - brep_edges: A list or numpy array of BREP edges, each defined by two 3D points.
+
+    Returns:
+    - chamfer_edge: The matching BREP edge for chamfering.
+    - chamfer_amount: The chamfer amount (minimum distance to the matching edge).
+    - selected_prob: The probability of the selected chamfer stroke.
+    """
+    # Step 1: Sample the chamfer stroke index based on the selection mask
+    top2_vals, top2_idxs = torch.topk(chamfer_selection_mask.view(-1), 2)
     total_sum = top2_vals.sum()
     relative_probs = top2_vals / total_sum
     sampled_idx = torch.multinomial(relative_probs, 1).item()
@@ -434,45 +448,46 @@ def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
     selected_idx = top2_idxs[sampled_idx].item()
     selected_prob = top2_vals[sampled_idx].item()
 
-    stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
+    # Step 2: Get the selected chamfer stroke
+    stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7)
     chamfer_stroke = stroke_features[selected_idx]
 
-
-    # Step 1: Extract all unique 3D points from chamfer_strokes
+    # Extract 3D points from the stroke
     point1 = chamfer_stroke[:3]
     point2 = chamfer_stroke[3:6]
 
-    # Convert brep_edges to a PyTorch tensor
+    # Step 3: Convert brep_edges to a tensor if necessary
     if isinstance(brep_edges, (np.ndarray, list)):
         brep_edges = torch.tensor(brep_edges, dtype=point1.dtype)
 
-    # Step 2 and 3: Iterate over brep_edges to find the matching edge
-    min_distance = 100
+    # Step 4: Find the matching BREP edge
+    min_edge_distance = float('inf')
     chamfer_edge = None
+    chamfer_amount = None
+
     for edge in brep_edges:
         edge_point1 = edge[:3]
         edge_point2 = edge[3:6]
-        edge_mid_point = (edge_point1 + edge_point2) / 2
 
-        # Compute distances from edge_mid_point to all chamfer_points
-        distance1 = torch.norm(point1 - edge_mid_point)
-        distance2 = torch.norm(point2 - edge_mid_point)
+        # Calculate distances between points
+        dist1_1 = torch.norm(point1 - edge_point1)
+        dist1_2 = torch.norm(point2 - edge_point1)
+        dist2_1 = torch.norm(point1 - edge_point2)
+        dist2_2 = torch.norm(point2 - edge_point2)
 
-        # Check if all distances are the same within a small tolerance
-        if torch.allclose(distance1, distance2, atol=1e-2):
-            if distance1 < min_distance:
-                min_distance = distance1
-                chamfer_edge = edge
+        # Check for matching edge
+        if dist1_1 == dist1_2 and dist2_1 == dist2_2 and min_edge_distance > min(dist1_1, dist2_1):
+            min_edge_distance = min(dist1_1, dist2_1)
+            chamfer_edge = edge
+            chamfer_amount = min_edge_distance
 
-
+    # Step 5: Return the results
     if chamfer_edge is not None:
-        dist1 = torch.norm(edge[:3] - point1)
-        dist2 = torch.norm(edge[3:6] - point1)
-
-        chamfer_amount = min(dist1.item(), dist2.item())
-        return edge, chamfer_amount, selected_prob
+        return chamfer_edge, chamfer_amount, selected_prob
 
     return None, None, 0
+
+
 
 
 

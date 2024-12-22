@@ -282,6 +282,7 @@ class Brep:
 
         target_edge.disable_fillet()
 
+
         verts_pos = []
         verts_id = []
         new_vert_pos = []

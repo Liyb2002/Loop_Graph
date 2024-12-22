@@ -212,11 +212,14 @@ class Particle():
 
 
         self.past_programs.append(self.current_op)
-        if len(self.past_programs) ==3:
-            self.current_op = 3
-        else:
-            self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
-            self.score = self.score * op_prob
+        self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
+
+        if len(self.past_programs) == 3:
+            self.current_op = 4
+        self.score = self.score * op_prob
+
+        print("self.past_programs", self.past_programs)
+        print("self.current_op", self.current_op)
 
         # 6) Write the stroke_cloud data to pkl file
         output_file_path = os.path.join(self.cur_output_dir, 'canvas', f'{len(brep_files)}_shape_info.pkl')
@@ -367,7 +370,7 @@ def predict_chamfer(gnn_graph):
     # chamfer_stroke_idx =  (chamfer_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
     # _, chamfer_stroke_idx = torch.topk(chamfer_selection_mask.flatten(), k=2)
     _, chamfer_stroke_idx = torch.max(chamfer_selection_mask, dim=0)
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
     
     return chamfer_selection_mask
 
@@ -375,8 +378,7 @@ def predict_chamfer(gnn_graph):
 def do_chamfer(gnn_graph, brep_edges):
     chamfer_selection_mask = predict_chamfer(gnn_graph)
     chamfer_edge, chamfer_amount, selected_prob= whole_process_helper.helper.get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges)
-
-    return chamfer_edge, chamfer_amount, selected_prob
+    return chamfer_edge, chamfer_amount.item(), selected_prob
 
 
 

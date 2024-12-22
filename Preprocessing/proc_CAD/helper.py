@@ -6,6 +6,7 @@ from shapely import affinity
 import pyrr
 import json 
 import torch
+import math
 
 import matplotlib.pyplot as plt
 from itertools import permutations, combinations
@@ -109,53 +110,58 @@ def find_edge_from_verts(vert_1, vert_2, edges):
 
 #----------------------------------------------------------------------------------#
 def compute_fillet_new_vert(old_vert, neighbor_verts, amount):
-    # Given the old_vertex (chosen by fillet op), and the neighbor verts, compute the position to move them
     move_positions = []
-    old_position = np.array(old_vert.position)
-    
+    old_position = old_vert.position
+
+    # Compute new positions for the arc endpoints
     for neighbor_vert in neighbor_verts:
-        direction_vector = [neighbor_vert.position[i] - old_position[i] for i in range(len(old_position))]
-        
-        norm = sum(x**2 for x in direction_vector)**0.5
+        direction_vector = [
+            neighbor_vert.position[i] - old_position[i]
+            for i in range(len(old_position))
+        ]
+        norm = math.sqrt(sum(x**2 for x in direction_vector))
         normalized_vector = [x / norm for x in direction_vector]
-        
-        move_position = [old_position[i] + normalized_vector[i] * amount for i in range(len(old_position))]
+        move_position = [
+            old_position[i] + normalized_vector[i] * amount
+            for i in range(len(old_position))
+        ]
         move_positions.append(move_position)
 
+    # Extract the moved positions
+    start_point = move_positions[0]
+    end_point = move_positions[1]
 
-    # Now move_positions contains the two new vertices (start and end of the arc)
-    start_point = np.array(move_positions[0])
-    end_point = np.array(move_positions[1])
-    
-    # Identify the shared axis where all points have the same value
-    shared_axis = None
-    for i in range(len(old_position)):
-        if old_position[i] == start_point[i] == end_point[i]:
-            shared_axis = i
-            break
-    
-    if shared_axis is None:
-        raise ValueError("No shared axis found for the square plane.")
-    
-    # For the other two axes, find the pairs that define the square
-    remaining_axes = [axis for axis in range(3) if axis != shared_axis]
-    
-    # Get the min and max for the remaining two axes (this will form the square)
-    center = np.copy(old_position)  # Copy old_position as the base
-    
-    for axis in remaining_axes:
-        values = [old_position[axis], start_point[axis], end_point[axis]]
-        unique_values = np.unique(values)
-        
-        if len(unique_values) != 2:
-            raise ValueError(f"Expected two unique values for axis {axis}, but got {unique_values}")
-        
-        # For the center, take the value not present in the old_position
-        if old_position[axis] == unique_values[0]:
-            center[axis] = unique_values[1]
-        else:
-            center[axis] = unique_values[0]
-        
+    # Compute the plane normal (cross product of vectors from old_vert to start and end)
+    vec1 = [start_point[i] - old_position[i] for i in range(len(old_position))]
+    vec2 = [end_point[i] - old_position[i] for i in range(len(old_position))]
+    normal = [
+        vec1[1] * vec2[2] - vec1[2] * vec2[1],
+        vec1[2] * vec2[0] - vec1[0] * vec2[2],
+        vec1[0] * vec2[1] - vec1[1] * vec2[0],
+    ]
+    norm = math.sqrt(sum(x**2 for x in normal))
+    normal = [x / norm for x in normal]  # Normalize the plane normal
+
+    # Find the midpoint between start_point and end_point
+    midpoint = [
+        (start_point[i] + end_point[i]) / 2
+        for i in range(len(start_point))
+    ]
+
+    # Project the midpoint onto the plane to find the arc center
+    vec_from_old_to_midpoint = [
+        midpoint[i] - old_position[i]
+        for i in range(len(old_position))
+    ]
+    distance_from_plane = sum(
+        vec_from_old_to_midpoint[i] * normal[i]
+        for i in range(len(normal))
+    )
+    center = [
+        midpoint[i] - distance_from_plane * normal[i]
+        for i in range(len(midpoint))
+    ]
+
     return move_positions, center
 
 

@@ -55,7 +55,6 @@ os.makedirs(output_dir, exist_ok=True)
 
 for data in tqdm(data_loader, desc="Generating CAD Programs"):
     program, stroke_node_features, data_path= data
-    print("stroke_node_features", stroke_node_features)
     
     if data_produced >= data_limit:
         break
