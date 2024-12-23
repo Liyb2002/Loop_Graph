@@ -92,8 +92,8 @@ def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
             mask = torch.rand(predicted_stroke_idx.shape) > drop_prob
             predicted_stroke_idx = predicted_stroke_idx[mask]
 
-            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
-            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
+            # Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
+            # Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
 
 
     return total, correct
@@ -135,7 +135,7 @@ def train():
 
         features_strokes = Encoders.helper.get_feature_strokes(gnn_graph)
         features_stroke_idx = (features_strokes == 1).nonzero(as_tuple=True)[0] 
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), features_stroke_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), features_stroke_idx)
 
 
         gnn_graph.remove_stroke_type()
@@ -274,7 +274,7 @@ def eval():
     batch_size = 16
 
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole_eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
 
     graphs = []
@@ -362,4 +362,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

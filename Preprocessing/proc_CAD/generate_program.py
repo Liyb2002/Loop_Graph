@@ -224,8 +224,8 @@ class Brep:
         self.Vertices.append(new_vert_A)
         self.Vertices.append(new_vert_C)
 
-        arc_0 = [new_A, new_B, centers[0].tolist(), [new_vert_A.id, new_vert_B.id]]
-        arc_1 = [new_C, new_D, centers[1].tolist(), [new_vert_C.id, new_vert_D.id]]
+        arc_0 = [new_A, new_B, centers[0], [new_vert_A.id, new_vert_B.id]]
+        arc_1 = [new_C, new_D, centers[1], [new_vert_C.id, new_vert_D.id]]
 
 
         #create 2 edge that connect new_B and new_D / new_A and new_C

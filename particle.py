@@ -90,7 +90,7 @@ class Particle():
             return False
         
         termination_prob, untouched_feature_idx= whole_process_helper.helper.sample_program_termination(gnn_graph['stroke'].x.cpu().numpy(), self.predicted_feature_strokes)
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), untouched_feature_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), [])
 
         if random.random() < termination_prob or len(self.past_programs) > 20: 
             return True
@@ -130,7 +130,7 @@ class Particle():
             stroke_to_edge
         )
 
-        Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+        # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
 
         if len(self.past_programs) == 1:
             # Find all feature edges
@@ -140,6 +140,7 @@ class Particle():
         if self.program_terminated(gnn_graph):
             self.valid_particle = False
             self.success_terminate = True
+            return 
 
 
 
@@ -197,7 +198,7 @@ class Particle():
         # 5.6) Update brep data
         brep_path = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
         self.brep_edges, self.brep_loops = cascade_brep_accumulate(self.brep_edges, self.brep_loops, brep_files, self.data_produced, brep_path)
-        Encoders.helper.vis_brep(self.brep_edges)
+        # Encoders.helper.vis_brep(self.brep_edges)
 
         max_dist_gt_to_output, max_dist_output_to_gt = chamfer_distance_brep(self.gt_brep_edges, self.brep_edges)
         if max_dist_gt_to_output < 0.05:
@@ -213,13 +214,11 @@ class Particle():
 
         self.past_programs.append(self.current_op)
         self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
-
-        if len(self.past_programs) == 3:
-            self.current_op = 4
         self.score = self.score * op_prob
 
         print("self.past_programs", self.past_programs)
         print("self.current_op", self.current_op)
+
 
         # 6) Write the stroke_cloud data to pkl file
         output_file_path = os.path.join(self.cur_output_dir, 'canvas', f'{len(brep_files)}_shape_info.pkl')
@@ -337,16 +336,15 @@ def predict_fillet(gnn_graph):
     # _, fillet_stroke_idx = torch.topk(fillet_selection_mask.flatten(), k=1)
     # _, fillet_stroke_idx = torch.max(fillet_selection_mask, dim=0)
 
-    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
     return fillet_selection_mask
 
 
 def do_fillet(gnn_graph, brep_edges):
     fillet_selection_mask = predict_fillet(gnn_graph)
     fillet_edge, fillet_amount, selected_prob= whole_process_helper.helper.get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges)
-    fillet_amount = fillet_amount.item()
 
-    return fillet_edge, fillet_amount, selected_prob
+    return fillet_edge, fillet_amount.item(), selected_prob
 
 
 
@@ -370,7 +368,7 @@ def predict_chamfer(gnn_graph):
     # chamfer_stroke_idx =  (chamfer_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
     # _, chamfer_stroke_idx = torch.topk(chamfer_selection_mask.flatten(), k=2)
     _, chamfer_stroke_idx = torch.max(chamfer_selection_mask, dim=0)
-    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
     
     return chamfer_selection_mask
 
@@ -465,7 +463,6 @@ def cascade_brep_accumulate(prev_edges, prev_loops, brep_files, data_produced, b
     - final_brep_edges: Tensor of updated edge features including the last file.
     - final_loops: Updated loops including new loops formed with the last file.
     """
-    import torch  # Only if not already imported elsewhere
 
     # Step 1: Read features from the last file
     last_file = brep_files[-1]

@@ -586,6 +586,7 @@ def sample_operation(operation_predictions):
     
     # Map back to the original class indices (1-5)
     sampled_class = sampled_index.item() + 1
+    # print("probabilities", probabilities)
     
     return sampled_class, sampled_class_prob
 
@@ -611,9 +612,9 @@ def sample_program_termination(stroke_nodes, feature_stroke_mask):
             untouched_feature_idx.append(i)
     
     termination_prob = used_feature_strokes / num_feature_strokes
-
-    if termination_prob < 0.8:
-        termination_prob = 0
+    
+    # if termination_prob < 0.8:
+    #     termination_prob = 0
 
     return termination_prob, untouched_feature_idx
 

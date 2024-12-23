@@ -127,6 +127,7 @@ class parsed_program():
         self.Op_idx += 1
         
     def parse_fillet(self, Op):
+        print("Do fillet!")
         fillet_amount = Op['operation'][2]['amount']
         verts = Op['operation'][3]['old_verts_pos']
 
