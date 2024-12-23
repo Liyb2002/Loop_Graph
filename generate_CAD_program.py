@@ -31,7 +31,7 @@ import numpy as np
 import random
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/example', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 
@@ -62,7 +62,6 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     if program[-1][0] != 'terminate':
         continue
     
-    print("program", program)
 
     # try:
     cur_output_dir = os.path.join(output_dir, f'data_{data_produced}')
@@ -78,8 +77,9 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     gt_brep_file_path = os.path.join(gt_brep_dir, brep_files[-1])
 
 
-    for particle_id in range (50):
+    for particle_id in range (30):
         new_particle = particle.Particle(cur_output_dir, gt_brep_file_path, data_produced, stroke_node_features, particle_id)
+        new_particle.set_gt_program(program)
         while new_particle.is_valid_particle():
             new_particle.generate_next_step()
         

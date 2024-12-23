@@ -13,15 +13,37 @@ import Encoders.helper
 class Evaluation_Dataset(Dataset):
     def __init__(self, dataset):
         self.data_path = os.path.join(os.getcwd(), dataset)
-        self.data_dirs = [d for d in os.listdir(self.data_path) if os.path.isdir(os.path.join(self.data_path, d))]
+        self.data_dirs = [
+            os.path.join(self.data_path, d) 
+            for d in os.listdir(self.data_path) 
+            if os.path.isdir(os.path.join(self.data_path, d))
+        ]
 
+        # List of sublist. Each sublist is all the particles in a data piece
+        self.data_particles = [
+            [
+                os.path.join(data_dir, subfolder)
+                for subfolder in os.listdir(data_dir)
+                if os.path.isdir(os.path.join(data_dir, subfolder))
+            ]
+            for data_dir in self.data_dirs
+        ]
+
+        # all particles
+        self.flatted_particle_folders = [
+            folder
+            for sublist in self.data_particles
+            for folder in sublist
+        ]
+
+        print("self.data_particles", self.flatted_particle_folders)
         print(f"Number of data directories: {len(self.data_dirs)}")
 
     def __len__(self):
-        return len(self.data_dirs)
+        return len(self.flatted_particle_folders)
 
     def __getitem__(self, idx):
-        data_dir = self.data_dirs[idx]
+        data_dir = self.flatted_particle_folders[idx]
 
         # Load shape_info
         shape_file_path = os.path.join(self.data_path, data_dir, 'shape_info.pkl')
@@ -97,7 +119,11 @@ def chamfer_distance(stroke_node_features, output_brep_edges):
     
     return torch.mean(min_dist_brep_to_stroke), torch.mean(min_dist_stroke_to_brep) + torch.mean(min_dist_brep_to_stroke)
 
+
+
 # --------------------- Main Code --------------------- #
+
+
 
 # Set up dataloader
 dataset = Evaluation_Dataset('program_output')
