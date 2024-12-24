@@ -29,6 +29,7 @@ import os
 import shutil
 import numpy as np
 import random
+import copy
 
 # --------------------- Dataset --------------------- #
 dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test', return_data_path=True)
@@ -77,27 +78,24 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     gt_brep_file_path = os.path.join(gt_brep_dir, brep_files[-1])
 
 
-    for particle_id in range (30):
-        new_particle = particle.Particle(cur_output_dir, gt_brep_file_path, data_produced, stroke_node_features, particle_id)
-        new_particle.set_gt_program(program)
-        while new_particle.is_valid_particle():
-            new_particle.generate_next_step()
-        
-        # if not new_particle.success_terminate:
-        #     delete_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
-        #     if os.path.exists(delete_dir):
-        #         shutil.rmtree(delete_dir)
 
-        if new_particle.success_terminate:
-            old_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
-            new_dir = os.path.join(cur_output_dir, f'particle_{particle_id}_succeed')
-            if os.path.exists(old_dir):
-                os.rename(old_dir, new_dir)
+    base_particle = particle.Particle(gt_brep_file_path, data_produced, stroke_node_features)
+    base_particle.set_gt_program(program)
+    particle_list = []
+    for particle_id in range (10):
+        new_particle = copy.deepcopy(base_particle)
+        new_particle.set_particle_id(particle_id, cur_output_dir)
+        particle_list.append(new_particle)
 
-    # except Exception as e:
-    #     print(f"An error occurred: {e}")
-    #     if os.path.exists(cur_output_dir):
-    #         shutil.rmtree(cur_output_dir)
-    #     data_produced -= 1
+    while len(particle_list) > 0:
+        # particle.next step 
+        for cur_particle in particle_list:
+            cur_particle.generate_next_step()
+
+        # resample particles
+        particle_list = whole_process_helper.helper.resample_particles(particle_list, cur_output_dir)
+
 
     data_produced += 1
+
+    break

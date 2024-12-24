@@ -647,8 +647,8 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, alpha_value=
     """
     
     # Initialize the 3D plot
-    print("stroke_node_features", stroke_node_features.shape)
-    print("selected_stroke_idx", selected_stroke_idx)
+
+    stroke_node_features = stroke_node_features[:, :-1]  
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.grid(False)

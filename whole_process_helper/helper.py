@@ -7,6 +7,7 @@ import torch
 from collections import Counter
 import os
 import shutil
+import random
 
 import torch.nn.functional as F
 
@@ -377,7 +378,6 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
     fillet_stroke = stroke_features[selected_idx]
     
 
-    print('fillet_stroke', fillet_stroke)
     # Step 1: Extract all unique 3D points from chamfer_strokes
     point1 = fillet_stroke[:3]
     point2 = fillet_stroke[3:6]
@@ -414,7 +414,6 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
         example_center = fillet_stroke[3:6]
 
         dist = torch.norm(example_point - example_center)
-        print("dist", dist)
         return fillet_edge, dist, selected_prob
 
     return None, None, 0
@@ -661,3 +660,38 @@ def brep_to_stl_and_copy(gt_brep_file_path, output_dir, cur_brep_file_path):
 
     except Exception as e:
         print(f"An error occurred: {e}")
+
+
+
+# --------------------------------------------------------------------------- #
+
+def resample_particles(particle_list, cur_output_dir):
+    can_process_particles = []
+    success_terminate_particles = []
+
+    for cur_particle in particle_list:
+        if cur_particle.valid_particle:
+            can_process_particles.append(cur_particle)
+        if cur_particle.success_terminate:  
+            success_terminate_particles.append(cur_particle)
+    
+
+    required_resampled_size = len(particle_list) - len(success_terminate_particles)
+    resampled_list = can_process_particles.copy()
+
+    if len(can_process_particles) == 0:
+        return []
+
+    while len(resampled_list) < required_resampled_size:
+        resampled_list.append(random.choice(can_process_particles))
+
+
+    for succeed_particle in success_terminate_particles:
+        particle_id = succeed_particle.success_terminate
+        old_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
+        new_dir = os.path.join(cur_output_dir, f'particle_{particle_id}_succeed')
+        if os.path.exists(old_dir):
+            os.rename(old_dir, new_dir)
+
+
+    return resampled_list
