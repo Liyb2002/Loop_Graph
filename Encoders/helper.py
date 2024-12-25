@@ -726,13 +726,13 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, alpha_value=
 
         color = 'red'
         
-        if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
+        if stroke[-1] == 2:
             # Circle face
             x_values, y_values, z_values = plot_circle(stroke)
             ax.plot(x_values, y_values, z_values, color=color, alpha=alpha_value)
             continue
 
-        if stroke[7] != 0 and stroke[8] != 0:
+        if stroke[-1] ==3:
             # Arc
             x_values, y_values, z_values = plot_arc(stroke)
             ax.plot(x_values, y_values, z_values, color=color, alpha=alpha_value)

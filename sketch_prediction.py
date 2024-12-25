@@ -175,7 +175,7 @@ def train():
 
         # Encoders.helper.vis_stroke_with_order(stroke_node_features)
         # Encoders.helper.vis_brep(output_brep_edges)
-        # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(loop_selection_mask)])
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
 
         # Prepare the pair
         graphs.append(gnn_graph)
@@ -206,7 +206,7 @@ def train():
 
 
     # Training loop
-    for epoch in range(epochs):
+    for epoch in range(0):
         train_loss = 0.0
         graph_encoder.train()
         graph_decoder.train()
@@ -284,7 +284,7 @@ def train():
 def eval():
     # load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/eval')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -343,7 +343,7 @@ def eval():
         # Encoders.helper.vis_brep(final_brep_edges)
         all_selected_loops_idx = [idx for idx, value in enumerate(all_loop_chosen_mask) if value != 0]
 
-        Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, all_selected_loops_idx )
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes )
 
         # Prepare the pair
         gnn_graph.to_device_withPadding(device)

@@ -191,7 +191,7 @@ class Brep:
         if amount == 0:
             amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
             safe_amount = self.safe_fillet_check([vert.position for vert in target_edge.vertices])
-            amount = min(amount * 0.3, safe_amount * 0.3)
+            amount = min(amount * 0.5, safe_amount * 0.5)
 
         
         target_edge.disable_fillet()
@@ -277,7 +277,7 @@ class Brep:
         if amount == 0:
             amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
             safe_amount = self.safe_fillet_check([vert.position for vert in target_edge.vertices])
-            amount = min(amount * 0.3, safe_amount * 0.3)
+            amount = min(amount * 0.5, safe_amount * 0.5)
 
 
         target_edge.disable_fillet()

@@ -110,8 +110,7 @@ class parsed_program():
 
         # Not circle
         else:
-            expected_point = Preprocessing.proc_CAD.helper.expected_extrude_point(sketch_point_list[0], sketch_face_normal, extrude_amount)
-        
+            expected_point = Op['vertices'][0]['coordinates']        
             if not isSubtract: 
                 canvas_1 = Preprocessing.proc_CAD.build123.protocol.test_extrude(self.prev_sketch, extrude_amount)
                 canvas_2 = Preprocessing.proc_CAD.build123.protocol.test_extrude(self.prev_sketch, -extrude_amount)

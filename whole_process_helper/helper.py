@@ -8,6 +8,7 @@ from collections import Counter
 import os
 import shutil
 import random
+import math
 
 import torch.nn.functional as F
 
@@ -450,10 +451,10 @@ def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
     # Step 2: Get the selected chamfer stroke
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7)
     chamfer_stroke = stroke_features[selected_idx]
-
     # Extract 3D points from the stroke
     point1 = chamfer_stroke[:3]
     point2 = chamfer_stroke[3:6]
+    print("point1", point1, "point2", point2)
 
     # Step 3: Convert brep_edges to a tensor if necessary
     if isinstance(brep_edges, (np.ndarray, list)):
@@ -469,13 +470,17 @@ def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
         edge_point2 = edge[3:6]
 
         # Calculate distances between points
-        dist1_1 = torch.norm(point1 - edge_point1)
-        dist1_2 = torch.norm(point2 - edge_point1)
-        dist2_1 = torch.norm(point1 - edge_point2)
-        dist2_2 = torch.norm(point2 - edge_point2)
+        dist1_1 = torch.norm(edge_point1 - point1)
+        dist1_2 = torch.norm(edge_point1 - point2)
+        dist2_1 = torch.norm(edge_point2 - point1)
+        dist2_2 = torch.norm(edge_point2 - point2)
 
+        # print("point1", point1, "point2", point2, "edge_point1", edge_point1, "edge_point2",edge_point2)
+        print("dist1_1", dist1_1, "dist1_2", dist1_2, "dist2_1", dist2_1, "dist2_2", dist2_2 )
+        print("is close?", math.isclose(dist1_1, dist1_2, abs_tol=0.01) and math.isclose(dist2_1, dist2_2, abs_tol=0.01))
+        print("---------")
         # Check for matching edge
-        if dist1_1 == dist1_2 and dist2_1 == dist2_2 and min_edge_distance > min(dist1_1, dist2_1):
+        if math.isclose(dist1_1, dist1_2) and math.isclose(dist2_1, dist2_2) and min_edge_distance > min(dist1_1, dist2_1):
             min_edge_distance = min(dist1_1, dist2_1)
             chamfer_edge = edge
             chamfer_amount = min_edge_distance

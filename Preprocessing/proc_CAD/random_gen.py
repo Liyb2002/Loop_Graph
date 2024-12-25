@@ -6,8 +6,8 @@ def generate_random_rectangle(perpendicular_axis):
     center = np.random.uniform(-10, 10, 3)
     
     # Generate random length and width
-    length = np.random.uniform(1, 5)
-    width = np.random.uniform(1, 5)
+    length = np.random.uniform(5, 10)
+    width = np.random.uniform(5, 10)
     
     # Calculate the half lengths
     half_length = length / 2
@@ -48,16 +48,16 @@ def generate_random_rectangle(perpendicular_axis):
 
 def generate_random_extrude():
     if np.random.choice([True, False]):
-        random_float = np.random.uniform(0.9, 2)
+        random_float = np.random.uniform(5, 10)
     else:
-        random_float = np.random.uniform(-2, -0.9)
+        random_float = np.random.uniform(-4, -2)
     return random_float
 
 
 def generate_random_fillet():
-    random_float = np.random.uniform(0.2, 0.5)
+    random_float = np.random.uniform(1, 2)
     return random_float
  
 def generate_random_cylinder_radius():
-    random_float = np.random.uniform(0.5, 1.0)
+    random_float = np.random.uniform(3, 5)
     return random_float

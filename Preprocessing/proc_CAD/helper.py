@@ -1350,11 +1350,12 @@ def stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, 
     num_brep_loops = len(brep_loops)
     correspondence_matrix = np.zeros((num_stroke_cloud_loops, num_brep_loops), dtype=np.float32)
 
-    
     for i, stroke_loop in enumerate(stroke_cloud_loops):
         for j, brep_loop in enumerate(brep_loops):
-
-
+            
+            if not isinstance(brep_loop, list):
+                continue
+            
             if len(stroke_loop) == 1 and len(brep_loop) ==1:
 
                 stroke_circle_edge = stroke_node_features[stroke_loop[0]]
