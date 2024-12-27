@@ -454,7 +454,7 @@ def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
     # Extract 3D points from the stroke
     point1 = chamfer_stroke[:3]
     point2 = chamfer_stroke[3:6]
-    print("point1", point1, "point2", point2)
+    # print("point1", point1, "point2", point2)
 
     # Step 3: Convert brep_edges to a tensor if necessary
     if isinstance(brep_edges, (np.ndarray, list)):
@@ -475,10 +475,6 @@ def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
         dist2_1 = torch.norm(edge_point2 - point1)
         dist2_2 = torch.norm(edge_point2 - point2)
 
-        # print("point1", point1, "point2", point2, "edge_point1", edge_point1, "edge_point2",edge_point2)
-        print("dist1_1", dist1_1, "dist1_2", dist1_2, "dist2_1", dist2_1, "dist2_2", dist2_2 )
-        print("is close?", math.isclose(dist1_1, dist1_2, abs_tol=0.01) and math.isclose(dist2_1, dist2_2, abs_tol=0.01))
-        print("---------")
         # Check for matching edge
         if math.isclose(dist1_1, dist1_2) and math.isclose(dist2_1, dist2_2) and min_edge_distance > min(dist1_1, dist2_1):
             min_edge_distance = min(dist1_1, dist2_1)
@@ -673,10 +669,13 @@ def brep_to_stl_and_copy(gt_brep_file_path, output_dir, cur_brep_file_path):
 def resample_particles(particle_list, cur_output_dir):
     can_process_particles = []
     success_terminate_particles = []
+    failed_particles = []
 
     for cur_particle in particle_list:
         if cur_particle.valid_particle:
             can_process_particles.append(cur_particle)
+        if not cur_particle.valid_particle:
+            failed_particles.append(cur_particle)
         if cur_particle.success_terminate:  
             success_terminate_particles.append(cur_particle)
     
@@ -684,19 +683,22 @@ def resample_particles(particle_list, cur_output_dir):
     required_resampled_size = len(particle_list) - len(success_terminate_particles)
     resampled_list = can_process_particles.copy()
 
-    if len(can_process_particles) == 0:
-        return []
 
-    while len(resampled_list) < required_resampled_size:
-        resampled_list.append(random.choice(can_process_particles))
+    # while len(resampled_list) < required_resampled_size:
+    #     resampled_list.append(random.choice(can_process_particles))
 
 
     for succeed_particle in success_terminate_particles:
-        particle_id = succeed_particle.success_terminate
-        old_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
-        new_dir = os.path.join(cur_output_dir, f'particle_{particle_id}_succeed')
+        old_dir = os.path.join(cur_output_dir, f'particle_{succeed_particle.particle_id}')
+        new_dir = os.path.join(cur_output_dir, f'particle_{succeed_particle.particle_id}_succeed')
         if os.path.exists(old_dir):
             os.rename(old_dir, new_dir)
 
+    print("-----------")
+    print("required_resampled_size", required_resampled_size)
+    print("len success_terminate_particles", len(success_terminate_particles))
+
+    if len(can_process_particles) == 0:
+        return []
 
     return resampled_list

@@ -32,7 +32,7 @@ import random
 import copy
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/example', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 
@@ -82,7 +82,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     base_particle = particle.Particle(gt_brep_file_path, data_produced, stroke_node_features)
     base_particle.set_gt_program(program)
     particle_list = []
-    for particle_id in range (1):
+    for particle_id in range (20):
         new_particle = copy.deepcopy(base_particle)
         new_particle.set_particle_id(particle_id, cur_output_dir)
         particle_list.append(new_particle)

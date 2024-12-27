@@ -206,7 +206,7 @@ def train():
 
 
     # Training loop
-    for epoch in range(0):
+    for epoch in range(30):
         train_loss = 0.0
         graph_encoder.train()
         graph_decoder.train()

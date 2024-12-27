@@ -293,7 +293,7 @@ def eval():
     batch_size = 16
 
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole_eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/eval')
     print(f"Total number of shape data: {len(dataset)}")
 
     graphs = []
@@ -329,7 +329,7 @@ def eval():
         stroke_selection_masks.append(stroke_selection_matrix)
 
     
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
 
 
         
