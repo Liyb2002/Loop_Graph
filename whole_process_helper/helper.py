@@ -475,11 +475,19 @@ def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
         dist2_1 = torch.norm(edge_point2 - point1)
         dist2_2 = torch.norm(edge_point2 - point2)
 
+        # print("edge_point1", edge_point1, "edge_point2", edge_point2)
+        # print("dist1_1, dist1_2", dist1_1, dist1_2)
+        # print("dist2_1, dist2_2", dist2_1, dist2_2)
+        # print("math.isclose(dist1_1.item(), dist1_2.item())", math.isclose(dist1_1.item(), dist1_2.item()))
+        # print("math.isclose(dist2_1.item(), dist2_2.item())", math.isclose(dist2_1.item(), dist2_2.item()))
+        # print("-----------")
+
         # Check for matching edge
-        if math.isclose(dist1_1, dist1_2) and math.isclose(dist2_1, dist2_2) and min_edge_distance > min(dist1_1, dist2_1):
+        if math.isclose(dist1_1.item(), dist1_2.item(), abs_tol=1e-2) and math.isclose(dist2_1.item(), dist2_2.item(), abs_tol=1e-2) and min_edge_distance > min(dist1_1.item(), dist2_1.item()):
             min_edge_distance = min(dist1_1, dist2_1)
             chamfer_edge = edge
             chamfer_amount = min_edge_distance
+            print("find chamfer edge!")
 
     # Step 5: Return the results
     if chamfer_edge is not None:
@@ -576,17 +584,26 @@ def find_valid_sketch(gnn_graph, sketch_selection_mask):
 def sample_operation(operation_predictions):
     logits_subset = operation_predictions[:, 1:5].squeeze(0)
 
-    
     # Apply softmax to convert logits into probabilities
     probabilities = F.softmax(logits_subset, dim=0)
-    
+    alpha = 0.3
+    p3_new = probabilities[2] + alpha * probabilities[3]
+    p4_new = probabilities[3] - alpha * probabilities[3]
+
+    # Construct the new tensor
+    new_probabilities = torch.tensor([
+        probabilities[0].item(),
+        probabilities[1].item(),
+        p3_new.item(),
+        p4_new.item()
+    ])
+
     # Sample an index from the probabilities
-    sampled_index = torch.multinomial(probabilities, num_samples=1)
-    sampled_class_prob = probabilities[sampled_index].item()
+    sampled_index = torch.multinomial(new_probabilities, num_samples=1)
+    sampled_class_prob = new_probabilities[sampled_index].item()
     
     # Map back to the original class indices (1-5)
     sampled_class = sampled_index.item() + 1
-
     return sampled_class, sampled_class_prob
 
 
@@ -666,39 +683,49 @@ def brep_to_stl_and_copy(gt_brep_file_path, output_dir, cur_brep_file_path):
 
 # --------------------------------------------------------------------------- #
 
-def resample_particles(particle_list, cur_output_dir):
+def resample_particles(particle_list, cur_output_dir_outerFolder):
     can_process_particles = []
     success_terminate_particles = []
     failed_particles = []
+    resampled_list = []
 
     for cur_particle in particle_list:
         if cur_particle.valid_particle:
             can_process_particles.append(cur_particle)
-        if not cur_particle.valid_particle:
+        if not cur_particle.valid_particle and not cur_particle.success_terminate:
             failed_particles.append(cur_particle)
         if cur_particle.success_terminate:  
             success_terminate_particles.append(cur_particle)
     
 
-    required_resampled_size = len(particle_list) - len(success_terminate_particles)
-    resampled_list = can_process_particles.copy()
+    print("-----------")
+    print("can_process_particles", len(can_process_particles))
+    print("required_resampled_size", len(failed_particles))
+    print("len success_terminate_particles", len(success_terminate_particles))
 
 
-    # while len(resampled_list) < required_resampled_size:
-    #     resampled_list.append(random.choice(can_process_particles))
+    
+    resampled_list = can_process_particles
+
+    if len(can_process_particles) != 0:
+        for failed_particle in failed_particles:
+            failed_particle.remove_particle()
+            failed_id = failed_particle.particle_id
+
+            random_particle = random.choice(can_process_particles)
+            new_particle = random_particle.deepcopy_particle(failed_id)
+            resampled_list.append(new_particle)
+
+    elif len(success_terminate_particles) != 0:
+        for failed_particle in failed_particles:
+            failed_particle.remove_particle()
 
 
     for succeed_particle in success_terminate_particles:
-        old_dir = os.path.join(cur_output_dir, f'particle_{succeed_particle.particle_id}')
-        new_dir = os.path.join(cur_output_dir, f'particle_{succeed_particle.particle_id}_succeed')
+        old_dir = os.path.join(cur_output_dir_outerFolder, f'particle_{succeed_particle.particle_id}')
+        new_dir = os.path.join(cur_output_dir_outerFolder, f'particle_{succeed_particle.particle_id}_succeed')
         if os.path.exists(old_dir):
             os.rename(old_dir, new_dir)
 
-    print("-----------")
-    print("required_resampled_size", required_resampled_size)
-    print("len success_terminate_particles", len(success_terminate_particles))
-
-    if len(can_process_particles) == 0:
-        return []
 
     return resampled_list

@@ -19,6 +19,9 @@ from Preprocessing.config import device
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+import copy
+import json
+
 import pickle
 import torch
 import torch.nn as nn
@@ -35,13 +38,10 @@ class Particle():
 
         print("new particle!")
 
-        stroke_node_features = stroke_node_features.squeeze(0)
-        stroke_node_features = stroke_node_features.cpu().numpy()
         stroke_node_features = np.round(stroke_node_features, 4)
-
-
         self.stroke_node_features = stroke_node_features
         
+
         self.gt_brep_file_path = gt_brep_file_path
         self.get_gt_brep_history()
 
@@ -81,14 +81,49 @@ class Particle():
 
 
 
-    def set_particle_id(self, particle_id, cur_output_dir):
-        cur_output_dir = os.path.join(cur_output_dir, f'particle_{particle_id}')
-        os.makedirs(cur_output_dir, exist_ok=True)
+    def set_particle_id(self, particle_id, cur_output_dir_outerFolder):
+        self.cur_output_dir = os.path.join(cur_output_dir_outerFolder, f'particle_{particle_id}')
+        os.makedirs(self.cur_output_dir, exist_ok=True)
         
         self.particle_id = particle_id
-        self.cur_output_dir = cur_output_dir
-        self.file_path = os.path.join(cur_output_dir, 'Program.json')
+        self.file_path = os.path.join(self.cur_output_dir, 'Program.json')
 
+
+    def deepcopy_particle(self, new_id):
+
+        new_particle = copy.copy(self)
+        
+        # manual copy, because we have tensors
+        new_particle.brep_edges = self.brep_edges.clone()
+        new_particle.brep_loops = self.brep_loops[:]
+        new_particle.cur__brep_class = copy.deepcopy(self.cur__brep_class)
+        new_particle.stroke_cloud_loops = copy.deepcopy(self.stroke_cloud_loops)
+        new_particle.connected_stroke_nodes = copy.deepcopy(self.connected_stroke_nodes)
+        new_particle.strokes_perpendicular = copy.deepcopy(self.strokes_perpendicular)
+        new_particle.loop_neighboring_all = copy.deepcopy(self.loop_neighboring_all)
+        new_particle.loop_neighboring_vertical = copy.deepcopy(self.loop_neighboring_vertical)
+        new_particle.loop_neighboring_horizontal = copy.deepcopy(self.loop_neighboring_horizontal)
+        new_particle.loop_neighboring_contained = copy.deepcopy(self.loop_neighboring_contained)
+        new_particle.current_op = self.current_op
+        new_particle.past_programs = self.past_programs[:]
+        new_particle.selected_loop_indices = self.selected_loop_indices[:]
+        new_particle.valid_particle = self.valid_particle
+        new_particle.success_terminate = self.success_terminate
+        new_particle.score = self.score
+        new_particle.predicted_feature_strokes = (self.predicted_feature_strokes.clone() if self.predicted_feature_strokes is not None else None)
+        new_particle.gt_program = self.gt_program
+
+
+        cur_output_dir_outerFolder = os.path.dirname(self.cur_output_dir)
+        new_folder_path = os.path.join(cur_output_dir_outerFolder, f'particle_{new_id}')
+        shutil.copytree(self.cur_output_dir, new_folder_path)
+
+        new_particle.particle_id = new_id
+        new_particle.cur_output_dir = new_folder_path
+        new_particle.file_path = os.path.join(new_folder_path, 'Program.json')
+        new_particle.valid_particle = True
+
+        return new_particle
 
 
     def set_gt_program(self, program):
@@ -105,6 +140,15 @@ class Particle():
 
         # if random.random() < termination_prob or len(self.past_programs) > 20: 
         #     return True
+        
+        if (len(self.gt_program) == len(self.past_programs)):
+            stroke_features_file = os.path.join(self.cur_output_dir, 'stroke_cloud_features.json')
+            stroke_features_list = self.stroke_node_features.tolist()
+
+            with open(stroke_features_file, 'w') as json_file:
+                for stroke in stroke_features_list:
+                    json.dump(stroke, json_file)
+                    json_file.write("\n")
 
         return len(self.gt_program) == len(self.past_programs)
         
@@ -116,6 +160,7 @@ class Particle():
 
     def is_valid_particle(self):
         return self.valid_particle
+
 
     def generate_next_step(self):
 
@@ -150,7 +195,7 @@ class Particle():
 
 
             if self.current_op == 1:
-                print("Do sketch")
+                # print("Build sketch")
                 self.sketch_selection_mask, self.sketch_points, normal, selected_loop_idx, prob = do_sketch(gnn_graph)
                 self.selected_loop_indices.append(selected_loop_idx)
                 self.score = self.score * prob
@@ -163,7 +208,7 @@ class Particle():
 
             # Build Extrude
             if self.current_op == 2:
-                print("Do extrude")
+                # print("Build extrude")
                 extrude_amount, extrude_direction, prob = do_extrude(gnn_graph, self.sketch_selection_mask, self.sketch_points, self.brep_edges)
                 self.cur__brep_class.extrude_op(extrude_amount, extrude_direction)
                 self.score = self.score * prob
@@ -171,7 +216,7 @@ class Particle():
 
             # Build fillet
             if self.current_op == 3:
-                print("Build Fillet")
+                # print("Build Fillet")
                 fillet_edge, fillet_amount, prob = do_fillet(gnn_graph, self.brep_edges)
                 self.cur__brep_class.random_fillet(fillet_edge, fillet_amount)
                 self.score = self.score * prob
@@ -180,6 +225,7 @@ class Particle():
             if self.current_op ==4:
                 print("Build Chamfer")
                 chamfer_edge, chamfer_amount, prob= do_chamfer(gnn_graph, self.brep_edges)
+                print("chamfer_amount", chamfer_amount)
                 self.cur__brep_class.random_chamfer(chamfer_edge, chamfer_amount)
                 self.score = self.score * prob
 
@@ -221,6 +267,10 @@ class Particle():
             self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
             self.score = self.score * op_prob
 
+            print("----------------")
+            print("self.past_programs", self.past_programs)
+            print("self.gt_program", self.gt_program)
+            print("self.current_op", self.current_op)
 
             # 6) Write the stroke_cloud data to pkl file
             output_file_path = os.path.join(self.cur_output_dir, 'canvas', f'{len(brep_files)}_shape_info.pkl')
@@ -237,8 +287,8 @@ class Particle():
 
         
         except Exception as e:
+            print(f"An error occurred: {e}")
             self.valid_particle = False
-            shutil.rmtree(self.cur_output_dir)
     
 
 
@@ -247,6 +297,7 @@ class Particle():
             self.success_terminate = True
             return 
 
+
     def get_gt_brep_history(self):
         brep_path = os.path.dirname(self.gt_brep_file_path)
         brep_files = [f for f in os.listdir(brep_path) if f.endswith('.step')]
@@ -254,6 +305,9 @@ class Particle():
         self.gt_brep_edges, _ = cascade_brep(brep_files, None, brep_path)
 
 
+
+    def remove_particle(self):
+        shutil.rmtree(self.cur_output_dir)
 
 
 

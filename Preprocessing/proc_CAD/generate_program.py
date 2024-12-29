@@ -504,7 +504,7 @@ class Brep:
         if closest_value == float('inf'):
             return inf_big
         else:
-            return closest_value
+            return closest_value * 0.9
 
 
     def safe_fillet_check(self, points):
