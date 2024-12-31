@@ -207,42 +207,70 @@ def extract_unique_points(max_prob_loop_idx, gnn_graph):
 
 def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges):
     """
-    Calculate the extrude amount and direction from the stroke with the highest probability in the extrude_selection_mask.
-    The extrusion direction is determined by identifying which point of the extruding stroke lies on the same plane
-    as the sketch_points (coplanar points). If brep_edges are provided, the function determines whether the extrusion 
-    is going into or out of the brep, and adjusts the stroke length accordingly.
+    Calculate the extrude target point from the stroke with the highest probability in the extrude_selection_mask.
+    The extrusion target is determined by identifying the point of the stroke that is not in the sketch points (coplanar points).
 
     Parameters:
     gnn_graph (HeteroData): The graph containing stroke nodes and their features.
     extrude_selection_mask (torch.Tensor): A tensor of shape (num_strokes, 1) representing probabilities for selecting strokes.
-    sketch_points (list): A list of points that are coplanar, meaning they share the same value along one axis.
-    brep_edges (torch.Tensor): A tensor of shape (num_strokes, 6) representing the brep edges.
+    sketch_points (torch.Tensor): A tensor of shape (num_points, 3), representing the coplanar points.
+    brep_edges (torch.Tensor): A tensor of shape (num_strokes, 6) representing the brep edges (not used in this logic).
 
     Returns:
-    tuple: (float, list) The stroke length and direction of extrusion for the stroke with the highest probability.
+    torch.Tensor: The target point for extrusion.
     """
 
-    # 1. Find the stroke with the highest value in extrude_selection_mask
-    top3_vals, top3_idxs = torch.topk(extrude_selection_mask.view(-1), 3)
-    total_sum = top3_vals.sum()
-    relative_probs = top3_vals / total_sum
-    sampled_idx = torch.multinomial(relative_probs, 1).item()
+    # 1. Find the strokes with the highest probabilities in extrude_selection_mask
+    topk_vals, topk_idxs = torch.topk(extrude_selection_mask.view(-1), 10)  # Get more top candidates to ensure uniqueness
 
-    selected_idx = top3_idxs[sampled_idx].item()
-    selected_prob = top3_vals[sampled_idx].item()
-
-
-
-
-    # 2. Extract stroke node features for the selected stroke
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
+
+    # Initialize variables to store the top 2 unique strokes
+    selected_strokes = []
+    unique_extrude_amounts = set()
+
+    # Iterate over topk indices to find 2 strokes with different extrude amounts
+    for idx in topk_idxs:
+        stroke_feature = stroke_features[idx]
+        point1 = stroke_feature[:3]
+        point2 = stroke_feature[3:6]
+        
+        # Compute extrude amount (distance between start and end points)
+        extrude_amount = torch.norm(point1 - point2, p=2).item()
+        
+        if extrude_amount not in unique_extrude_amounts:
+            selected_strokes.append((idx.item(), extrude_amount))
+            unique_extrude_amounts.add(extrude_amount)
+            
+        # Stop once we have 2 unique strokes
+        if len(selected_strokes) == 2:
+            break
+
+    # Extract indices and probabilities of the selected strokes
+    selected_idxs = [s[0] for s in selected_strokes]
+    selected_extrude_amounts = [s[1] for s in selected_strokes]
+    selected_probs = [extrude_selection_mask[idx] for idx in selected_idxs]
+
+    # Normalize probabilities for random sampling
+    selected_probs = torch.tensor(selected_probs)
+    temperature = 0.5
+    relative_probs = torch.softmax(selected_probs / temperature, dim=0)
+
+    # Randomly choose one of the strokes based on probabilities
+    sampled_idx = torch.multinomial(relative_probs, 1).item()
+    selected_idx = selected_idxs[sampled_idx]
     stroke_feature = stroke_features[selected_idx]
+    selected_prob = selected_probs[sampled_idx].item()
+
+    # Extract the two points of the stroke
+    point1 = stroke_feature[:3]
+    point2 = stroke_feature[3:6]
 
 
-
+    # Now find the target_point
     if sketch_points.shape[0] == 1:
+        # Handle circle strokes
         circle_stroke = sketch_points.squeeze(0)
-        # circle stroke
         normal_vector = circle_stroke[3:6]
 
         # Find common_axis_idx where the normal vector has a value of 1
@@ -254,78 +282,23 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
         
         if common_axis_idx != -1:
             plane_value = circle_stroke[common_axis_idx]
+            # Check which point lies on the plane
+            if torch.isclose(point1[common_axis_idx], torch.tensor(plane_value)):
+                target_point = point2
+            else:
+                target_point = point1
         else:
-            plane_value = None  # Handle case if no axis has a value of 1
-
-    else: 
-        # 3. Determine the common axis and value from the coplanar sketch_points
-        sketch_points_tensor = sketch_points.clone().detach().float()  # Convert to tensor if needed and clone
-        common_axes = (torch.all(sketch_points_tensor[:, 0] == sketch_points_tensor[0, 0]),
-                    torch.all(sketch_points_tensor[:, 1] == sketch_points_tensor[0, 1]),
-                    torch.all(sketch_points_tensor[:, 2] == sketch_points_tensor[0, 2]))
-
-        # Find the index of the common axis (x: 0, y: 1, z: 2)
-        common_axis_idx = common_axes.index(True)
-        plane_value = sketch_points_tensor[0, common_axis_idx]
-
-
-
-    # Extract the two 3D points for the stroke
-    point1 = stroke_feature[:3]
-    point2 = stroke_feature[3:6]
-
-    # 4. Determine which point of the extruding stroke is on the same plane as the sketch_points
-    if torch.isclose(point1[common_axis_idx], plane_value):
-        start_point, end_point = point1, point2
+            raise ValueError("Get extrude_amount failed, Normal vector does not define a valid plane.")
     else:
-        start_point, end_point = point2, point1
+        # For regular sketch points, check which point is in the sketch points
+        if any(torch.allclose(point1, sp) for sp in sketch_points):
+            target_point = point2
+        elif any(torch.allclose(point2, sp) for sp in sketch_points):
+            target_point = point1
+        else:
+            raise ValueError("Get extrude_amount failed, No matching point found in sketch points.")
 
-    # 5. Compute the length of the stroke
-    stroke_length = torch.dist(start_point, end_point).item()
-    
-    # 6. Compute the direction of the extrusion (from start_point to end_point)
-    direction_vector = (end_point - start_point).tolist()
-
-    # If brep_edges is empty, return the stroke length as positive
-    if brep_edges.shape[0] == 0:
-        return stroke_length, direction_vector
-
-    # 7. Iterate through each brep_edge to find the first one that satisfies the conditions
-    brep_edges_tensor = torch.tensor(brep_edges, dtype=torch.float32)
-
-    selected_brep_edge = None
-    on_axis_point = None
-    other_point = None
-
-    for brep_edge in brep_edges_tensor:
-        brep_point1 = brep_edge[:3]
-        brep_point2 = brep_edge[3:6]
-
-        # Check if one of the brep_edge points is on the same plane (has the same value on the common axis)
-        if torch.isclose(brep_point1[common_axis_idx], plane_value) and not torch.isclose(brep_point2[common_axis_idx], plane_value):
-            selected_brep_edge = brep_edge
-            on_axis_point = brep_point1
-            other_point = brep_point2
-            break
-        elif torch.isclose(brep_point2[common_axis_idx], plane_value) and not torch.isclose(brep_point1[common_axis_idx], plane_value):
-            selected_brep_edge = brep_edge
-            on_axis_point = brep_point2
-            other_point = brep_point1
-            break
-
-    # 8. If we found a matching brep edge, compute the brep direction
-    if selected_brep_edge is not None:
-        # Compute the brep direction from the other_point to the on_axis_point
-        brep_direction = (other_point - on_axis_point).tolist()
-
-        # 9. Check if brep_direction is opposite to direction_vector
-        dot_product = sum(brep_direction[i] * direction_vector[i] for i in range(3))
-
-        # If directions are opposite (dot product < 0), stroke_length should be positive, otherwise negative
-        stroke_length = abs(stroke_length) if dot_product < 0 else -abs(stroke_length)
-
-    return stroke_length, direction_vector, selected_prob
-
+    return target_point, selected_prob
 
 
 def extrude_strokes(gnn_graph, extrude_selection_mask):
@@ -378,11 +351,11 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
     fillet_stroke = stroke_features[selected_idx]
     
-
+    # print("fillet_stroke", fillet_stroke)
     # Step 1: Extract all unique 3D points from chamfer_strokes
     point1 = fillet_stroke[:3]
     point2 = fillet_stroke[3:6]
-
+    # print("point1", point1, "point2", point2)
     # Convert brep_edges to a PyTorch tensor
     if isinstance(brep_edges, (np.ndarray, list)):
         brep_edges = torch.tensor(brep_edges, dtype=point1.dtype)
@@ -400,6 +373,14 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
         # Compute distances from edge_mid_point to all fillet_points
         distance1 = torch.norm(point1 - edge_mid_point)
         distance2 = torch.norm(point2 - edge_mid_point)
+
+
+        # print("edge_point1", edge_point1, "edge_point2", edge_point2)
+        # print("distance1", distance1)
+        # print("distance2", distance2)
+        # print("torch.allclose(distance1, distance2, atol=1e-2)", torch.allclose(distance1, distance2, atol=1e-2))
+        # print("-----------")
+
 
         # Check if all distances are the same within a small tolerance
         if torch.allclose(distance1, distance2, atol=1e-2):
@@ -475,19 +456,18 @@ def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
         dist2_1 = torch.norm(edge_point2 - point1)
         dist2_2 = torch.norm(edge_point2 - point2)
 
-        # print("edge_point1", edge_point1, "edge_point2", edge_point2)
-        # print("dist1_1, dist1_2", dist1_1, dist1_2)
-        # print("dist2_1, dist2_2", dist2_1, dist2_2)
-        # print("math.isclose(dist1_1.item(), dist1_2.item())", math.isclose(dist1_1.item(), dist1_2.item()))
-        # print("math.isclose(dist2_1.item(), dist2_2.item())", math.isclose(dist2_1.item(), dist2_2.item()))
-        # print("-----------")
+        print("edge_point1", edge_point1, "edge_point2", edge_point2)
+        print("dist1_1, dist1_2", dist1_1, dist1_2)
+        print("dist2_1, dist2_2", dist2_1, dist2_2)
+        print("math.isclose(dist1_1.item(), dist1_2.item())", math.isclose(dist1_1.item(), dist1_2.item()))
+        print("math.isclose(dist2_1.item(), dist2_2.item())", math.isclose(dist2_1.item(), dist2_2.item()))
+        print("-----------")
 
         # Check for matching edge
         if math.isclose(dist1_1.item(), dist1_2.item(), abs_tol=1e-2) and math.isclose(dist2_1.item(), dist2_2.item(), abs_tol=1e-2) and min_edge_distance > min(dist1_1.item(), dist2_1.item()):
             min_edge_distance = min(dist1_1, dist2_1)
             chamfer_edge = edge
             chamfer_amount = min_edge_distance
-            print("find chamfer edge!")
 
     # Step 5: Return the results
     if chamfer_edge is not None:

@@ -105,36 +105,64 @@ class Brep:
         self.op.append(['sketch'])
 
 
-    def extrude_op(self, amount = 0, sketch_face_opposite_normal = [0,0,0]):
+    def extrude_op(self, extrude_target_point = None):
         
-        if amount == 0:
-            amount = Preprocessing.proc_CAD.random_gen.generate_random_extrude()
-        if self.idx < 2:
-            amount = abs(amount)
-        
+
         sketch_face = self.Faces[-1]
-            
-        if sketch_face_opposite_normal == [0,0,0]:
-            sketch_face_opposite_normal = [-x for x in sketch_face.normal]
-            safe_amount = -self.safe_extrude_check()
-
-            if amount <0:
-                amount = max(amount, safe_amount)
-
-        else:
-            sketch_face.normal = [-x for x in sketch_face_opposite_normal]
-
         new_vertices = []
         new_edges = []
         new_faces = []
+        sketch_face_opposite_normal = [-x for x in sketch_face.normal]
 
-        for i, vertex in enumerate(sketch_face.vertices):
 
-            new_pos = [vertex.position[j] + sketch_face_opposite_normal[j] * amount for j in range(3)]
-            vertex_id = f"vertex_{self.idx}_{i}"
-            new_vertex = Vertex(vertex_id, new_pos)
-            self.Vertices.append(new_vertex)
-            new_vertices.append(new_vertex)
+        # For dataset generation process
+        if extrude_target_point is None:
+            amount = Preprocessing.proc_CAD.random_gen.generate_random_extrude()
+            safe_amount = -self.safe_extrude_check()
+            if amount <0:
+                amount = max(amount, safe_amount)
+
+            if self.idx < 2:
+                amount = abs(amount)
+
+            for i, vertex in enumerate(sketch_face.vertices):
+
+                new_pos = [vertex.position[j] + sketch_face_opposite_normal[j] * amount for j in range(3)]
+                vertex_id = f"vertex_{self.idx}_{i}"
+                new_vertex = Vertex(vertex_id, new_pos)
+                self.Vertices.append(new_vertex)
+                new_vertices.append(new_vertex)
+
+        else:
+            extrude_direction = None
+            amount = None
+
+            for sketch_face_vert in sketch_face.vertices:
+                vert_pos = sketch_face_vert.position
+                # Check if vert_pos differs from extrude_target_point by only one axis
+                diff_axis_values = [extrude_target_point[j] - vert_pos[j] for j in range(3)]
+                diff_non_zero = [abs(val) > 1e-2 for val in diff_axis_values]
+                
+                if sum(diff_non_zero) == 1:  # Only one axis has a significant difference
+                    extrude_direction = [1 if val > 0 else -1 if val < 0 else 0 for val in diff_axis_values]
+                    amount = max(abs(val) for val in diff_axis_values).item()
+                    break
+
+            for i, sketch_face_vert in enumerate(sketch_face.vertices):
+                vert_pos = sketch_face_vert.position
+                # Map vert_pos to the same plane as extrude_target_point
+                new_pos = [vert_pos[j] + extrude_direction[j] * amount for j in range(3)]
+                vertex_id = f"vertex_{self.idx}_{i}"
+                new_vertex = Vertex(vertex_id, new_pos)
+                self.Vertices.append(new_vertex)
+                new_vertices.append(new_vertex)
+
+
+
+
+        
+
+
 
 
         num_vertices = len(new_vertices)
@@ -378,6 +406,7 @@ class Brep:
         
         self.write_terminate(data)  
 
+        print("data", data)
         with open(filename, 'w') as f:
             json.dump(data, f, indent=4)
         
@@ -541,6 +570,13 @@ class Brep:
         for edge in self.Edges:
             pos_1 = edge.vertices[0].position
             pos_2 = edge.vertices[1].position
+
+            print("point_1", point_1, "point_2", point_2)
+            print("pos_1", pos_1, "pos_2", pos_2)
+            print ("(is_close(point_1, pos_1)", is_close(point_1, pos_1))
+            print ("(is_close(point_2, pos_2)", is_close(point_2, pos_2))
+            print("------------")
+            
 
             # Check if the points match (considering floating point tolerance)
             if (is_close(point_1, pos_1) and is_close(point_2, pos_2)) or \
