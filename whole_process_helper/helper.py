@@ -456,12 +456,12 @@ def get_chamfer_amount(gnn_graph, chamfer_selection_mask, brep_edges):
         dist2_1 = torch.norm(edge_point2 - point1)
         dist2_2 = torch.norm(edge_point2 - point2)
 
-        print("edge_point1", edge_point1, "edge_point2", edge_point2)
-        print("dist1_1, dist1_2", dist1_1, dist1_2)
-        print("dist2_1, dist2_2", dist2_1, dist2_2)
-        print("math.isclose(dist1_1.item(), dist1_2.item())", math.isclose(dist1_1.item(), dist1_2.item()))
-        print("math.isclose(dist2_1.item(), dist2_2.item())", math.isclose(dist2_1.item(), dist2_2.item()))
-        print("-----------")
+        # print("edge_point1", edge_point1, "edge_point2", edge_point2)
+        # print("dist1_1, dist1_2", dist1_1, dist1_2)
+        # print("dist2_1, dist2_2", dist2_1, dist2_2)
+        # print("math.isclose(dist1_1.item(), dist1_2.item())", math.isclose(dist1_1.item(), dist1_2.item()))
+        # print("math.isclose(dist2_1.item(), dist2_2.item())", math.isclose(dist2_1.item(), dist2_2.item()))
+        # print("-----------")
 
         # Check for matching edge
         if math.isclose(dist1_1.item(), dist1_2.item(), abs_tol=1e-2) and math.isclose(dist2_1.item(), dist2_2.item(), abs_tol=1e-2) and min_edge_distance > min(dist1_1.item(), dist2_1.item()):

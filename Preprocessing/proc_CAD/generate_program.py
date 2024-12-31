@@ -157,10 +157,8 @@ class Brep:
                 self.Vertices.append(new_vertex)
                 new_vertices.append(new_vertex)
 
-
-
-
-        
+            if random.random() < 0.5 and len(self.op) > 2:
+                amount = -amount
 
 
 
@@ -406,7 +404,6 @@ class Brep:
         
         self.write_terminate(data)  
 
-        print("data", data)
         with open(filename, 'w') as f:
             json.dump(data, f, indent=4)
         
@@ -571,11 +568,11 @@ class Brep:
             pos_1 = edge.vertices[0].position
             pos_2 = edge.vertices[1].position
 
-            print("point_1", point_1, "point_2", point_2)
-            print("pos_1", pos_1, "pos_2", pos_2)
-            print ("(is_close(point_1, pos_1)", is_close(point_1, pos_1))
-            print ("(is_close(point_2, pos_2)", is_close(point_2, pos_2))
-            print("------------")
+            # print("point_1", point_1, "point_2", point_2)
+            # print("pos_1", pos_1, "pos_2", pos_2)
+            # print ("(is_close(point_1, pos_1)", is_close(point_1, pos_1))
+            # print ("(is_close(point_2, pos_2)", is_close(point_2, pos_2))
+            # print("------------")
             
 
             # Check if the points match (considering floating point tolerance)

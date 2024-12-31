@@ -521,7 +521,7 @@ def print_canvas_points(canvas):
                 round_position([verts[0].X, verts[0].Y, verts[0].Z]), 
                 round_position([verts[1].X, verts[1].Y, verts[1].Z])
                 ]
-        print("edge_positions", edge_positions)
+        # print("edge_positions", edge_positions)
 
 
 
@@ -1355,7 +1355,7 @@ def stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, 
             
             if not isinstance(brep_loop, list):
                 continue
-            
+
             if len(stroke_loop) == 1 and len(brep_loop) ==1:
 
                 stroke_circle_edge = stroke_node_features[stroke_loop[0]]
