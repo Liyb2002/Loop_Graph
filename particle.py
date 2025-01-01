@@ -288,15 +288,33 @@ class Particle():
             print("self.current_op", self.current_op)
 
             # 6) Write the stroke_cloud data to pkl file
-            output_file_path = os.path.join(self.cur_output_dir, 'canvas', f'{len(brep_files)}_shape_info.pkl')
+            output_file_path = os.path.join(self.cur_output_dir, 'canvas', f'{len(brep_files)-1}_eval_info.pkl')
             with open(output_file_path, 'wb') as f:
                 pickle.dump({
+                    'stroke_node_features': self.stroke_node_features,
+                    'gt_brep_edges': self.gt_brep_edges,
                     'gt_to_output_same': gt_to_output_same,
                     'output_to_gt_same': output_to_gt_same
                 }, f)
             
 
             # 7) Also copy the gt brep file
+            gt_brep_folder = os.path.dirname(self.gt_brep_file_path)
+
+            # Create a new folder called gt_canvas in self.cur_output_dir
+            gt_canvas_dir = os.path.join(self.cur_output_dir, 'gt_canvas')
+            os.makedirs(gt_canvas_dir, exist_ok=True)
+
+            # Copy everything from gt_brep_folder to gt_canvas
+            for item in os.listdir(gt_brep_folder):
+                source_item = os.path.join(gt_brep_folder, item)
+                dest_item = os.path.join(gt_canvas_dir, item)
+                
+                if os.path.isdir(source_item):
+                    shutil.copytree(source_item, dest_item, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(source_item, dest_item)
+            
             shutil.copy(self.gt_brep_file_path, os.path.join(self.cur_output_dir, 'gt_brep.step'))
             whole_process_helper.helper.brep_to_stl_and_copy(self.gt_brep_file_path, self.cur_output_dir,os.path.join(self.cur_output_dir, 'gt_brep.step'))
 

@@ -36,36 +36,44 @@ class Evaluation_Dataset(Dataset):
             for folder in sublist
         ]
 
-        print("self.data_particles", self.flatted_particle_folders)
-        print(f"Number of data directories: {len(self.data_dirs)}")
+        # Collect all data pieces: (folder_path, file_index)
+        self.data_pieces = []
+        for folder in self.flatted_particle_folders:
+            canvas_dir = os.path.join(folder, 'canvas')
+            if os.path.exists(canvas_dir) and os.path.isdir(canvas_dir):
+                shape_files = sorted(
+                    f for f in os.listdir(canvas_dir) if f.endswith('_eval_info.pkl')
+                )
+                for shape_file in shape_files:
+                    index = int(shape_file.split('_')[0])
+                    self.data_pieces.append((folder, index))
+
+        print(f"Total number of data pieces: {len(self.data_pieces)}")
+        print("self.data_pieces", self.data_pieces)
 
     def __len__(self):
-        return len(self.flatted_particle_folders)
+        return len(self.data_pieces)
 
     def __getitem__(self, idx):
-        data_dir = self.flatted_particle_folders[idx]
+        # Load stroke_node_features from  _eval_info.pkl
+        folder, file_index = self.data_pieces[idx]
+        canvas_dir = os.path.join(folder, 'canvas')
+        shape_file_path = os.path.join(canvas_dir, f"{file_index}_eval_info.pkl")
 
-        # Load shape_info
-        shape_file_path = os.path.join(self.data_path, data_dir, 'shape_info.pkl')
         with open(shape_file_path, 'rb') as f:
             shape_data = pickle.load(f)
+        
         stroke_node_features = shape_data['stroke_node_features']
         
 
-        # Load Brep file
-        brep_files = [file_name for file_name in os.listdir(os.path.join(self.data_path, data_dir, 'canvas'))
-                if file_name.startswith('brep_') and file_name.endswith('.step')]
-        brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
-
-
-        final_brep_file_path = os.path.join(self.data_path, data_dir, 'canvas', brep_files[-1])
-        edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(final_brep_file_path)
+        # Load generated Brep file
+        shape_file_path = os.path.join(canvas_dir, f"brep_{file_index}.step")
+        edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(shape_file_path)
         output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(edge_features_list + cylinder_features)
 
+
         # Load gt Brep file
-        gt_brep_file_path = os.path.join(self.data_path, data_dir, 'gt_brep.step')
-        gt_edge_features_list, gt_cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(gt_brep_file_path)
-        gt_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(gt_edge_features_list + gt_cylinder_features)
+        gt_brep_edges = shape_data['gt_brep_edges']
 
         return stroke_node_features, output_brep_edges, gt_brep_edges
 
@@ -147,7 +155,7 @@ for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
     if output_brep_edges.shape[0] == 0:
         continue
     
-    # Covered = the first shape covers the second
+    # Covered = the first shape covers the second, if it is 0, then we are on the right track
     covered_chamfer_dist, whole_chamfer_dist= chamfer_distance(gt_brep_edges, output_brep_edges)
     # Encoders.helper.vis_brep(stroke_node_features)
     # Encoders.helper.vis_brep(output_brep_edges)
@@ -156,10 +164,10 @@ for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
 
     if covered_chamfer_dist < 0.1:
         total_correct += 1
-    else:
-        print("chamfer_dist", covered_chamfer_dist)
-        Encoders.helper.vis_brep(output_brep_edges)
-        Encoders.helper.vis_brep(gt_brep_edges)
+
+    print("chamfer_dist", covered_chamfer_dist)
+    # Encoders.helper.vis_brep(output_brep_edges)
+    # Encoders.helper.vis_brep(gt_brep_edges)
 
     
     total += 1
