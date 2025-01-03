@@ -49,7 +49,6 @@ class Evaluation_Dataset(Dataset):
                     self.data_pieces.append((folder, index))
 
         print(f"Total number of data pieces: {len(self.data_pieces)}")
-        print("self.data_pieces", self.data_pieces)
 
     def __len__(self):
         return len(self.data_pieces)
@@ -74,8 +73,17 @@ class Evaluation_Dataset(Dataset):
 
         # Load gt Brep file
         gt_brep_edges = shape_data['gt_brep_edges']
+        gt_to_output_same = shape_data['gt_to_output_same']
+        output_to_gt_same = shape_data['output_to_gt_same']
 
-        return stroke_node_features, output_brep_edges, gt_brep_edges
+        
+        # Find high_dist_indices 
+        high_dist_indices = shape_data['high_dist_indices']
+        dist_vals = shape_data['dist_vals']
+
+
+        # Load Pre-computed 
+        return stroke_node_features, output_brep_edges, gt_brep_edges, gt_to_output_same, output_to_gt_same, high_dist_indices, dist_vals
 
 
 
@@ -139,8 +147,9 @@ data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 total_correct = 0
 total = 0
+
 for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
-    stroke_node_features, output_brep_edges, gt_brep_edges= data
+    stroke_node_features, output_brep_edges, gt_brep_edges, gt_to_output_same, output_to_gt_same, high_dist_indices, dist_vals= data
 
     stroke_node_features = stroke_node_features.squeeze(0)
     stroke_node_features = torch.round(stroke_node_features * 10000) / 10000
@@ -156,18 +165,19 @@ for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
         continue
     
     # Covered = the first shape covers the second, if it is 0, then we are on the right track
-    covered_chamfer_dist, whole_chamfer_dist= chamfer_distance(gt_brep_edges, output_brep_edges)
+    # covered_chamfer_dist, whole_chamfer_dist= chamfer_distance(gt_brep_edges, output_brep_edges)
     # Encoders.helper.vis_brep(stroke_node_features)
     # Encoders.helper.vis_brep(output_brep_edges)
     # Encoders.helper.vis_brep(gt_brep_edges)
-    # print("chamfer_dist", chamfer_dist)
+    print("output_to_gt_same : on the right track", output_to_gt_same)
+    # print("output_to_gt_same", output_to_gt_same)
 
-    if covered_chamfer_dist < 0.1:
-        total_correct += 1
 
-    print("chamfer_dist", covered_chamfer_dist)
-    # Encoders.helper.vis_brep(output_brep_edges)
-    # Encoders.helper.vis_brep(gt_brep_edges)
+    print("high_dist_indices", high_dist_indices)
+    print("dist_vals", dist_vals)
+    print("gt_brep_edges", output_brep_edges)
+    Encoders.helper.vis_brep_with_indices(output_brep_edges, high_dist_indices)
+    Encoders.helper.vis_brep(gt_brep_edges)
 
     
     total += 1

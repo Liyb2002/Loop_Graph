@@ -32,7 +32,7 @@ import random
 import copy
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/example', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/eval', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 
@@ -48,7 +48,7 @@ pass
 
 # --------------------- Main Code --------------------- #
 data_produced = 0
-data_limit = 100
+data_limit = 1
 if os.path.exists(output_dir):
     shutil.rmtree(output_dir)
 os.makedirs(output_dir, exist_ok=True)
@@ -97,3 +97,4 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
 
 
     data_produced += 1
+    break

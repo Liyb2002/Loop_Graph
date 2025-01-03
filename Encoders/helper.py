@@ -613,6 +613,139 @@ def vis_brep(brep):
     plt.show()
 
 
+def vis_brep_with_indices(brep, indices):
+    """
+    Visualize the BREP strokes and circular/cylindrical faces in 3D space,
+    highlighting the specified edges in red.
+
+    Parameters:
+    - brep (np.ndarray or torch.Tensor): A matrix with shape (num_strokes, 6) representing strokes.
+        Each row contains two 3D points representing the start and end of a stroke.
+    - indices (list): List of indices in the BREP to highlight in red.
+    """
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+
+    # Check if BREP is empty
+    if brep.shape[0] == 0:
+        plt.title('Empty Plot')
+        plt.show()
+        return
+
+    # Convert BREP to numpy if it's a tensor
+    if not isinstance(brep, np.ndarray):
+        brep = brep.numpy()
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Plot all strokes
+    for i, stroke in enumerate(brep):
+        color = 'red' if i in indices else 'blue'
+
+        if stroke[-1] == 3:
+            # Cylinder face
+            center = stroke[:3]
+            normal = stroke[3:6]
+            height = stroke[6]
+            radius = stroke[7]
+
+            # Generate points for the cylinder's base circle (less dense)
+            theta = np.linspace(0, 2 * np.pi, 30)  # Less dense with 30 points
+            x_values = radius * np.cos(theta)
+            y_values = radius * np.sin(theta)
+            z_values = np.zeros_like(theta)
+
+            # Combine the coordinates into a matrix (3, 30)
+            base_circle_points = np.array([x_values, y_values, z_values])
+
+            # Normalize the normal vector
+            normal = normal / np.linalg.norm(normal)
+
+            # Rotation logic using Rodrigues' formula
+            z_axis = np.array([0, 0, 1])  # Z-axis is the default normal for the cylinder
+
+            # Rotate the base circle points to align with the normal vector
+            rotation_axis = np.cross(z_axis, normal)
+            if np.linalg.norm(rotation_axis) > 0:  # Check if rotation is needed
+                rotation_axis /= np.linalg.norm(rotation_axis)
+                angle = np.arccos(np.clip(np.dot(z_axis, normal), -1.0, 1.0))
+
+                # Create the rotation matrix using the rotation axis and angle (Rodrigues' rotation formula)
+                K = np.array([[0, -rotation_axis[2], rotation_axis[1]],
+                              [rotation_axis[2], 0, -rotation_axis[0]],
+                              [-rotation_axis[1], rotation_axis[0], 0]])
+
+                R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * np.dot(K, K)
+
+                # Rotate the base circle points
+                rotated_base_circle_points = np.dot(R, base_circle_points)
+            else:
+                rotated_base_circle_points = base_circle_points
+
+            # Translate the base circle to the center point
+            x_base = rotated_base_circle_points[0] + center[0]
+            y_base = rotated_base_circle_points[1] + center[1]
+            z_base = rotated_base_circle_points[2] + center[2]
+
+            # Plot the base circle
+            ax.plot(x_base, y_base, z_base, color=color)
+
+            # Plot vertical lines to create the "cylinder" (but without filling the body)
+            x_top = x_base - normal[0] * height
+            y_top = y_base - normal[1] * height
+            z_top = z_base - normal[2] * height
+
+            # Plot lines connecting the base and top circle with reduced density
+            for j in range(0, len(x_base), 3):  # Fewer lines by skipping points
+                ax.plot([x_base[j], x_top[j]], [y_base[j], y_top[j]], [z_base[j], z_top[j]], color=color)
+
+        elif stroke[-1] == 2:
+            # Circle face
+            x_values, y_values, z_values = plot_circle(stroke)
+            ax.plot(x_values, y_values, z_values, color=color)
+
+        elif stroke[-1] == 4:
+            # Arc face
+            x_values, y_values, z_values = plot_brep_arc(stroke)
+            ax.plot(x_values, y_values, z_values, color=color)
+
+        else:
+            # Regular stroke
+            start, end = stroke[:3], stroke[3:6]
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color=color, linewidth=1)
+
+        # Update axis limits
+        x_min, x_max = min(x_min, stroke[:3].min(), stroke[3:6].min()), max(x_max, stroke[:3].max(), stroke[3:6].max())
+        y_min, y_max = min(y_min, stroke[:3].min(), stroke[3:6].min()), max(y_max, stroke[:3].max(), stroke[3:6].max())
+        z_min, z_max = min(z_min, stroke[:3].min(), stroke[3:6].min()), max(z_max, stroke[:3].max(), stroke[3:6].max())
+
+    # Compute the center of the shape
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+
+    # Compute the maximum difference across x, y, z directions
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    # Set the same limits for x, y, and z axes centered around the computed center
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # Show plot
+    plt.show()
+
+
 
 
 # Straight Line: 10 values + type 1
