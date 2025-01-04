@@ -260,26 +260,12 @@ class Particle():
 
 
             # Compute Chamfer Distance
-            max_dist_gt_to_output, max_dist_output_to_gt, high_dist_indices, dist_vals= chamfer_distance_brep(self.gt_brep_edges, new_edges_in_current_step)
-            if max_dist_gt_to_output < 0.05:
-                gt_to_output_same = 1
-            else:
-                gt_to_output_same = 0
-
-            if max_dist_output_to_gt < 0.05:
-                output_to_gt_same = 1
-            else:
-                output_to_gt_same = 0
+            on_right_track, high_dist_indices= chamfer_distance_brep(self.gt_brep_edges, new_edges_in_current_step)
 
 
             self.past_programs.append(self.current_op)
             self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
             self.score = self.score * op_prob
-
-            if len(self.past_programs) == 3:
-                self.current_op = 4
-            if len(self.past_programs) == 6:
-                self.current_op = 3
 
 
             print("----------------")
@@ -293,9 +279,7 @@ class Particle():
                 pickle.dump({
                     'stroke_node_features': self.stroke_node_features,
                     'gt_brep_edges': self.gt_brep_edges,
-                    'dist_vals' : dist_vals, 
-                    'gt_to_output_same': gt_to_output_same,
-                    'output_to_gt_same': output_to_gt_same,
+                    'on_right_track' : on_right_track, 
                     'high_dist_indices': high_dist_indices
                 }, f)
             
@@ -318,6 +302,7 @@ class Particle():
                     shutil.copy2(source_item, dest_item)
             
             shutil.copy(self.gt_brep_file_path, os.path.join(self.cur_output_dir, 'gt_brep.step'))
+
             whole_process_helper.helper.brep_to_stl_and_copy(self.gt_brep_file_path, self.cur_output_dir,os.path.join(self.cur_output_dir, 'gt_brep.step'))
 
         
@@ -566,6 +551,7 @@ def cascade_brep_accumulate(prev_edges, prev_loops, brep_files, data_produced, b
     edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
 
     # Convert new features to a Tensor
+    straight_edges = torch.tensor(edge_features_list, dtype=prev_edges.dtype, device=prev_edges.device)
     new_edges = torch.tensor(edge_features_list + cylinder_features, dtype=prev_edges.dtype, device=prev_edges.device)
 
     # Step 2: Combine previous and new features
@@ -592,75 +578,91 @@ def cascade_brep_accumulate(prev_edges, prev_loops, brep_files, data_produced, b
     # Concatenate the lists
     new_loops += list(circle_loops)  # Ensure circle_loops is also a list
 
-    return final_brep_edges, prev_loops + new_loops, new_edges
+    return final_brep_edges, prev_loops + new_loops, straight_edges
 
 
 # --------------------- Chamfer Distance --------------------- #
 def chamfer_distance_brep(gt_brep_edges, output_brep_edges, threshold=0.05):
     """
-    Calculates the maximum Chamfer distance between ground truth (GT) BREP edges and output BREP edges.
-    Also identifies indices of output edges with a minimum distance greater than the threshold.
+    Calculates the Chamfer distance between ground truth (GT) BREP edges and output BREP edges,
+    considering edge containment.
 
     Parameters:
-    - gt_brep_edges (numpy.ndarray or torch.Tensor): Array or tensor of shape (num_gt_edges, 10),
-      where the first 6 values represent two 3D points defining a GT BREP edge (start and end points).
-    - output_brep_edges (numpy.ndarray or torch.Tensor): Array or tensor of shape (num_output_edges, 10),
-      where the first 6 values represent two 3D points defining an output BREP edge (start and end points).
-    - threshold (float): Distance threshold to identify output edges with high minimum distance.
+    - gt_brep_edges (torch.Tensor): A tensor of shape (num_gt_edges, 6), where each row represents an edge
+      with two 3D points (start and end).
+    - output_brep_edges (torch.Tensor): A tensor of shape (num_output_edges, 6), where each row represents
+      an edge with two 3D points (start and end).
+    - threshold (float): Distance threshold to check if the output edges are within acceptable limits.
 
     Returns:
-    - max_dist_gt_to_output (torch.Tensor): Maximum Chamfer distance from GT edges to output edges.
-    - max_dist_output_to_gt (torch.Tensor): Maximum Chamfer distance from output edges to GT edges.
-    - high_dist_indices (list): List of indices of output edges with minimum distance > threshold.
+    - on_right_track (bool): True if all distances are below the threshold, False otherwise.
+    - dists (list): A list of minimum distances for each output edge.
+    - high_dist_indices (list): A list of indices where dists[i] > threshold.
     """
+    def is_point_on_segment(point, segment_start, segment_end, tol=1e-6):
+        """Check if a point lies on the segment defined by segment_start and segment_end."""
+        segment_vec = segment_end - segment_start
+        point_vec = point - segment_start
+        cross_product = torch.cross(segment_vec, point_vec)
+        # Check collinearity
+        if torch.norm(cross_product) > tol:
+            return False
+        # Check bounds
+        dot_product = torch.dot(segment_vec, point_vec)
+        if dot_product < 0 or dot_product > torch.dot(segment_vec, segment_vec):
+            return False
+        return True
+
     # Ensure inputs are tensors
     if not isinstance(gt_brep_edges, torch.Tensor):
         gt_brep_edges = torch.tensor(gt_brep_edges, dtype=torch.float32)
     if not isinstance(output_brep_edges, torch.Tensor):
         output_brep_edges = torch.tensor(output_brep_edges, dtype=torch.float32)
 
-    # Filter valid GT edges (where 8th column == 0)
-    valid_gt_edges = gt_brep_edges[gt_brep_edges[:, 7] == 0]
+    dists = []
+    high_dist_indices = []
 
-    # Extract start and end points for valid GT edges
-    gt_start_points = valid_gt_edges[:, :3]  # First 3 values
-    gt_end_points = valid_gt_edges[:, 3:6]  # Next 3 values
-    gt_points = torch.cat((gt_start_points, gt_end_points), dim=0)  # Combine start and end points
+    for output_idx, output_edge in enumerate(output_brep_edges):
+        output_start, output_end = output_edge[:3], output_edge[3:6]
+        min_distance = float('inf')
 
-    # Extract start and end points for valid output edges
-    output_start_points = output_brep_edges[:, :3]  # First 3 values
-    output_end_points = output_brep_edges[:, 3:6]  # Next 3 values
-    output_points = torch.cat((output_start_points, output_end_points), dim=0)  # Combine start and end points
+        for gt_edge in gt_brep_edges:
+            gt_start, gt_end = gt_edge[:3], gt_edge[3:6]
 
-    # Compute Chamfer distance (GT to Output)
-    dist_gt_to_output = torch.cdist(gt_points, output_points, p=2)  # Pairwise distances
-    min_dist_gt_to_output = torch.min(dist_gt_to_output, dim=1)[0]  # Minimum distance for each GT point
-    max_dist_gt_to_output = torch.max(min_dist_gt_to_output)  # Maximum distance
+            # Check if the output edge is contained within the gt edge
+            if (is_point_on_segment(output_start, gt_start, gt_end) and
+                    is_point_on_segment(output_end, gt_start, gt_end)):
+                min_distance = 0
+                break
 
-    # Compute Chamfer distance (Output to GT)
-    dist_output_to_gt = torch.cdist(output_points, gt_points, p=2)  # Pairwise distances
-    min_dist_output_to_gt = torch.min(dist_output_to_gt, dim=1)[0]  # Minimum distance for each Output point
-    max_dist_output_to_gt = torch.max(min_dist_output_to_gt)  # Maximum distance
+            # Calculate distances between corresponding vertices
+            dist_start = torch.dist(output_start, gt_start, p=2)
+            dist_end = torch.dist(output_end, gt_end, p=2)
 
-    # Identify indices of output edges with high-distance points
-    high_dist_point_indices = torch.where(min_dist_output_to_gt > threshold)[0]  # Indices of high-dist points
+            # Calculate distances for reversed vertices (to account for edge reversibility)
+            dist_start_reversed = torch.dist(output_start, gt_end, p=2)
+            dist_end_reversed = torch.dist(output_end, gt_start, p=2)
 
-    # Map high-distance points back to edges
-    num_output_edges = gt_brep_edges.shape[0]
-    high_dist_edge_indices = set()
-    dist_vals = []
-    edge_to_max_dist = {}
+            # Find the minimum distance for this pair of edges
+            dist = min(dist_start + dist_end, dist_start_reversed + dist_end_reversed)
 
-    for point_idx in high_dist_point_indices:
-        # Each edge contributes two points in output_points (start and end)
-        edge_idx = point_idx // 2  # Integer division to map back to edge index
-        if edge_idx < num_output_edges:
-            high_dist_edge_indices.add(edge_idx)
-            # Update the maximum distance for this edge
-            edge_to_max_dist[edge_idx] = max(edge_to_max_dist.get(edge_idx, 0), min_dist_output_to_gt[point_idx].item())
+            # Update the minimum distance for this output edge
+            min_distance = min(min_distance, dist)
 
-    # Sort edges and prepare dist_vals
-    high_dist_edge_indices = sorted(list(high_dist_edge_indices))
-    dist_vals = [edge_to_max_dist[edge_idx] for edge_idx in high_dist_edge_indices]
+        dists.append(min_distance)
 
-    return max_dist_gt_to_output, max_dist_output_to_gt, high_dist_edge_indices, dist_vals
+        # Check if this distance exceeds the threshold
+        if min_distance > threshold:
+            high_dist_indices.append(output_idx)
+
+    # Determine if all distances are below the threshold
+    on_right_track = all(dist < threshold for dist in dists)
+
+    # Additional visualization if there are high-distance indices
+    # if len(high_dist_indices) > 0:
+    #     combined_brep_edges = torch.cat((output_brep_edges, gt_brep_edges), dim=0)
+        # Encoders.helper.vis_brep(gt_brep_edges)
+        # Encoders.helper.vis_brep_with_indices(combined_brep_edges, high_dist_indices)
+        # print("High distance values:", [dists[i] for i in high_dist_indices])
+
+    return on_right_track, high_dist_indices

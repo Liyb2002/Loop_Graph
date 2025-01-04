@@ -392,11 +392,13 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
 
     if fillet_edge is not None:
         # Compute chamfer_amount
-        example_point = fillet_stroke[:3]
-        example_center = fillet_stroke[3:6]
+        example_point_1 = fillet_stroke[:3]
+        example_point_2 = fillet_stroke[3:6]
 
-        dist = torch.norm(example_point - example_center)
-        return fillet_edge, dist, selected_prob
+        distance = torch.sqrt(torch.sum((example_point_2 - example_point_1) ** 2))
+        radius = distance / torch.sqrt(torch.tensor(2.0))
+
+        return fillet_edge, radius, selected_prob
 
     return None, None, 0
 

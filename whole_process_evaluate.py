@@ -89,53 +89,117 @@ class Evaluation_Dataset(Dataset):
 
 
 # --------------------- Chamfer Distance Computation --------------------- #
-def chamfer_distance(stroke_node_features, output_brep_edges):
+def chamfer_distance_brep(gt_brep_edges, output_brep_edges, threshold=0.05):
     """
-    Calculates the Chamfer distance between strokes and BREP edges.
+    Calculates the maximum Chamfer distance between ground truth (GT) BREP edges and output BREP edges.
+    Also identifies indices of output edges with a minimum distance greater than the threshold.
 
     Parameters:
-    - stroke_node_features (torch.Tensor): Tensor of shape (num_strokes, 8), where the first 6 values represent
-      two 3D points defining a stroke (start and end points), and the 8th value indicates whether to ignore the stroke (1 to ignore).
-    - output_brep_edges (torch.Tensor): Tensor of shape (num_brep_edges, 8), where the first 6 values represent
-      two 3D points defining a BREP edge (start and end points), and the 8th value indicates whether to ignore the edge (1 to ignore).
+    - gt_brep_edges (numpy.ndarray or torch.Tensor): Array or tensor of shape (num_gt_edges, 10),
+      where the first 6 values represent two 3D points defining a GT BREP edge (start and end points).
+    - output_brep_edges (numpy.ndarray or torch.Tensor): Array or tensor of shape (num_output_edges, 10),
+      where the first 6 values represent two 3D points defining an output BREP edge (start and end points).
+    - threshold (float): Distance threshold to identify output edges with high minimum distance.
 
     Returns:
-    - chamfer_dist (torch.Tensor): Chamfer distance between the strokes and the BREP edges.
+    - max_dist_gt_to_output (torch.Tensor): Maximum Chamfer distance from GT edges to output edges.
+    - max_dist_output_to_gt (torch.Tensor): Maximum Chamfer distance from output edges to GT edges.
+    - high_dist_indices (list): List of indices of output edges with minimum distance > threshold.
+    """
+    # Ensure inputs are tensors
+    if not isinstance(gt_brep_edges, torch.Tensor):
+        gt_brep_edges = torch.tensor(gt_brep_edges, dtype=torch.float32)
+    if not isinstance(output_brep_edges, torch.Tensor):
+        output_brep_edges = torch.tensor(output_brep_edges, dtype=torch.float32)
+
+    # Extract start and end points for valid GT edges
+    gt_start_points = gt_brep_edges[:, :3]  # First 3 values
+    gt_end_points = gt_brep_edges[:, 3:6]  # Next 3 values
+    gt_points = torch.cat((gt_start_points, gt_end_points), dim=0)  # Combine start and end points
+
+    # Extract start and end points for valid output edges
+    output_start_points = output_brep_edges[:, :3]  # First 3 values
+    output_end_points = output_brep_edges[:, 3:6]  # Next 3 values
+    output_points = torch.cat((output_start_points, output_end_points), dim=0)  # Combine start and end points
+
+    # Compute Chamfer distance (GT to Output)
+    dist_gt_to_output = torch.cdist(gt_points, output_points, p=2)  # Pairwise distances
+    min_dist_gt_to_output = torch.min(dist_gt_to_output, dim=1)[0]  # Minimum distance for each GT point
+    max_dist_gt_to_output = torch.max(min_dist_gt_to_output)  # Maximum distance
+
+    # Compute Chamfer distance (Output to GT)
+    dist_output_to_gt = torch.cdist(output_points, gt_points, p=2)  # Pairwise distances
+    min_dist_output_to_gt = torch.min(dist_output_to_gt, dim=1)[0]  # Minimum distance for each Output point
+    max_dist_output_to_gt = torch.max(min_dist_output_to_gt)  # Maximum distance
+
+    # Identify indices of output edges with high-distance points
+    high_dist_point_indices = torch.where(min_dist_output_to_gt > threshold)[0]  # Indices of high-dist points
+
+    # Map high-distance points back to edges
+    num_output_edges = gt_brep_edges.shape[0]
+    high_dist_edge_indices = set()
+    dist_vals = []
+    edge_to_max_dist = {}
+
+    for point_idx in high_dist_point_indices:
+        # Each edge contributes two points in output_points (start and end)
+        edge_idx = point_idx // 2  # Integer division to map back to edge index
+        if edge_idx < num_output_edges:
+            high_dist_edge_indices.add(edge_idx)
+            # Update the maximum distance for this edge
+            edge_to_max_dist[edge_idx] = max(edge_to_max_dist.get(edge_idx, 0), min_dist_output_to_gt[point_idx].item())
+
+    # Sort edges and prepare dist_vals
+    high_dist_edge_indices = sorted(list(high_dist_edge_indices))
+    dist_vals = [edge_to_max_dist[edge_idx] for edge_idx in high_dist_edge_indices]
+
+    return max_dist_gt_to_output, max_dist_output_to_gt, high_dist_edge_indices, dist_vals
+
+
+
+def brep_difference(prev_brep_edges, new_brep_edges):
+    """
+    Returns the edges in new_brep_edges that are not present in prev_brep_edges.
+
+    Two edges are considered the same if they have the same two points [:3] and [3:6],
+    regardless of the order of the points.
+
+    Parameters:
+    - prev_brep_edges (numpy.ndarray or torch.Tensor): Array or tensor of shape (num_prev_edges, 10),
+      where the first 6 values represent two 3D points defining an edge (start and end points).
+    - new_brep_edges (numpy.ndarray or torch.Tensor): Array or tensor of shape (num_new_edges, 10),
+      where the first 6 values represent two 3D points defining an edge (start and end points).
+
+    Returns:
+    - unique_new_edges (torch.Tensor): Tensor of edges in new_brep_edges that are not in prev_brep_edges.
     """
 
-    # Filter valid strokes based on the 8th column (ignore strokes where stroke[8] != 0)
-    valid_strokes = stroke_node_features[stroke_node_features[:, 7] == 0]
+    if prev_brep_edges is None:
+        return new_brep_edges
     
-    # Extract the start and end 3D points from valid strokes
-    stroke_start_points = valid_strokes[:, :3]  # First 3 values
-    stroke_end_points = valid_strokes[:, 3:6]  # Next 3 values
-    
-    # Combine start and end points to get a list of all 3D points
-    stroke_points = torch.cat((stroke_start_points, stroke_end_points), dim=0)
+    # Ensure inputs are tensors
+    if isinstance(prev_brep_edges, torch.Tensor):
+        prev_brep_edges = prev_brep_edges.cpu().numpy()
+    if isinstance(new_brep_edges, torch.Tensor):
+        new_brep_edges = new_brep_edges.cpu().numpy()
 
-    # Filter valid brep edges based on the 8th column (ignore edges where output_brep_edges[8] != 0)
-    valid_brep_edges = output_brep_edges[output_brep_edges[:, 7] == 0]
-    
-    # Extract the start and end 3D points from valid BREP edges
-    brep_start_points = valid_brep_edges[:, :3]  # First 3 values
-    brep_end_points = valid_brep_edges[:, 3:6]  # Next 3 values
-    
-    # Combine start and end points to get a list of all 3D points
-    brep_points = torch.cat((brep_start_points, brep_end_points), dim=0)
+    # Helper function to normalize edges (sort start and end points)
+    def normalize_edge(edge):
+        start, end = edge[:3], edge[3:6]
+        return tuple(sorted([tuple(start), tuple(end)]))
 
-    # Compute Chamfer distance (forward direction: stroke to BREP)
-    dist_stroke_to_brep = torch.cdist(stroke_points, brep_points, p=2)
-    min_dist_stroke_to_brep = torch.min(dist_stroke_to_brep, dim=1)[0]
+    # Normalize and create sets of edges
+    prev_edge_set = {normalize_edge(edge) for edge in prev_brep_edges}
+    unique_edges = []
 
-    # Compute Chamfer distance (backward direction: BREP to stroke)
-    dist_brep_to_stroke = torch.cdist(brep_points, stroke_points, p=2)
-    min_dist_brep_to_stroke = torch.min(dist_brep_to_stroke, dim=1)[0]
+    for edge in new_brep_edges:
+        if normalize_edge(edge) not in prev_edge_set:
+            unique_edges.append(edge)
 
-    # Average Chamfer distance (forward + backward)
-    
-    return torch.mean(min_dist_brep_to_stroke), torch.mean(min_dist_stroke_to_brep) + torch.mean(min_dist_brep_to_stroke)
+    # Convert the unique edges back to a tensor
+    unique_new_edges = torch.tensor(unique_edges, dtype=torch.float32)
 
-
+    return unique_new_edges
 
 # --------------------- Main Code --------------------- #
 
@@ -147,6 +211,8 @@ data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 total_correct = 0
 total = 0
+
+prev_brep_edges = None
 
 for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
     stroke_node_features, output_brep_edges, gt_brep_edges, gt_to_output_same, output_to_gt_same, high_dist_indices, dist_vals= data
@@ -164,20 +230,21 @@ for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
     if output_brep_edges.shape[0] == 0:
         continue
     
-    # Covered = the first shape covers the second, if it is 0, then we are on the right track
-    # covered_chamfer_dist, whole_chamfer_dist= chamfer_distance(gt_brep_edges, output_brep_edges)
-    # Encoders.helper.vis_brep(stroke_node_features)
-    # Encoders.helper.vis_brep(output_brep_edges)
-    # Encoders.helper.vis_brep(gt_brep_edges)
     print("output_to_gt_same : on the right track", output_to_gt_same)
-    # print("output_to_gt_same", output_to_gt_same)
 
+    if prev_brep_edges is not None:
+        print("prev_brep_edges", prev_brep_edges)
+    
+    unique_new_edges = brep_difference(prev_brep_edges, output_brep_edges)
+    prev_brep_edges = output_brep_edges
 
-    print("high_dist_indices", high_dist_indices)
-    print("dist_vals", dist_vals)
-    print("gt_brep_edges", output_brep_edges)
+    high_dist_indices_values = [idx.item() for tensor in high_dist_indices for idx in tensor]
+    print('high_dist_indices_values', high_dist_indices_values)
+    print("high_dist_indices", output_brep_edges[high_dist_indices_values])
+    
     Encoders.helper.vis_brep_with_indices(output_brep_edges, high_dist_indices)
-    Encoders.helper.vis_brep(gt_brep_edges)
+    Encoders.helper.vis_brep(unique_new_edges)
+    # Encoders.helper.vis_brep(gt_brep_edges)
 
     
     total += 1
