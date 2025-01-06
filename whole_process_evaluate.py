@@ -73,18 +73,16 @@ class Evaluation_Dataset(Dataset):
 
         # Load gt Brep file
         gt_brep_edges = shape_data['gt_brep_edges']
-        gt_to_output_same = shape_data['gt_to_output_same']
-        output_to_gt_same = shape_data['output_to_gt_same']
 
         
         # Find high_dist_indices 
+        on_right_track = shape_data['on_right_track']
+        is_finished = shape_data['is_finished']
         high_dist_indices = shape_data['high_dist_indices']
-        dist_vals = shape_data['dist_vals']
 
 
         # Load Pre-computed 
-        return stroke_node_features, output_brep_edges, gt_brep_edges, gt_to_output_same, output_to_gt_same, high_dist_indices, dist_vals
-
+        return stroke_node_features, output_brep_edges, gt_brep_edges, on_right_track, is_finished, high_dist_indices
 
 
 
@@ -215,7 +213,7 @@ total = 0
 prev_brep_edges = None
 
 for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
-    stroke_node_features, output_brep_edges, gt_brep_edges, gt_to_output_same, output_to_gt_same, high_dist_indices, dist_vals= data
+    stroke_node_features, output_brep_edges, gt_brep_edges, on_right_track, is_finished, high_dist_indices = data
 
     stroke_node_features = stroke_node_features.squeeze(0)
     stroke_node_features = torch.round(stroke_node_features * 10000) / 10000
@@ -227,24 +225,20 @@ for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
     gt_brep_edges = torch.round(gt_brep_edges * 10000) / 10000
 
 
-    if output_brep_edges.shape[0] == 0:
-        continue
-    
-    print("output_to_gt_same : on the right track", output_to_gt_same)
+    print("on_right_track ?", on_right_track)
+    print("is_finished?", is_finished)
 
-    if prev_brep_edges is not None:
-        print("prev_brep_edges", prev_brep_edges)
-    
-    unique_new_edges = brep_difference(prev_brep_edges, output_brep_edges)
-    prev_brep_edges = output_brep_edges
+    high_dist_indices_values = [idx.item() for tensor in high_dist_indices for idx in tensor]    
 
-    high_dist_indices_values = [idx.item() for tensor in high_dist_indices for idx in tensor]
-    print('high_dist_indices_values', high_dist_indices_values)
-    print("high_dist_indices", output_brep_edges[high_dist_indices_values])
-    
-    Encoders.helper.vis_brep_with_indices(output_brep_edges, high_dist_indices)
-    Encoders.helper.vis_brep(unique_new_edges)
-    # Encoders.helper.vis_brep(gt_brep_edges)
+    # if not on_right_track:
+    #     Encoders.helper.vis_brep_with_indices(output_brep_edges, high_dist_indices)
+
+    if is_finished:
+        print("output_brep_edges", output_brep_edges.shape)
+        Encoders.helper.vis_brep(output_brep_edges)
+
+    # unique_new_edges = brep_difference(prev_brep_edges, output_brep_edges)
+    # Encoders.helper.vis_brep(unique_new_edges)
 
     
     total += 1

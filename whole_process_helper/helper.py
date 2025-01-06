@@ -220,6 +220,9 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
     torch.Tensor: The target point for extrusion.
     """
 
+    if sketch_points.shape[0] == 1:
+        return get_extrude_amount_circle(gnn_graph, sketch_points, extrude_selection_mask)
+    
     # 1. Find the strokes with the highest probabilities in extrude_selection_mask
     topk_vals, topk_idxs = torch.topk(extrude_selection_mask.view(-1), 10)  # Get more top candidates to ensure uniqueness
 
@@ -299,6 +302,58 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
             raise ValueError("Get extrude_amount failed, No matching point found in sketch points.")
 
     return target_point, selected_prob
+
+
+
+def get_extrude_amount_circle(gnn_graph, sketch_points, extrude_selection_mask):
+    """
+    Calculates the extrude target point and amount for a circle sketch.
+    
+    Parameters:
+    - gnn_graph (HeteroData): The graph containing stroke features.
+    - sketch_points (torch.Tensor): A tensor representing the sketch points (the circle center in this case).
+    - extrude_selection_mask (torch.Tensor): A tensor of shape (num_strokes, 1) representing probabilities for selecting strokes.
+    
+    Returns:
+    - target_point (list): A list of 3 values representing the extrusion target point.
+    """
+    # 1) Get the sketch center point
+    center = sketch_points[0][:3]  # Assuming the first row corresponds to the circle and [:3] gives the center
+
+    # 2) Get the predicted strokes
+    topk_vals, topk_idxs = torch.topk(extrude_selection_mask.view(-1), 10)  # Get top candidates
+
+    stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
+
+    # Iterate over topk indices to find the stroke to extrude
+    for idx in topk_idxs:
+        stroke_feature = stroke_features[idx]
+        point1 = stroke_feature[:3]
+        point2 = stroke_feature[3:6]
+
+        # Check if point1 or point2 is on the same plane with center
+        if any(torch.isclose(center[i], point1[i]) for i in range(3)):
+            extrude_point = point2
+            other_point = point1
+            extrude_amount = torch.norm(point1 - point2, p=2).item()
+            break
+        elif any(torch.isclose(center[i], point2[i]) for i in range(3)):
+            extrude_point = point1
+            other_point = point2
+            extrude_amount = torch.norm(point1 - point2, p=2).item()
+            break
+    
+    else:
+        raise ValueError("No suitable stroke found for extrusion.")
+
+    # Compute the direction from the other point to the extrude_point
+    direction = (extrude_point - other_point).tolist()
+
+    # Compute the target point by extruding from the center
+    target_point = [center[i].item() + direction[i] for i in range(3)]
+
+    return target_point, extrude_amount
+
 
 
 def extrude_strokes(gnn_graph, extrude_selection_mask):

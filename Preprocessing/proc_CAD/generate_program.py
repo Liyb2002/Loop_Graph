@@ -75,8 +75,8 @@ class Brep:
         boundary_points = [vert.position for vert in target_face.vertices]
         normal = [ 0 - normal for normal in target_face.normal]
 
-        cases = ['create_circle', 'find_rectangle', 'find_triangle', 'triangle_to_cut']
-        # cases = ['find_rectangle']
+        # cases = ['create_circle', 'find_rectangle', 'find_triangle', 'triangle_to_cut']
+        cases = ['create_circle']
         selected_case = random.choice(cases)
         if selected_case == 'create_circle':
             radius, center = Preprocessing.proc_CAD.helper.random_circle(boundary_points, normal)
@@ -147,7 +147,7 @@ class Brep:
                     extrude_direction = [1 if val > 0 else -1 if val < 0 else 0 for val in diff_axis_values]
                     amount = max(abs(val) for val in diff_axis_values).item()
                     break
-
+            
             for i, sketch_face_vert in enumerate(sketch_face.vertices):
                 vert_pos = sketch_face_vert.position
                 # Map vert_pos to the same plane as extrude_target_point
@@ -157,8 +157,31 @@ class Brep:
                 self.Vertices.append(new_vertex)
                 new_vertices.append(new_vertex)
 
+
+            if sketch_face.is_circle:
+                print('extrude_target_point', extrude_target_point)
+                print('sketch_face.center', sketch_face.center)
+
+                center = sketch_face.center  # Circle's center
+
+                # Compute the difference between the center and the extrude target point
+                diff_axis_values = [extrude_target_point[j] - center[j] for j in range(3)]
+                diff_non_zero = [abs(val) > 1e-2 for val in diff_axis_values]
+
+                if sum(diff_non_zero) == 1:  # Only one axis has a significant difference
+                    # Determine the extrusion direction and amount
+                    normal = [1 if val > 0 else -1 if val < 0 else 0 for val in diff_axis_values]  # Extrusion direction (normal)
+                    amount = max(abs(val) for val in diff_axis_values)  # Extrusion amount
+                else:
+                    raise ValueError("Extrusion target point does not differ from center by exactly one axis.")
+
+                # The computed 'amount' and 'normal' can now be used for further operations
+                print(f"Extrusion amount: {amount}, Normal: {normal}")
+
+
             if random.random() < 0.5 and len(self.op) > 2:
                 amount = -amount
+
 
 
 
@@ -423,7 +446,7 @@ class Brep:
         for face in self.Faces:
             if face.id.split('_')[1] == str(index):
 
-                if face.is_cirlce:
+                if face.is_circle:
                     face = {
                     'id': face.id,
                     'radius': face.radius,

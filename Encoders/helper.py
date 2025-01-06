@@ -115,6 +115,21 @@ def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_
     return extrude_strokes
 
 
+
+def choose_extrude_strokes_from_circle(kth_operation, stroke_node_features):
+    last_feature = stroke_node_features[:, -1]
+    
+    # Stroke selection criteria: kth_operation is considered here as "stroke_selection_mask"
+    # Create mask: True if kth_operation == 1 and last_feature == 0
+    stroke_selection_mask = (kth_operation.view(-1) == 1) & (last_feature == 1)
+    
+    # Reshape the mask to match the output shape (num_strokes, 1)
+    chosen_strokes = stroke_selection_mask.int().view(-1, 1)
+    
+    return chosen_strokes
+
+
+
 def choose_fillet_strokes(raw_fillet_stroke_idx, stroke_node_features):
     # Filter raw_fillet_stroke_idx based on conditions in stroke_node_features
     filtered_strokes = [
@@ -570,7 +585,6 @@ def vis_brep(brep):
             z_min, z_max = min(z_min, z_base.min(), z_top.min()), max(z_max, z_base.max(), z_top.max())
 
         elif stroke[-1] == 2:
-            print("stroke", stroke)
             # Circle face (same rotation logic as shared)
             x_values, y_values, z_values = plot_circle(stroke)
             ax.plot(x_values, y_values, z_values, color='blue')
@@ -912,131 +926,16 @@ def plot_circle(stroke):
 
 
 
-
 def plot_arc(stroke):
-    # Extract start point, end point, and center from stroke
-    start_point = stroke[:3]
-    end_point = stroke[3:6]
-    center = stroke[7:10]
+    import numpy as np
 
-    # Calculate the radius of the arc (distance from center to start_point)
-    radius = np.linalg.norm(start_point - center)
-    # Determine the plane where the arc lies by checking which axis is constant
-    shared_axes = np.isclose(start_point, center) & np.isclose(end_point, center)
-    if np.sum(shared_axes) != 1:
-        raise ValueError("The arc points and center do not lie on a plane aligned with one of the axes.")
+    # Extract start and end points from the stroke
+    start_point = np.array(stroke[:3])
+    end_point = np.array(stroke[3:6])
 
-    # The axis where all points have the same value (constant axis)
-    shared_axis = np.where(shared_axes)[0][0]  # This is the constant axis
-    plane_axes = [axis for axis in range(3) if axis != shared_axis]
+    # Generate a straight line with 100 points between start_point and end_point
+    t = np.linspace(0, 1, 100)  # Parameter for interpolation
+    line_points = (1 - t)[:, None] * start_point + t[:, None] * end_point
 
-    # Calculate the angles for start_point and end_point relative to the center using atan2
-    vector_start = np.array([start_point[plane_axes[0]], start_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
-    vector_end = np.array([end_point[plane_axes[0]], end_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
-
-    theta_start = np.arctan2(vector_start[1], vector_start[0])
-    theta_end = np.arctan2(vector_end[1], vector_end[0])
-
-    # Normalize angles to the range [0, 2pi]
-    if theta_start < 0:
-        theta_start += 2 * np.pi
-    if theta_end < 0:
-        theta_end += 2 * np.pi
-
-    # Ensure clockwise direction: the start point should have a smaller angle
-    if theta_start > theta_end:
-        theta_start, theta_end = theta_end, theta_start
-
-    # Ensure that the difference between angles is exactly 1.57 radians (quarter circle)
-    if np.abs(theta_end - theta_start) > np.pi / 2:
-        theta_end = theta_start + np.pi / 2
-
-    # Generate angles for the arc in the clockwise direction
-    theta = np.linspace(theta_start, theta_end, 100)
-
-    # Generate arc points using parametric circle equation on the plane
-    x_values, y_values, z_values = [], [], []
-    for t in theta:
-        arc_x = center[plane_axes[0]] + radius * np.cos(t)
-        arc_y = center[plane_axes[1]] + radius * np.sin(t)
-        point = [0, 0, 0]  # Create a 3D point
-
-        # Set the shared axis (constant value for all points)
-        point[shared_axis] = center[shared_axis]
-        
-        # Assign the arc points to the correct axes
-        point[plane_axes[0]] = arc_x
-        point[plane_axes[1]] = arc_y
-
-        # Append x, y, z values based on the computed theta points
-        x_values.append(point[0])
-        y_values.append(point[1])
-        z_values.append(point[2])
-
-    # Return the computed x, y, z values
-    return np.array(x_values), np.array(y_values), np.array(z_values)
-
-
-
-def plot_brep_arc(stroke):
-    # Extract start point, end point, and center from stroke
-    start_point = stroke[:3]
-    end_point = stroke[3:6]
-    center = stroke[6:9]
-
-    # Calculate the radius of the arc (distance from center to start_point)
-    radius = np.linalg.norm(start_point - center)
-    # Determine the plane where the arc lies by checking which axis is constant
-    shared_axes = np.isclose(start_point, center) & np.isclose(end_point, center)
-    if np.sum(shared_axes) != 1:
-        raise ValueError("The arc points and center do not lie on a plane aligned with one of the axes.")
-
-    # The axis where all points have the same value (constant axis)
-    shared_axis = np.where(shared_axes)[0][0]  # This is the constant axis
-    plane_axes = [axis for axis in range(3) if axis != shared_axis]
-
-    # Calculate the angles for start_point and end_point relative to the center using atan2
-    vector_start = np.array([start_point[plane_axes[0]], start_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
-    vector_end = np.array([end_point[plane_axes[0]], end_point[plane_axes[1]]]) - np.array([center[plane_axes[0]], center[plane_axes[1]]])
-
-    theta_start = np.arctan2(vector_start[1], vector_start[0])
-    theta_end = np.arctan2(vector_end[1], vector_end[0])
-
-    # Normalize angles to the range [0, 2pi]
-    if theta_start < 0:
-        theta_start += 2 * np.pi
-    if theta_end < 0:
-        theta_end += 2 * np.pi
-
-    # Ensure clockwise direction: the start point should have a smaller angle
-    if theta_start > theta_end:
-        theta_start, theta_end = theta_end, theta_start
-
-    # Ensure that the difference between angles is exactly 1.57 radians (quarter circle)
-    if np.abs(theta_end - theta_start) > np.pi / 2:
-        theta_end = theta_start + np.pi / 2
-
-    # Generate angles for the arc in the clockwise direction
-    theta = np.linspace(theta_start, theta_end, 100)
-
-    # Generate arc points using parametric circle equation on the plane
-    x_values, y_values, z_values = [], [], []
-    for t in theta:
-        arc_x = center[plane_axes[0]] + radius * np.cos(t)
-        arc_y = center[plane_axes[1]] + radius * np.sin(t)
-        point = [0, 0, 0]  # Create a 3D point
-
-        # Set the shared axis (constant value for all points)
-        point[shared_axis] = center[shared_axis]
-        
-        # Assign the arc points to the correct axes
-        point[plane_axes[0]] = arc_x
-        point[plane_axes[1]] = arc_y
-
-        # Append x, y, z values based on the computed theta points
-        x_values.append(point[0])
-        y_values.append(point[1])
-        z_values.append(point[2])
-
-    # Return the computed x, y, z values
-    return np.array(x_values), np.array(y_values), np.array(z_values)
+    # Return x, y, z coordinates of the line points
+    return line_points[:, 0], line_points[:, 1], line_points[:, 2]

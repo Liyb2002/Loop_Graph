@@ -10,7 +10,7 @@ class Face:
         self.normal = normal
 
         self.future_sketch = True
-        self.is_cirlce = False
+        self.is_circle = False
 
         self.sketch_plane()
     
@@ -18,7 +18,7 @@ class Face:
         self.future_sketch = False
 
     def check_is_circle(self, radius, center, normal):
-        self.is_cirlce = True
+        self.is_circle = True
         self.radius = radius
         self.center = center
         self.normal = normal
