@@ -1300,7 +1300,7 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
 
     Parameters:
         stroke_cloud_loops (list of lists): Each sublist contains indices of strokes in a stroke loop.
-        brep_loops (list of np.ndarrays): Each array contains the edges forming a BRep loop.
+        brep_loops (list of lists): Each sublist contains indices of BRep edges in final_brep_edges forming a BRep loop.
         stroke_node_features (list or np.ndarray): Features of strokes, each defined by its start and end points.
         final_brep_edges (list or np.ndarray): Features of BRep edges, each defined by its start and end points.
 
@@ -1313,23 +1313,7 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
         """Check if two points are approximately equal within a tolerance."""
         return all(abs(a - b) <= tolerance for a, b in zip(point1, point2))
 
-    print("brep_loops", brep_loops)
-    # Step 1: Convert BRep loops into indices in final_brep_edges
-    brep_loops_indices = []
-    for brep_loop in brep_loops:
-        loop_indices = []
-        for edge in brep_loop:
-            for idx, brep_edge in enumerate(final_brep_edges):
-                brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))
-                edge_points = set(map(tuple, [edge[:3], edge[3:6]]))
-
-                if brep_points == edge_points:
-                    loop_indices.append(idx)
-                    break
-        brep_loops_indices.append(loop_indices)
-
-    print("brep_loops_indices", brep_loops_indices)
-    # Step 2: Map BRep edges to strokes
+    # Step 1: Map BRep edges to strokes as index pairs
     brep_to_stroke_map = {}
 
     for brep_idx, brep_edge in enumerate(final_brep_edges):
@@ -1350,19 +1334,18 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
             )
 
             if stroke_match or brep_match:
-                brep_to_stroke_map[brep_idx] = stroke_idx
+                brep_to_stroke_map[brep_idx] = stroke_idx  # Pair BRep edge index with stroke index
                 break  # No need to check further for this BRep edge
 
-    print("brep_to_stroke_map", brep_to_stroke_map)
-    # Step 3: Initialize correspondence matrix
+    # Step 2: Initialize correspondence matrix
     num_stroke_cloud_loops = len(stroke_cloud_loops)
-    num_brep_loops = len(brep_loops_indices)
+    num_brep_loops = len(brep_loops)
     correspondence_matrix = np.zeros((num_stroke_cloud_loops, num_brep_loops), dtype=np.float32)
 
-    # Step 4: Find corresponding loops
+    # Step 3: Find corresponding loops
     for stroke_loop_idx, stroke_loop in enumerate(stroke_cloud_loops):
         stroke_loop_set = set(stroke_loop)  # Convert stroke loop to a set for fast lookup
-        for brep_loop_idx, brep_loop in enumerate(brep_loops_indices):
+        for brep_loop_idx, brep_loop in enumerate(brep_loops):
             # Check if all strokes in the stroke loop map to the BRep edges in the BRep loop
             if all(
                 brep_to_stroke_map.get(brep_edge_idx, None) in stroke_loop_set
@@ -1371,6 +1354,7 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
                 correspondence_matrix[stroke_loop_idx, brep_loop_idx] = 1.0
 
     return correspondence_matrix
+
 
 
 
@@ -1395,7 +1379,6 @@ def stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, 
                 if (stroke_circle_edge[:3] == brep_circle_edge[:3]).all():
                     correspondence_matrix[i, j] = 1.0
 
-    print("correspondence_matrix circle", correspondence_matrix)
     return correspondence_matrix
 
 
