@@ -381,18 +381,18 @@ def vis_left_graph(stroke_node_features):
         color = 'black'
 
         # Update min and max limits for rescaling (ignoring circles)
-        if stroke[7] == 0:
+        if stroke[-2] == 1:
             x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
         
-        if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
+        if stroke[-2] == 2:
             # Circle face
             x_values, y_values, z_values = plot_circle(stroke)
             ax.plot(x_values, y_values, z_values, color=color, linewidth=0.5, alpha = alpha_value)
             continue
 
-        if stroke[7] != 0 and stroke[8] != 0:
+        if stroke[-2] == 3:
             # Arc
             x_values, y_values, z_values = plot_arc(stroke)
             ax.plot(x_values, y_values, z_values, color=color, linewidth=0.5, alpha = alpha_value)
@@ -434,13 +434,13 @@ def vis_left_graph(stroke_node_features):
             
             color = 'blue'
             
-            if stroke[7] != 0 and stroke[8] == 0 and stroke[9] == 0:
+            if stroke[-2] == 2:
                 # Circle face
                 x_values, y_values, z_values = plot_circle(stroke)
                 ax.plot(x_values, y_values, z_values, color=color, linewidth=1, alpha = alpha_value)
                 continue
 
-            if stroke[7] != 0 and stroke[8] != 0:
+            if stroke[-2] == 3:
                 # Arc
                 x_values, y_values, z_values = plot_arc(stroke)
                 ax.plot(x_values, y_values, z_values, color=color, linewidth=1, alpha = alpha_value)
@@ -477,6 +477,143 @@ def vis_left_graph(stroke_node_features):
     ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
     ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
 
+
+    # Show plot
+    plt.show()
+
+
+
+def vis_left_graph_loops(stroke_node_features, loop_node_features, stroke_cloud_loops):
+    """
+    Visualizes strokes and loops in 3D space.
+    
+    1. Plots regular strokes in black.
+    2. Highlights strokes associated with used loops (loop_node_features[-1] == 1) in blue.
+    3. Considers stroke types (line, circle, arc) for plotting.
+    
+    Parameters:
+    - stroke_node_features: A numpy array of shape (num_strokes, 12) representing stroke features.
+    - loop_node_features: A numpy array of shape (num_loops, 12) representing loop features.
+    - stroke_cloud_loops: A list of sublists, where each sublist contains the stroke indices corresponding to a loop.
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    import numpy as np
+    from scipy.interpolate import CubicSpline
+
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+    ax.axis('off')
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    perturb_factor = 0.002  # Adjusted perturbation factor for hand-drawn effect
+
+    # Plot regular strokes in black
+    for stroke in stroke_node_features:
+        start, end = stroke[:3], stroke[3:6]
+        alpha_value = stroke[6]
+        
+        # Ignore invalid strokes
+        if stroke[-2] == -1 and stroke[-3] == -1 and stroke[-4] == -1:
+            continue
+
+        color = 'black'
+
+        # Update min and max limits for rescaling based on stroke type
+        if stroke[-2] == 1:  # Line
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+            # Hand-drawn effect for lines
+            x_values = np.array([start[0], end[0]])
+            y_values = np.array([start[1], end[1]])
+            z_values = np.array([start[2], end[2]])
+            
+            perturbations = np.random.normal(0, perturb_factor, (10, 3))
+            t = np.linspace(0, 1, 10)
+            x_interpolated = np.linspace(x_values[0], x_values[1], 10) + perturbations[:, 0]
+            y_interpolated = np.linspace(y_values[0], y_values[1], 10) + perturbations[:, 1]
+            z_interpolated = np.linspace(z_values[0], z_values[1], 10) + perturbations[:, 2]
+
+            cs_x = CubicSpline(t, x_interpolated)
+            cs_y = CubicSpline(t, y_interpolated)
+            cs_z = CubicSpline(t, z_interpolated)
+            smooth_t = np.linspace(0, 1, 100)
+            smooth_x = cs_x(smooth_t)
+            smooth_y = cs_y(smooth_t)
+            smooth_z = cs_z(smooth_t)
+
+            ax.plot(smooth_x, smooth_y, smooth_z, color=color, linewidth=0.5, alpha=alpha_value)
+
+        elif stroke[-2] == 2:  # Circle
+            x_values, y_values, z_values = plot_circle(stroke)
+            ax.plot(x_values, y_values, z_values, color=color, linewidth=0.5, alpha=alpha_value)
+
+        elif stroke[-2] == 3:  # Arc
+            x_values, y_values, z_values = plot_arc(stroke)
+            ax.plot(x_values, y_values, z_values, color=color, linewidth=0.5, alpha=alpha_value)
+
+    # Find used loops
+    used_loops = [i for i, loop in enumerate(loop_node_features) if loop[-1] == 1]
+
+    # Plot strokes belonging to used loops in blue
+    for loop_index in used_loops:
+        stroke_indices = stroke_cloud_loops[loop_index]
+        for idx in stroke_indices:
+            stroke = stroke_node_features[idx]
+            start, end = stroke[:3], stroke[3:6]
+            alpha_value = stroke[6]
+
+            # Ignore invalid strokes
+            if stroke[-2] == -1 and stroke[-3] == -1 and stroke[-4] == -1:
+                continue
+
+            color = 'blue'
+
+            if stroke[-2] == 1:  # Line
+                x_values = np.array([start[0], end[0]])
+                y_values = np.array([start[1], end[1]])
+                z_values = np.array([start[2], end[2]])
+
+                perturbations = np.random.normal(0, perturb_factor, (10, 3))
+                t = np.linspace(0, 1, 10)
+                x_interpolated = np.linspace(x_values[0], x_values[1], 10) + perturbations[:, 0]
+                y_interpolated = np.linspace(y_values[0], y_values[1], 10) + perturbations[:, 1]
+                z_interpolated = np.linspace(z_values[0], z_values[1], 10) + perturbations[:, 2]
+
+                cs_x = CubicSpline(t, x_interpolated)
+                cs_y = CubicSpline(t, y_interpolated)
+                cs_z = CubicSpline(t, z_interpolated)
+                smooth_t = np.linspace(0, 1, 100)
+                smooth_x = cs_x(smooth_t)
+                smooth_y = cs_y(smooth_t)
+                smooth_z = cs_z(smooth_t)
+
+                ax.plot(smooth_x, smooth_y, smooth_z, color=color, linewidth=1, alpha=alpha_value)
+
+            elif stroke[-2] == 2:  # Circle
+                x_values, y_values, z_values = plot_circle(stroke)
+                ax.plot(x_values, y_values, z_values, color=color, linewidth=1, alpha=alpha_value)
+
+            elif stroke[-2] == 3:  # Arc
+                x_values, y_values, z_values = plot_arc(stroke)
+                ax.plot(x_values, y_values, z_values, color=color, linewidth=1, alpha=alpha_value)
+
+    # Compute the center and rescale
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([x_center - max_diff / 2, x_center + max_diff / 2])
 
     # Show plot
     plt.show()

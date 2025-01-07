@@ -169,12 +169,12 @@ class Particle():
         stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
         stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
         stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
-        
 
         stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(self.stroke_node_features, self.brep_edges)
         stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(self.stroke_node_features, self.brep_edges)
         stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
-        
+
+
         # 2) Build graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             self.stroke_cloud_loops, 
@@ -188,6 +188,7 @@ class Particle():
         )
 
         # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+        Encoders.helper.vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), self.stroke_cloud_loops)
 
         if len(self.past_programs) == 1:
             # Find all feature edges
@@ -249,7 +250,8 @@ class Particle():
         # 5.6) Update brep data
         prev_brep_edges = self.brep_edges
         brep_path = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
-        self.brep_edges, self.brep_loops, new_edges_in_current_step = cascade_brep_accumulate(self.brep_edges, self.brep_loops, brep_files, self.data_produced, brep_path)
+        self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
+        new_edges_in_current_step = torch.tensor(get_final_brep(brep_path, brep_files[-1]))
         # Encoders.helper.vis_brep(self.brep_edges)
 
         # Check if extrude op really adds something new
@@ -516,7 +518,6 @@ def cascade_brep(brep_files, data_produced, brep_path):
         brep_file_path = os.path.join(brep_path, file_name)
         edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
         
-        
         if len(final_brep_edges) == 0:
             final_brep_edges = edge_features_list
             final_cylinder_features = cylinder_features
@@ -531,59 +532,6 @@ def cascade_brep(brep_files, data_produced, brep_path):
     brep_loops = [list(loop) for loop in brep_loops]
 
     return output_brep_edges, brep_loops
-
-
-def cascade_brep_accumulate(prev_edges, prev_loops, brep_files, data_produced, brep_path):
-    """
-    Efficiently processes the last BREP file by leveraging previous edges and loops.
-    Finds new unique edges and aggregates loops involving at least one new edge.
-
-    Parameters:
-    - prev_edges: Tensor of previously processed edge features.
-    - prev_loops: List of loops formed by the previous edges.
-    - brep_files: List of BREP file names.
-    - data_produced: Placeholder for additional data, currently unused.
-    - brep_path: Path to the directory containing the BREP files.
-
-    Returns:
-    - final_brep_edges: Tensor of updated edge features including the last file.
-    - final_loops: Updated loops including new loops formed with the last file.
-    """
-
-    # Step 1: Read features from the last file
-    last_file = brep_files[-1]
-    brep_file_path = os.path.join(brep_path, last_file)
-    edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
-
-    # Convert new features to a Tensor
-    straight_edges = torch.tensor(edge_features_list, dtype=prev_edges.dtype, device=prev_edges.device)
-    new_edges = torch.tensor(edge_features_list + cylinder_features, dtype=prev_edges.dtype, device=prev_edges.device)
-
-    # Step 2: Combine previous and new features
-    final_brep_edges = torch.cat((prev_edges, new_edges), dim=0)
-
-    # Convert Tensor to list for padding
-    final_brep_edges_list = final_brep_edges.tolist()
-
-    # Step 3: Pad the combined features
-    output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges_list)
-
-    # Step 4: Find unique new edges
-    unique_new_edges = Preprocessing.generate_dataset_baseline.find_new_features(prev_edges.tolist(), new_edges.tolist())
-
-    # Step 5: Find loops with the new face_aggregate() function
-    new_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx_accumulate(
-        np.array(unique_new_edges), np.array(prev_edges.tolist())
-    )
-
-    # Ensure both are lists before concatenation
-    new_loops = list(new_loops)  # Convert to list if it is a tuple
-    circle_loops = Preprocessing.proc_CAD.helper.face_aggregate_circle_brep(output_brep_edges)
-
-    # Concatenate the lists
-    new_loops += list(circle_loops)  # Ensure circle_loops is also a list
-
-    return final_brep_edges, prev_loops + new_loops, straight_edges
 
 
 def get_final_brep(brep_path, last_file):

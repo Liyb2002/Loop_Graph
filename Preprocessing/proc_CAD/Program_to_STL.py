@@ -97,10 +97,8 @@ class parsed_program():
                 canvas_2 = Preprocessing.proc_CAD.build123.protocol.test_extrude(self.prev_sketch, -extrude_amount)
 
                 if (canvas_1 is not None) and Preprocessing.proc_CAD.helper.canvas_has_lvl(canvas_1, expected_axis, expected_value):
-                    print("do 1")
                     self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
                 if (canvas_2 is not None) and Preprocessing.proc_CAD.helper.canvas_has_lvl(canvas_2, expected_axis, expected_value):
-                    print("do 2")
                     self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, -extrude_amount, self.output, self.data_directory)
 
             else:
@@ -118,10 +116,8 @@ class parsed_program():
 
                 if (canvas_1 is not None) and Preprocessing.proc_CAD.helper.canvas_has_point(canvas_1, expected_point):
                     self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
-                    print("cnavax 1")
                 if (canvas_2 is not None) and Preprocessing.proc_CAD.helper.canvas_has_point(canvas_2, expected_point):
                     self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, -extrude_amount, self.output, self.data_directory)
-                    print("cnavax 2")
 
             else:
                 self.canvas = Preprocessing.proc_CAD.build123.protocol.build_subtract(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
