@@ -233,9 +233,8 @@ for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
     # if not on_right_track:
     #     Encoders.helper.vis_brep_with_indices(output_brep_edges, high_dist_indices)
 
-    if is_finished:
-        print("output_brep_edges", output_brep_edges.shape)
-        Encoders.helper.vis_brep(output_brep_edges)
+    Encoders.helper.vis_brep(output_brep_edges)
+    Encoders.helper.vis_brep(gt_brep_edges)
 
     # unique_new_edges = brep_difference(prev_brep_edges, output_brep_edges)
     # Encoders.helper.vis_brep(unique_new_edges)

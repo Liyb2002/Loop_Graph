@@ -728,7 +728,7 @@ def vis_brep(brep):
         
         elif stroke[-1] == 4:
             # plot arc 
-            x_values, y_values, z_values = plot_brep_arc(stroke)
+            x_values, y_values, z_values = plot_arc(stroke)
             ax.plot(x_values, y_values, z_values, color='blue')
 
 
