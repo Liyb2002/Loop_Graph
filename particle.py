@@ -14,6 +14,8 @@ import Encoders.gnn.gnn
 import Encoders.gnn_stroke.gnn
 import Encoders.helper
 
+import fidelity_score
+
 from Preprocessing.config import device
 
 from torch.utils.data import DataLoader
@@ -164,168 +166,168 @@ class Particle():
 
     def generate_next_step(self):
 
-        try:
+        # try:
 
-            stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
-            stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
-            stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
+        stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
+        stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
+        stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
 
-            stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(self.stroke_node_features, self.brep_edges)
-            stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(self.stroke_node_features, self.brep_edges)
-            stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
-
-
-            # 2) Build graph
-            gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
-                self.stroke_cloud_loops, 
-                self.stroke_node_features, 
-                self.strokes_perpendicular, 
-                self.loop_neighboring_vertical, 
-                self.loop_neighboring_horizontal, 
-                self.loop_neighboring_contained,
-                stroke_to_loop,
-                stroke_to_edge
-            )
-
-            # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
-            # Encoders.helper.vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), self.stroke_cloud_loops)
-
-            if len(self.past_programs) == 1:
-                # Find all feature edges
-                self.predicted_feature_strokes = do_stroke_type_prediction(gnn_graph)
+        stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(self.stroke_node_features, self.brep_edges)
+        stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(self.stroke_node_features, self.brep_edges)
+        stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
 
 
-            if self.current_op == 1:
-                # print("Build sketch")
-                self.sketch_selection_mask, self.sketch_points, normal, selected_loop_idx, prob = do_sketch(gnn_graph)
-                self.selected_loop_indices.append(selected_loop_idx)
-                self.score = self.score * prob
-                if self.sketch_points.shape[0] == 1:
-                    # do circle sketch
-                    self.cur__brep_class.regular_sketch_circle(self.sketch_points[0, 3:6].tolist(), self.sketch_points[0, 7].item(), self.sketch_points[0, :3].tolist())
-                else: 
-                    self.cur__brep_class._sketch_op(self.sketch_points, normal, self.sketch_points)
+        # 2) Build graph
+        gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
+            self.stroke_cloud_loops, 
+            self.stroke_node_features, 
+            self.strokes_perpendicular, 
+            self.loop_neighboring_vertical, 
+            self.loop_neighboring_horizontal, 
+            self.loop_neighboring_contained,
+            stroke_to_loop,
+            stroke_to_edge
+        )
+
+        # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+        # Encoders.helper.vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), self.stroke_cloud_loops)
+
+        if len(self.past_programs) == 1:
+            # Find all feature edges
+            self.predicted_feature_strokes = do_stroke_type_prediction(gnn_graph)
 
 
-            # Build Extrude
-            if self.current_op == 2:
-                # print("Build extrude")
-                extrude_target_point, prob = do_extrude(gnn_graph, self.sketch_selection_mask, self.sketch_points, self.brep_edges)
-                self.cur__brep_class.extrude_op(extrude_target_point)
-                self.score = self.score * prob
+        if self.current_op == 1:
+            # print("Build sketch")
+            self.sketch_selection_mask, self.sketch_points, normal, selected_loop_idx, prob = do_sketch(gnn_graph)
+            self.selected_loop_indices.append(selected_loop_idx)
+            self.score = self.score * prob
+            if self.sketch_points.shape[0] == 1:
+                # do circle sketch
+                self.cur__brep_class.regular_sketch_circle(self.sketch_points[0, 3:6].tolist(), self.sketch_points[0, 7].item(), self.sketch_points[0, :3].tolist())
+            else: 
+                self.cur__brep_class._sketch_op(self.sketch_points, normal, self.sketch_points)
 
 
-            # Build fillet
-            if self.current_op == 3:
-                # print("Build Fillet")
-                fillet_edge, fillet_amount, prob = do_fillet(gnn_graph, self.brep_edges)
-                self.cur__brep_class.random_fillet(fillet_edge, fillet_amount)
-                self.score = self.score * prob
+        # Build Extrude
+        if self.current_op == 2:
+            # print("Build extrude")
+            extrude_target_point, prob = do_extrude(gnn_graph, self.sketch_selection_mask, self.sketch_points, self.brep_edges)
+            self.cur__brep_class.extrude_op(extrude_target_point)
+            self.score = self.score * prob
 
 
-            if self.current_op ==4:
-                print("Build Chamfer")
-                chamfer_edge, chamfer_amount, prob= do_chamfer(gnn_graph, self.brep_edges)
-                self.cur__brep_class.random_chamfer(chamfer_edge, chamfer_amount)
-                self.score = self.score * prob
+        # Build fillet
+        if self.current_op == 3:
+            # print("Build Fillet")
+            fillet_edge, fillet_amount, prob = do_fillet(gnn_graph, self.brep_edges)
+            self.cur__brep_class.random_fillet(fillet_edge, fillet_amount)
+            self.score = self.score * prob
 
 
-            # 5.3) Write to brep
-            self.cur__brep_class.write_to_json(self.cur_output_dir)
+        if self.current_op ==4:
+            print("Build Chamfer")
+            chamfer_edge, chamfer_amount, prob= do_chamfer(gnn_graph, self.brep_edges)
+            self.cur__brep_class.random_chamfer(chamfer_edge, chamfer_amount)
+            self.score = self.score * prob
 
 
-            # 5.4) Read the program and produce the brep file
-            parsed_program_class = Preprocessing.proc_CAD.Program_to_STL.parsed_program(self.file_path, self.cur_output_dir)
-            parsed_program_class.read_json_file()
+        # 5.3) Write to brep
+        self.cur__brep_class.write_to_json(self.cur_output_dir)
 
 
-            # 5.5) Read brep file
-            cur_relative_output_dir = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}')
-
-            brep_files = [file_name for file_name in os.listdir(os.path.join(cur_relative_output_dir, 'canvas'))
-                    if file_name.startswith('brep_') and file_name.endswith('.step')]
-            brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
+        # 5.4) Read the program and produce the brep file
+        parsed_program_class = Preprocessing.proc_CAD.Program_to_STL.parsed_program(self.file_path, self.cur_output_dir)
+        parsed_program_class.read_json_file()
 
 
-            # 5.6) Update brep data
-            prev_brep_edges = self.brep_edges
-            brep_path = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
-            self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
-            new_edges_in_current_step = torch.tensor(get_final_brep(brep_path, brep_files[-1]))
-            # Encoders.helper.vis_brep(self.brep_edges)
+        # 5.5) Read brep file
+        cur_relative_output_dir = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}')
 
-            # Check if extrude op really adds something new
-            if self.current_op == 2 and len(self.past_programs) > 2:
-                if prev_brep_edges.shape[0] == self.brep_edges.shape[0]:
-                    self.valid_particle = False
-                    return 
+        brep_files = [file_name for file_name in os.listdir(os.path.join(cur_relative_output_dir, 'canvas'))
+                if file_name.startswith('brep_') and file_name.endswith('.step')]
+        brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
 
 
-            # Compute Chamfer Distance
-            on_right_track, is_finished, high_dist_indices= chamfer_distance_brep(self.gt_brep_edges, self.gt_final_brep_edges, new_edges_in_current_step)
+        # 5.6) Update brep data
+        prev_brep_edges = self.brep_edges
+        brep_path = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
+        self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
+        new_edges_in_current_step = torch.tensor(get_final_brep(brep_path, brep_files[-1]))
+        # Encoders.helper.vis_brep(self.brep_edges)
+
+        # Check if extrude op really adds something new
+        if self.current_op == 2 and len(self.past_programs) > 2:
+            if prev_brep_edges.shape[0] == self.brep_edges.shape[0]:
+                self.valid_particle = False
+                return 
 
 
-            self.past_programs.append(self.current_op)
-            self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
-            self.score = self.score * op_prob
+        # Compute Chamfer Distance
+        cur_fidelity_score = fidelity_score.compute_fidelity_score(self.gt_brep_file_path, os.path.join(brep_path, brep_files[-1]))
+        contained_in_strokeCloud = chamfer_distance_with_strokeCloud(self.stroke_node_features, new_edges_in_current_step)
+
+        self.past_programs.append(self.current_op)
+        self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
+        self.score = self.score * op_prob
 
 
-            print("----------------")
-            print("self.past_programs", self.past_programs)
-            print("self.gt_program", self.gt_program)
-            print("self.current_op", self.current_op)
+        print("----------------")
+        print("self.past_programs", self.past_programs)
+        print("self.gt_program", self.gt_program)
+        print("self.current_op", self.current_op)
 
-            # 6) Write the stroke_cloud data to pkl file
-            output_file_path = os.path.join(self.cur_output_dir, 'canvas', f'{len(brep_files)-1}_eval_info.pkl')
-            with open(output_file_path, 'wb') as f:
-                pickle.dump({
-                    'stroke_node_features': self.stroke_node_features,
-                    'gt_brep_edges': self.gt_brep_edges,
-                    'on_right_track' : on_right_track, 
-                    'is_finished' : is_finished, 
-                    'high_dist_indices': high_dist_indices,
+        # 6) Write the stroke_cloud data to pkl file
+        output_file_path = os.path.join(self.cur_output_dir, 'canvas', f'{len(brep_files)-1}_eval_info.pkl')
+        with open(output_file_path, 'wb') as f:
+            pickle.dump({
+                'stroke_node_features': self.stroke_node_features,
+                'gt_brep_edges': self.gt_brep_edges,
+                'on_right_track' : on_right_track, 
+                'contained_in_strokeCloud' : contained_in_strokeCloud, 
+                'high_dist_indices': high_dist_indices,
 
-                    'stroke_cloud_loops': self.stroke_cloud_loops, 
+                'stroke_cloud_loops': self.stroke_cloud_loops, 
 
-                    'stroke_node_features': self.stroke_node_features,
-                    'strokes_perpendicular': self.strokes_perpendicular,
+                'stroke_node_features': self.stroke_node_features,
+                'strokes_perpendicular': self.strokes_perpendicular,
 
-                    'loop_neighboring_vertical': self.loop_neighboring_vertical,
-                    'loop_neighboring_horizontal': self.loop_neighboring_horizontal,
-                    'loop_neighboring_contained': self.loop_neighboring_contained,
+                'loop_neighboring_vertical': self.loop_neighboring_vertical,
+                'loop_neighboring_horizontal': self.loop_neighboring_horizontal,
+                'loop_neighboring_contained': self.loop_neighboring_contained,
 
-                    'stroke_to_loop': stroke_to_loop,
-                    'stroke_to_edge': stroke_to_edge
+                'stroke_to_loop': stroke_to_loop,
+                'stroke_to_edge': stroke_to_edge
 
-                }, f)
+            }, f)
+        
+
+        # 7) Also copy the gt brep file
+        gt_brep_folder = os.path.dirname(self.gt_brep_file_path)
+
+        # Create a new folder called gt_canvas in self.cur_output_dir
+        gt_canvas_dir = os.path.join(self.cur_output_dir, 'gt_canvas')
+        os.makedirs(gt_canvas_dir, exist_ok=True)
+
+        # Copy everything from gt_brep_folder to gt_canvas
+        for item in os.listdir(gt_brep_folder):
+            source_item = os.path.join(gt_brep_folder, item)
+            dest_item = os.path.join(gt_canvas_dir, item)
             
+            if os.path.isdir(source_item):
+                shutil.copytree(source_item, dest_item, dirs_exist_ok=True)
+            else:
+                shutil.copy2(source_item, dest_item)
+        
+        shutil.copy(self.gt_brep_file_path, os.path.join(self.cur_output_dir, 'gt_brep.step'))
 
-            # 7) Also copy the gt brep file
-            gt_brep_folder = os.path.dirname(self.gt_brep_file_path)
-
-            # Create a new folder called gt_canvas in self.cur_output_dir
-            gt_canvas_dir = os.path.join(self.cur_output_dir, 'gt_canvas')
-            os.makedirs(gt_canvas_dir, exist_ok=True)
-
-            # Copy everything from gt_brep_folder to gt_canvas
-            for item in os.listdir(gt_brep_folder):
-                source_item = os.path.join(gt_brep_folder, item)
-                dest_item = os.path.join(gt_canvas_dir, item)
-                
-                if os.path.isdir(source_item):
-                    shutil.copytree(source_item, dest_item, dirs_exist_ok=True)
-                else:
-                    shutil.copy2(source_item, dest_item)
-            
-            shutil.copy(self.gt_brep_file_path, os.path.join(self.cur_output_dir, 'gt_brep.step'))
-
-            whole_process_helper.helper.brep_to_stl_and_copy(self.gt_brep_file_path, self.cur_output_dir,os.path.join(self.cur_output_dir, 'gt_brep.step'))
+        whole_process_helper.helper.brep_to_stl_and_copy(self.gt_brep_file_path, self.cur_output_dir,os.path.join(self.cur_output_dir, 'gt_brep.step'))
 
             
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            self.valid_particle = False
-    
+        # except Exception as e:
+        #     print(f"An error occurred: {e}")
+        #     self.valid_particle = False
+
 
 
         if self.program_terminated(gnn_graph):
@@ -544,32 +546,33 @@ def cascade_brep(brep_files, data_produced, brep_path):
     return output_brep_edges, brep_loops
 
 
+
 def get_final_brep(brep_path, last_file):
     
     brep_file_path = os.path.join(brep_path, last_file)
     edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(brep_file_path)
     return edge_features_list
 
+
 # --------------------- Chamfer Distance --------------------- #
-def chamfer_distance_brep(gt_brep_edges, gt_final_brep_edges, output_brep_edges, threshold=0.05):
+
+
+def chamfer_distance_with_strokeCloud(stroke_node_features, output_brep_edges, threshold=0.05):
     """
-    Calculates the Chamfer distance between ground truth (GT) BREP edges and output BREP edges,
-    considering edge containment.
+    Compares output BREP edges with stroke node features and checks if all output edges
+    are contained within the stroke node features.
 
     Parameters:
-    - gt_brep_edges (torch.Tensor): A tensor of shape (num_gt_edges, 6), where each row represents an edge
-      with two 3D points (start and end).
-    - gt_final_brep_edges (torch.Tensor): A tensor of shape (num_gt_final_edges, 6), where each row represents
-      a final edge with two 3D points (start and end).
-    - output_brep_edges (torch.Tensor): A tensor of shape (num_output_edges, 6), where each row represents
+    - stroke_node_features (torch.Tensor): A tensor of shape (num_strokes, 6) where each row represents
+      a stroke with two 3D points (start and end).
+    - output_brep_edges (torch.Tensor): A tensor of shape (num_output_edges, 6) where each row represents
       an edge with two 3D points (start and end).
     - threshold (float): Distance threshold to check if the output edges are within acceptable limits.
 
     Returns:
-    - on_right_track (bool): True if all distances are below the threshold, False otherwise.
-    - high_dist_indices (list): A list of indices where dists[i] > threshold.
-    - is_finished (bool): True if all gt_final_brep_edges have a distance < threshold to output_brep_edges.
+    - is_valid (bool): True if all output_brep_edges are contained in stroke_node_features within the threshold.
     """
+
     def is_point_on_segment(point, segment_start, segment_end, tol=1e-6):
         """Check if a point lies on the segment defined by segment_start and segment_end."""
         segment_vec = segment_end - segment_start
@@ -585,85 +588,40 @@ def chamfer_distance_brep(gt_brep_edges, gt_final_brep_edges, output_brep_edges,
         return True
 
     # Ensure inputs are tensors
-    if not isinstance(gt_brep_edges, torch.Tensor):
-        gt_brep_edges = torch.tensor(gt_brep_edges, dtype=torch.float32)
-    if not isinstance(gt_final_brep_edges, torch.Tensor):
-        gt_final_brep_edges = torch.tensor(gt_final_brep_edges, dtype=torch.float32)
+    if not isinstance(stroke_node_features, torch.Tensor):
+        stroke_node_features = torch.tensor(stroke_node_features, dtype=torch.float32)
     if not isinstance(output_brep_edges, torch.Tensor):
         output_brep_edges = torch.tensor(output_brep_edges, dtype=torch.float32)
 
-    dists = []
-    high_dist_indices = []
-
-    for output_idx, output_edge in enumerate(output_brep_edges):
+    for output_edge in output_brep_edges:
         output_start, output_end = output_edge[:3], output_edge[3:6]
-        min_distance = float('inf')
+        contained_in_any_stroke = False
 
-        for gt_edge in gt_brep_edges:
-            gt_start, gt_end = gt_edge[:3], gt_edge[3:6]
+        for stroke in stroke_node_features:
+            stroke_start, stroke_end = stroke[:3], stroke[3:6]
 
-            # Check if the output edge is contained within the gt edge
-            if (is_point_on_segment(output_start, gt_start, gt_end) and
-                    is_point_on_segment(output_end, gt_start, gt_end)):
-                min_distance = 0
+            # Check if the output edge is contained within the stroke
+            if (is_point_on_segment(output_start, stroke_start, stroke_end) and
+                    is_point_on_segment(output_end, stroke_start, stroke_end)):
+                contained_in_any_stroke = True
                 break
 
             # Calculate distances between corresponding vertices
-            dist_start = torch.dist(output_start, gt_start, p=2)
-            dist_end = torch.dist(output_end, gt_end, p=2)
+            dist_start = torch.dist(output_start, stroke_start, p=2)
+            dist_end = torch.dist(output_end, stroke_end, p=2)
 
             # Calculate distances for reversed vertices (to account for edge reversibility)
-            dist_start_reversed = torch.dist(output_start, gt_end, p=2)
-            dist_end_reversed = torch.dist(output_end, gt_start, p=2)
+            dist_start_reversed = torch.dist(output_start, stroke_end, p=2)
+            dist_end_reversed = torch.dist(output_end, stroke_start, p=2)
 
-            # Find the minimum distance for this pair of edges
-            dist = min(dist_start + dist_end, dist_start_reversed + dist_end_reversed)
-
-            # Update the minimum distance for this output edge
-            min_distance = min(min_distance, dist)
-
-        dists.append(min_distance)
-
-        # Check if this distance exceeds the threshold
-        if min_distance > threshold:
-            high_dist_indices.append(output_idx)
-
-    # Determine if all distances are below the threshold
-    on_right_track = all(dist < threshold for dist in dists)
-
-
-
-    # Check if all gt_final_brep_edges are within the threshold distance of output_brep_edges
-    is_finished = True
-    for gt_final_edge in gt_final_brep_edges:
-        gt_final_start, gt_final_end = gt_final_edge[:3], gt_final_edge[3:6]
-        min_distance = float('inf')
-
-        for output_edge in output_brep_edges:
-            output_start, output_end = output_edge[:3], output_edge[3:6]
-
-            # Check if the gt_final_edge is contained within the output edge
-            if (is_point_on_segment(gt_final_start, output_start, output_end) and
-                    is_point_on_segment(gt_final_end, output_start, output_end)):
-                min_distance = 0
+            # Check if the output edge matches this stroke within the threshold
+            if min(dist_start + dist_end, dist_start_reversed + dist_end_reversed) <= threshold:
+                contained_in_any_stroke = True
                 break
 
-            # Calculate distances between corresponding vertices
-            dist_start = torch.dist(gt_final_start, output_start, p=2)
-            dist_end = torch.dist(gt_final_end, output_end, p=2)
+        # If the output edge is not contained in any stroke, return False
+        if not contained_in_any_stroke:
+            return False
 
-            # Calculate distances for reversed vertices (to account for edge reversibility)
-            dist_start_reversed = torch.dist(gt_final_start, output_end, p=2)
-            dist_end_reversed = torch.dist(gt_final_end, output_start, p=2)
-
-            # Find the minimum distance for this pair of edges
-            dist = min(dist_start + dist_end, dist_start_reversed + dist_end_reversed)
-
-            # Update the minimum distance for this gt_final_edge
-            min_distance = min(min_distance, dist)
-
-        if min_distance >= threshold:
-            is_finished = False
-            break
-
-    return on_right_track, is_finished, high_dist_indices
+    # All output edges are contained within stroke_node_features
+    return True

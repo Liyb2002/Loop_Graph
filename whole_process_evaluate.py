@@ -76,7 +76,7 @@ class Evaluation_Dataset(Dataset):
         # Convert numpy arrays to tensors
         gt_brep_edges = torch.tensor(shape_data['gt_brep_edges'], dtype=torch.float32)
         on_right_track = torch.tensor(shape_data['on_right_track'], dtype=torch.float32)
-        is_finished = torch.tensor(shape_data['is_finished'], dtype=torch.float32)
+        contained_in_strokeCloud = torch.tensor(shape_data['contained_in_strokeCloud'], dtype=torch.float32)
         high_dist_indices = torch.tensor(shape_data['high_dist_indices'], dtype=torch.long)  # Indices should use torch.long
         strokes_perpendicular = torch.tensor(shape_data['strokes_perpendicular'], dtype=torch.float32)
         loop_neighboring_vertical = torch.tensor(shape_data['loop_neighboring_vertical'], dtype=torch.long)  # Adjacency typically uses torch.long
@@ -88,7 +88,7 @@ class Evaluation_Dataset(Dataset):
 
         return (
             stroke_node_features, output_brep_edges, gt_brep_edges,
-            on_right_track, is_finished, high_dist_indices,
+            on_right_track, contained_in_strokeCloud, high_dist_indices,
             shape_data['stroke_cloud_loops'], 
             strokes_perpendicular, loop_neighboring_vertical,
             loop_neighboring_horizontal, loop_neighboring_contained,
@@ -224,7 +224,7 @@ def run_eval():
     prev_brep_edges = None
 
     for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
-        stroke_node_features, output_brep_edges, gt_brep_edges, on_right_track, is_finished, high_dist_indices = data
+        stroke_node_features, output_brep_edges, gt_brep_edges, on_right_track, contained_in_strokeCloud, high_dist_indices, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
         stroke_node_features = stroke_node_features.squeeze(0)
         stroke_node_features = torch.round(stroke_node_features * 10000) / 10000
@@ -236,16 +236,13 @@ def run_eval():
         gt_brep_edges = torch.round(gt_brep_edges * 10000) / 10000
 
 
-        print("on_right_track ?", on_right_track)
-        print("is_finished?", is_finished)
-
         high_dist_indices_values = [idx.item() for tensor in high_dist_indices for idx in tensor]    
 
-        # if not on_right_track:
-        #     Encoders.helper.vis_brep_with_indices(output_brep_edges, high_dist_indices)
 
-        Encoders.helper.vis_brep(output_brep_edges)
-        Encoders.helper.vis_brep(gt_brep_edges)
+        print("on_right_track?", on_right_track)
+        if on_right_track.item() == 0:
+            Encoders.helper.vis_brep(output_brep_edges)
+            Encoders.helper.vis_brep(gt_brep_edges)
 
         # unique_new_edges = brep_difference(prev_brep_edges, output_brep_edges)
         # Encoders.helper.vis_brep(unique_new_edges)
@@ -255,4 +252,4 @@ def run_eval():
     print(f"Overall Average Accuracy: {total_correct / total:.4f}, with total_correct : {total_correct} and total: {total}")
 
 
-# run_eval()
+run_eval()

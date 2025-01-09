@@ -102,10 +102,20 @@ def train():
 
 
     for data in tqdm(dataset, desc="Evaluating CAD Programs"):
-        stroke_node_features, output_brep_edges, gt_brep_edges, on_right_track, is_finished, high_dist_indices, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
-        
-        print("on_right_track?", on_right_track)
+        stroke_node_features, output_brep_edges, gt_brep_edges, on_right_track, contained_in_strokeCloud, high_dist_indices, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+    
+        print("on_right_track", on_right_track)
 
+        
+        if contained_in_strokeCloud.item() == 0:
+            print("contained_in_strokeCloud", contained_in_strokeCloud)
+            print("on_right_track", on_right_track)
+        
+        if on_right_track.item() == 0:
+            print("contained_in_strokeCloud", contained_in_strokeCloud)
+            print("on_right_track", on_right_track)
+
+        print("----------")
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
             stroke_node_features, 
@@ -119,6 +129,55 @@ def train():
         gnn_graph.to_device_withPadding(device)
         graphs.append(gnn_graph)
 
+        on_right_track = on_right_track.to(device)
+        gt_on_right_track.append(on_right_track)
+
+        if len(graphs) > 20:
+            break
+
+
+    print(f"Total number of preprocessed graphs: {len(graphs)}")
+
+
+    # Split the dataset into training and validation sets (80-20 split)
+    split_index = int(0.8 * len(graphs))
+    train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
+    train_labels, val_labels = gt_on_right_track[:split_index], gt_on_right_track[split_index:]
+
+    # Convert train and validation graphs to HeteroData
+    hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]
+    hetero_val_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in val_graphs]
+
+    # Create DataLoaders for training and validation graphs/masks
+    graph_train_loader = DataLoader(hetero_train_graphs, batch_size=16, shuffle=False)
+    label_train_loader = DataLoader(train_labels, batch_size=16, shuffle=False)
+
+    graph_val_loader = DataLoader(hetero_val_graphs, batch_size=16, shuffle=False)
+    label_val_loader = DataLoader(val_labels, batch_size=16, shuffle=False)
+
+
+    # Training and validation loop
+    epochs = 30  # Number of epochs
+    best_accuracy = 0.0
+
+    for epoch in range(epochs):
+        train_loss = 0.0
+        correct = 0
+        total = 0
+
+        graph_encoder.train()
+        graph_decoder.train()
+
+        # Get total number of iterations for progress bar
+        total_iterations = min(len(graph_train_loader), len(label_train_loader))
+
+        # Training loop with progress bar
+        for hetero_batch, batch_masks in tqdm(zip(graph_train_loader, label_train_loader), 
+                                              desc=f"Epoch {epoch+1}/{epochs} - Training", 
+                                              dynamic_ncols=True, 
+                                              total=total_iterations):
+        
+            print("hi")
 
 
 train()

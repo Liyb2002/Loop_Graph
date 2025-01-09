@@ -38,7 +38,7 @@ data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 # --------------------- Directory --------------------- #
 current_dir = os.getcwd()
-output_dir = os.path.join(current_dir, 'program_output_dataset')
+output_dir = os.path.join(current_dir, 'program_output')
 
 
 
@@ -48,7 +48,7 @@ pass
 
 # --------------------- Main Code --------------------- #
 data_produced = 0
-data_limit = 1000
+data_limit = 5
 if os.path.exists(output_dir):
     shutil.rmtree(output_dir)
 os.makedirs(output_dir, exist_ok=True)
@@ -82,7 +82,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     base_particle = particle.Particle(gt_brep_file_path, data_produced, stroke_node_features.squeeze(0).cpu().numpy())
     base_particle.set_gt_program(program)
     particle_list = []
-    for particle_id in range (20):
+    for particle_id in range (10):
         new_particle = copy.deepcopy(base_particle)
         new_particle.set_particle_id(particle_id, cur_output_dir)
         particle_list.append(new_particle)
