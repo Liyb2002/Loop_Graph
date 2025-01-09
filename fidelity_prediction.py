@@ -98,24 +98,12 @@ def train():
     epochs = 30
 
     graphs = []
-    gt_on_right_track = []
+    gt_fidelity_score = []
 
 
     for data in tqdm(dataset, desc="Evaluating CAD Programs"):
-        stroke_node_features, output_brep_edges, gt_brep_edges, on_right_track, contained_in_strokeCloud, high_dist_indices, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        stroke_node_features, output_brep_edges, gt_brep_edges, cur_fidelity_score, contained_in_strokeCloud, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
     
-        print("on_right_track", on_right_track)
-
-        
-        if contained_in_strokeCloud.item() == 0:
-            print("contained_in_strokeCloud", contained_in_strokeCloud)
-            print("on_right_track", on_right_track)
-        
-        if on_right_track.item() == 0:
-            print("contained_in_strokeCloud", contained_in_strokeCloud)
-            print("on_right_track", on_right_track)
-
-        print("----------")
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
             stroke_node_features, 
@@ -129,8 +117,8 @@ def train():
         gnn_graph.to_device_withPadding(device)
         graphs.append(gnn_graph)
 
-        on_right_track = on_right_track.to(device)
-        gt_on_right_track.append(on_right_track)
+        cur_fidelity_score = cur_fidelity_score.to(device)
+        gt_fidelity_score.append(cur_fidelity_score)
 
         if len(graphs) > 20:
             break
@@ -142,7 +130,7 @@ def train():
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
     train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
-    train_labels, val_labels = gt_on_right_track[:split_index], gt_on_right_track[split_index:]
+    train_labels, val_labels = gt_fidelity_score[:split_index], gt_fidelity_score[split_index:]
 
     # Convert train and validation graphs to HeteroData
     hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]

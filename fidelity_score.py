@@ -17,7 +17,11 @@ def read_step(filepath):
     return shape
 
 
-from OCC.Core.BRepTools import breptools_UVBounds
+from OCC.Core.TopExp import TopExp_Explorer
+from OCC.Core.TopoDS import topods
+from OCC.Core.TopAbs import TopAbs_FACE
+from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
+from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
 
 def sample_points_from_shape(shape, tolerance=0.01, sample_density=10):
     """
@@ -30,11 +34,12 @@ def sample_points_from_shape(shape, tolerance=0.01, sample_density=10):
     points = []
     explorer = TopExp_Explorer(shape, TopAbs_FACE)
     while explorer.More():
-        face = topods_Face(explorer.Current())
+        face = topods.Face(explorer.Current())  # Static method for Face
         adaptor = BRepAdaptor_Surface(face)
-
-        # Get the UV bounds of the surface
-        umin, umax, vmin, vmax = breptools_UVBounds(face)
+        
+        # Get the bounds of the surface
+        umin, umax, vmin, vmax = adaptor.FirstUParameter(), adaptor.LastUParameter(), \
+                                 adaptor.FirstVParameter(), adaptor.LastVParameter()
 
         # Sample points within the surface bounds
         u_step = (umax - umin) / sample_density
@@ -50,6 +55,7 @@ def sample_points_from_shape(shape, tolerance=0.01, sample_density=10):
             u += u_step
         explorer.Next()
     return points
+
 
 
 def chamfer_distance(points1, points2):
