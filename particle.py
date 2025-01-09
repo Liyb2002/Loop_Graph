@@ -283,7 +283,20 @@ class Particle():
                     'gt_brep_edges': self.gt_brep_edges,
                     'on_right_track' : on_right_track, 
                     'is_finished' : is_finished, 
-                    'high_dist_indices': high_dist_indices
+                    'high_dist_indices': high_dist_indices,
+
+                    'stroke_cloud_loops': self.stroke_cloud_loops, 
+
+                    'stroke_node_features': self.stroke_node_features,
+                    'strokes_perpendicular': self.strokes_perpendicular,
+
+                    'loop_neighboring_vertical': self.loop_neighboring_vertical,
+                    'loop_neighboring_horizontal': self.loop_neighboring_horizontal,
+                    'loop_neighboring_contained': self.loop_neighboring_contained,
+
+                    'stroke_to_loop': stroke_to_loop,
+                    'stroke_to_edge': stroke_to_edge
+
                 }, f)
             
 

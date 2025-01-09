@@ -23,6 +23,9 @@ class SketchLoopGraph(HeteroData):
     def __init__(self, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, loop_to_brep, stroke_to_edge):
         super(SketchLoopGraph, self).__init__()
         
+        print("stroke_to_edge", stroke_to_edge.shape)
+        print("stroke_node_features", stroke_node_features.shape)
+
         # Use all 8 values of stroke_node_features + 1 feature of used or not
         self['stroke'].x = torch.cat([torch.tensor(stroke_node_features, dtype=torch.float), 
                                  torch.tensor(stroke_to_edge, dtype=torch.float)], dim=1)

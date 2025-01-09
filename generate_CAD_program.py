@@ -32,13 +32,13 @@ import random
 import copy
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/eval', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
 
 # --------------------- Directory --------------------- #
 current_dir = os.getcwd()
-output_dir = os.path.join(current_dir, 'program_output')
+output_dir = os.path.join(current_dir, 'program_output_dataset')
 
 
 
@@ -48,7 +48,7 @@ pass
 
 # --------------------- Main Code --------------------- #
 data_produced = 0
-data_limit = 3
+data_limit = 1000
 if os.path.exists(output_dir):
     shutil.rmtree(output_dir)
 os.makedirs(output_dir, exist_ok=True)
