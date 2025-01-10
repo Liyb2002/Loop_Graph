@@ -74,43 +74,59 @@ class Extrude_Decoder(nn.Module):
     def forward(self, x_dict):
         return torch.sigmoid(self.decoder(x_dict['stroke']))
 
+class Fidelity_Decoder(nn.Module):
+    def __init__(self, hidden_channels=256, num_bins=10, num_loop_nodes=400, num_stroke_nodes=400):
+        super(Fidelity_Decoder, self).__init__()
 
-class Fillet_Decoder(nn.Module):
-    def __init__(self, hidden_channels=256):
-        super(Fillet_Decoder, self).__init__()
-
-        self.decoder = nn.Sequential(
+        # Decoders for loop and stroke embeddings
+        self.loop_decoder = nn.Sequential(
             nn.Linear(128, hidden_channels),
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.1),
             nn.Linear(hidden_channels, 64),
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.1),
-            nn.Linear(64, 1),
-
+            nn.Linear(64, num_bins)  # Output logits for each bin
         )
 
-    def forward(self, x_dict):
-        return torch.sigmoid(self.decoder(x_dict['stroke']))
-
-
-class Chamfer_Decoder(nn.Module):
-    def __init__(self, hidden_channels=256):
-        super(Chamfer_Decoder, self).__init__()
-
-        self.decoder = nn.Sequential(
+        self.stroke_decoder = nn.Sequential(
             nn.Linear(128, hidden_channels),
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.1),
             nn.Linear(hidden_channels, 64),
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.1),
-            nn.Linear(64, 1),
-
+            nn.Linear(64, num_bins)  # Output logits for each bin
         )
 
+        self.num_loop_nodes = num_loop_nodes
+        self.num_stroke_nodes = num_stroke_nodes
+
     def forward(self, x_dict):
-        return torch.sigmoid(self.decoder(x_dict['stroke']))
+        # Extract embeddings
+        loop_embeddings = x_dict['loop']  # Shape: [batch_size * num_loop_nodes, feature_dim]
+        stroke_embeddings = x_dict['stroke']  # Shape: [batch_size * num_stroke_nodes, feature_dim]
+
+        # Compute batch size dynamically
+        batch_size = loop_embeddings.size(0) // self.num_loop_nodes  # Calculate from loop embeddings
+        feature_dim = loop_embeddings.size(-1)  # Feature dimension (e.g., 128)
+
+        # Reshape embeddings to separate batch and node dimensions
+        loop_embeddings = loop_embeddings.view(batch_size, self.num_loop_nodes, feature_dim)  # Shape: [batch_size, num_loop_nodes, feature_dim]
+        stroke_embeddings = stroke_embeddings.view(batch_size, self.num_stroke_nodes, feature_dim)  # Shape: [batch_size, num_stroke_nodes, feature_dim]
+
+        # Decode logits for each node
+        loop_logits = self.loop_decoder(loop_embeddings)  # Shape: [batch_size, num_loop_nodes, num_bins]
+        stroke_logits = self.stroke_decoder(stroke_embeddings)  # Shape: [batch_size, num_stroke_nodes, num_bins]
+
+        # Aggregate logits across nodes for each graph in the batch (sum across node dimension)
+        loop_graph_logits = loop_logits.sum(dim=1)  # Shape: [batch_size, num_bins]
+        stroke_graph_logits = stroke_logits.sum(dim=1)  # Shape: [batch_size, num_bins]
+
+        # Combine logits from loop and stroke nodes
+        combined_logits = loop_graph_logits + stroke_graph_logits  # Shape: [batch_size, num_bins]
+
+        return combined_logits  # Return raw logits for CrossEntropyLoss
 
 
 

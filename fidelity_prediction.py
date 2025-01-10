@@ -38,12 +38,12 @@ from mpl_toolkits.mplot3d import Axes3D
 
 
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
-graph_decoder = Encoders.gnn.gnn.Extrude_Decoder()
+graph_decoder = Encoders.gnn.gnn.Fidelity_Decoder()
 
 graph_encoder.to(device)
 graph_decoder.to(device)
 
-criterion = nn.BCELoss()
+criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
 batch_size = 16
 
@@ -66,22 +66,26 @@ def save_models():
 
 
 
-def compute_accuracy(valid_output, valid_batch_masks):
-    batch_size = valid_output.shape[0] // 400
-    correct = 0
+def compute_accuracy(predictions, ground_truth):
+    """
+    Computes accuracy for classification predictions.
 
-    for i in range(batch_size):
-        output_slice = valid_output[i * 400:(i + 1) * 400]
-        mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
+    Args:
+        predictions (torch.Tensor): Predicted logits, shape (batch_size, num_bins).
+        ground_truth (torch.Tensor): Ground truth bin indices, shape (batch_size).
 
-        condition_1 = (mask_slice == 1) & (output_slice > 0.5)
-        condition_2 = (mask_slice == 0) & (output_slice < 0.5)
+    Returns:
+        correct (int): Number of correct predictions.
+        total (int): Total number of predictions.
+    """
+    # Get the predicted bin index by finding the max logit
+    predicted_bins = torch.argmax(predictions, dim=1)  # Shape: (batch_size,)
 
+    # Compare with ground truth
+    correct = (predicted_bins == ground_truth).sum().item()
+    total = ground_truth.size(0)
 
-        if torch.all(condition_1 | condition_2):
-            correct += 1
-
-    return correct
+    return correct, total
 
 # ------------------------------------------------------------------------------# 
 
@@ -100,7 +104,7 @@ def train():
     graphs = []
     gt_fidelity_score = []
 
-
+    bins = torch.linspace(0, 1, steps=11).to(device)  
     for data in tqdm(dataset, desc="Evaluating CAD Programs"):
         stroke_node_features, output_brep_edges, gt_brep_edges, cur_fidelity_score, contained_in_strokeCloud, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
     
@@ -118,9 +122,10 @@ def train():
         graphs.append(gnn_graph)
 
         cur_fidelity_score = cur_fidelity_score.to(device)
-        gt_fidelity_score.append(cur_fidelity_score)
+        binned_score = torch.bucketize(cur_fidelity_score, bins) - 1  # Get the bin index (0-based)
+        gt_fidelity_score.append(binned_score)  # Append the bin index as the ground truth
 
-        if len(graphs) > 20:
+        if len(graphs) > 40:
             break
 
 
@@ -130,7 +135,7 @@ def train():
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
     train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
-    train_labels, val_labels = gt_fidelity_score[:split_index], gt_fidelity_score[split_index:]
+    train_scores, val_scores = gt_fidelity_score[:split_index], gt_fidelity_score[split_index:]
 
     # Convert train and validation graphs to HeteroData
     hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]
@@ -138,10 +143,10 @@ def train():
 
     # Create DataLoaders for training and validation graphs/masks
     graph_train_loader = DataLoader(hetero_train_graphs, batch_size=16, shuffle=False)
-    label_train_loader = DataLoader(train_labels, batch_size=16, shuffle=False)
+    score_train_loader = DataLoader(train_scores, batch_size=16, shuffle=False)
 
     graph_val_loader = DataLoader(hetero_val_graphs, batch_size=16, shuffle=False)
-    label_val_loader = DataLoader(val_labels, batch_size=16, shuffle=False)
+    score_val_loader = DataLoader(val_scores, batch_size=16, shuffle=False)
 
 
     # Training and validation loop
@@ -150,22 +155,42 @@ def train():
 
     for epoch in range(epochs):
         train_loss = 0.0
-        correct = 0
-        total = 0
+        total_correct = 0
+        total_samples = 0
 
         graph_encoder.train()
         graph_decoder.train()
 
         # Get total number of iterations for progress bar
-        total_iterations = min(len(graph_train_loader), len(label_train_loader))
+        total_iterations = min(len(graph_train_loader), len(score_train_loader))
 
         # Training loop with progress bar
-        for hetero_batch, batch_masks in tqdm(zip(graph_train_loader, label_train_loader), 
+        for hetero_batch, batch_scores in tqdm(zip(graph_train_loader, score_train_loader), 
                                               desc=f"Epoch {epoch+1}/{epochs} - Training", 
                                               dynamic_ncols=True, 
                                               total=total_iterations):
         
-            print("hi")
+            optimizer.zero_grad()
+
+            x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
+            output = graph_decoder(x_dict)
+
+            loss = criterion(output, batch_scores)
+            loss.backward()
+            optimizer.step()
+
+            train_loss += loss.item()
+
+            # Compute accuracy
+            correct, total = compute_accuracy(output, batch_scores)
+            total_correct += correct
+            total_samples += total
+
+        # Calculate epoch-level metrics
+        train_accuracy = total_correct / total_samples
+        print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.4%}")
+
+
 
 
 train()
