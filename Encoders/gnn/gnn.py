@@ -74,6 +74,46 @@ class Extrude_Decoder(nn.Module):
     def forward(self, x_dict):
         return torch.sigmoid(self.decoder(x_dict['stroke']))
 
+
+class Fillet_Decoder(nn.Module):
+    def __init__(self, hidden_channels=256):
+        super(Fillet_Decoder, self).__init__()
+
+        self.decoder = nn.Sequential(
+            nn.Linear(128, hidden_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.1),
+            nn.Linear(hidden_channels, 64),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.1),
+            nn.Linear(64, 1),
+
+        )
+
+    def forward(self, x_dict):
+        return torch.sigmoid(self.decoder(x_dict['stroke']))
+
+
+class Chamfer_Decoder(nn.Module):
+    def __init__(self, hidden_channels=256):
+        super(Chamfer_Decoder, self).__init__()
+
+        self.decoder = nn.Sequential(
+            nn.Linear(128, hidden_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.1),
+            nn.Linear(hidden_channels, 64),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.1),
+            nn.Linear(64, 1),
+
+        )
+
+    def forward(self, x_dict):
+        return torch.sigmoid(self.decoder(x_dict['stroke']))
+
+
+
 class Fidelity_Decoder(nn.Module):
     def __init__(self, hidden_channels=256, num_bins=10, num_loop_nodes=400, num_stroke_nodes=400):
         super(Fidelity_Decoder, self).__init__()
