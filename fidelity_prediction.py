@@ -3,6 +3,7 @@ import os
 import pickle
 from tqdm import tqdm
 import torch
+import numpy as np
 
 import Preprocessing.SBGCN.brep_read
 import Preprocessing.proc_CAD.helper
@@ -50,7 +51,7 @@ batch_size = 16
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction')
+save_dir = os.path.join(current_dir, 'checkpoints', 'fidelity_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -89,6 +90,43 @@ def compute_accuracy(predictions, ground_truth):
 
 # ------------------------------------------------------------------------------# 
 
+def calculate_bins_with_min_score(S_min=0.3, S_max=1.0, gamma=2, num_bins=10):
+    # Transformed bin edges (equally spaced in [0, 1])
+    transformed_bin_edges = torch.linspace(0, 1, num_bins + 1, device=device)
+
+    # Rescale bin edges to the range [S_min, S_max]
+    original_bin_edges = S_min + (transformed_bin_edges ** (1 / gamma)) * (S_max - S_min)
+    return original_bin_edges
+
+
+def compute_bin_score(cur_fidelity_score, bins):
+    """
+    Maps fidelity scores into hardcoded bins and computes the bin score (midpoint of the bin).
+
+    Parameters:
+        cur_fidelity_score (torch.Tensor): Tensor of fidelity scores.
+        bins (list or torch.Tensor): List of bin edges.
+        device (str): Device to move tensors to.
+
+    Returns:
+        torch.Tensor: Bin scores for each fidelity score.
+    """
+    # Ensure bins are a tensor and on the correct device
+    bins = torch.tensor(bins, dtype=torch.float32)
+
+    # Compute bin indices (0-based)
+    bin_indices = torch.bucketize(cur_fidelity_score, bins) - 1
+
+    # Handle edge case for scores exactly equal to the last bin's upper limit
+    bin_indices = torch.clamp(bin_indices, 0, len(bins) - 2)
+
+    return bin_indices
+
+
+
+# ------------------------------------------------------------------------------# 
+
+
 
 def train():
 
@@ -104,7 +142,8 @@ def train():
     graphs = []
     gt_fidelity_score = []
 
-    bins = torch.linspace(0, 1, steps=11).to(device)  
+    bins = calculate_bins_with_min_score()
+
     for data in tqdm(dataset, desc="Evaluating CAD Programs"):
         stroke_node_features, output_brep_edges, gt_brep_edges, cur_fidelity_score, contained_in_strokeCloud, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
     
@@ -121,12 +160,19 @@ def train():
         gnn_graph.to_device_withPadding(device)
         graphs.append(gnn_graph)
 
+
+
         cur_fidelity_score = cur_fidelity_score.to(device)
-        binned_score = torch.bucketize(cur_fidelity_score, bins) - 1  # Get the bin index (0-based)
+        binned_score = compute_bin_score(cur_fidelity_score, bins)  # Get the bin index (0-based)
         gt_fidelity_score.append(binned_score)  # Append the bin index as the ground truth
 
-        if len(graphs) > 40:
-            break
+        # Vis
+        # print("binned_score", binned_score)
+        # Encoders.helper.vis_brep(output_brep_edges)
+        # Encoders.helper.vis_brep(gt_brep_edges)
+
+        # if len(graphs) > 40:
+        #     break
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -189,6 +235,45 @@ def train():
         # Calculate epoch-level metrics
         train_accuracy = total_correct / total_samples
         print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.4%}")
+
+
+
+        graph_encoder.eval()
+        graph_decoder.eval()
+
+        val_loss = 0.0
+        val_correct = 0
+        val_samples = 0
+
+        with torch.no_grad():
+            for hetero_batch, batch_scores in tqdm(zip(graph_val_loader, score_val_loader), 
+                                                  desc=f"Epoch {epoch+1}/{epochs} - Validation", 
+                                                  dynamic_ncols=True, 
+                                                  total=len(graph_val_loader)):
+                # Forward pass
+                x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
+                output = graph_decoder(x_dict)
+
+                # Compute loss
+                loss = criterion(output, batch_scores)
+                val_loss += loss.item()
+
+                # Compute accuracy
+                correct, total = compute_accuracy(output, batch_scores)
+                val_correct += correct
+                val_samples += total
+
+        # Calculate validation metrics
+        val_accuracy = val_correct / val_samples
+        print(f"Epoch {epoch+1}/{epochs} - Validation Loss: {val_loss:.4f}, Accuracy: {val_accuracy:.4%}")
+
+        # Save the model if validation accuracy improves
+        if val_accuracy > best_accuracy:
+            best_accuracy = val_accuracy
+            save_models()
+            print("Best model saved.")
+
+    print(f"Training complete. Best Validation Accuracy: {best_accuracy:.4%}")
 
 
 

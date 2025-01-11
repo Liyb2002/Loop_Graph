@@ -23,7 +23,7 @@ from OCC.Core.TopAbs import TopAbs_FACE
 from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
 from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
 
-def sample_points_from_shape(shape, tolerance=0.01, sample_density=10):
+def sample_points_from_shape(shape, tolerance=0.01, sample_density=100):
     """
     Samples points from the surface of the shape using a given tolerance.
     """
@@ -76,6 +76,7 @@ def chamfer_distance(points1, points2):
     # Calculate Chamfer distance
     chamfer = np.mean(dist1) + np.mean(dist2)
     return chamfer
+
 
 def compute_fidelity_score(gt_brep_path, output_brep_path, tolerance=0.01, sample_density=10):
     """

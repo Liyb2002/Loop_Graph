@@ -623,9 +623,16 @@ def sample_operation(operation_predictions):
 
     # Apply softmax to convert logits into probabilities
     probabilities = F.softmax(logits_subset, dim=0)
+
     alpha = 0.3
-    p3_new = probabilities[2] + alpha * probabilities[3]
-    p4_new = probabilities[3] - alpha * probabilities[3]
+    p3 = probabilities[2]
+    p4 = probabilities[3]
+
+    # Symmetric adjustment
+    adjustment = alpha * (p4 - p3)
+    p3_new = p3 + adjustment
+    p4_new = p4 - adjustment
+
 
     # Construct the new tensor
     new_probabilities = torch.tensor([

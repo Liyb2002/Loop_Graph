@@ -20,14 +20,17 @@ class Evaluation_Dataset(Dataset):
         ]
 
         # List of sublist. Each sublist is all the particles in a data piece
-        self.data_particles = [
-            [
-                os.path.join(data_dir, subfolder)
-                for subfolder in os.listdir(data_dir)
-                if os.path.isdir(os.path.join(data_dir, subfolder))
-            ]
-            for data_dir in self.data_dirs
-        ]
+        self.data_particles = []
+                
+        for data_dir in self.data_dirs:
+            found_folder = False
+            for subfolder in os.listdir(data_dir):
+                if os.path.isdir(os.path.join(data_dir, subfolder)):
+                    self.data_particles.append([os.path.join(data_dir, subfolder)])
+                    found_folder = True
+                    break
+            if not found_folder:
+                self.data_particles.append([])
 
         # all particles
         self.flatted_particle_folders = [

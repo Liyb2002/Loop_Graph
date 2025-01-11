@@ -254,7 +254,6 @@ class Particle():
             brep_path = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
             self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
             new_edges_in_current_step = torch.tensor(get_final_brep(brep_path, brep_files[-1]))
-            # Encoders.helper.vis_brep(self.brep_edges)
 
             # Check if extrude op really adds something new
             if self.current_op == 2 and len(self.past_programs) > 2:
@@ -271,6 +270,11 @@ class Particle():
             self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
             self.score = self.score * op_prob
 
+            if not contained_in_strokeCloud:
+                # Encoders.helper.vis_brep(self.brep_edges)
+                # Encoders.helper.vis_brep(self.gt_brep_edges)
+                self.valid_particle = False
+                return
 
             print("----------------")
             print("self.past_programs", self.past_programs)
