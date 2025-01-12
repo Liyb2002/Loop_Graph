@@ -189,7 +189,7 @@ class Particle():
                 stroke_to_edge
             )
 
-            # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+            Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
             # Encoders.helper.vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), self.stroke_cloud_loops)
 
             if len(self.past_programs) == 1:
@@ -331,6 +331,9 @@ class Particle():
             print(f"An error occurred: {e}")
             self.valid_particle = False
 
+
+        # compute particle score
+        self.fidelity_score = do_fidelity_score_prediction(gnn_graph)
 
 
         if self.program_terminated(gnn_graph):
@@ -521,6 +524,24 @@ def do_stroke_type_prediction(gnn_graph):
     predicted_stroke_idx = (output_mask > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
     # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), predicted_stroke_idx)
     return output_mask
+
+
+
+# --------------------- Fidelity Score --------------------- #
+fidelity_graph_encoder = Encoders.gnn.gnn.SemanticModule()
+fidelity_graph_decoder= Encoders.gnn.gnn.Fidelity_Decoder()
+fidelity_dir = os.path.join(current_dir, 'checkpoints', 'fidelity_prediction')
+fidelity_graph_encoder.eval()
+fidelity_graph_decoder.eval()
+fidelity_graph_encoder.load_state_dict(torch.load(os.path.join(fidelity_dir, 'graph_encoder.pth'), weights_only=True))
+fidelity_graph_decoder.load_state_dict(torch.load(os.path.join(fidelity_dir, 'graph_decoder.pth'), weights_only=True))
+
+
+def do_fidelity_score_prediction(gnn_graph):
+    x_dict = fidelity_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+    output_logits = fidelity_graph_decoder(x_dict)
+    predicted_bin = torch.argmax(output_logits, dim=1)
+    return predicted_bin.item()
 
 
 # --------------------- Cascade Brep Features --------------------- #

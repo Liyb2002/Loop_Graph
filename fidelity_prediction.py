@@ -234,6 +234,7 @@ def train():
 
         # Calculate epoch-level metrics
         train_accuracy = total_correct / total_samples
+        train_loss = train_loss / total_samples
         print(f"Epoch {epoch+1}/{epochs} - Training Loss: {train_loss:.4f}, Accuracy: {train_accuracy:.4%}")
 
 
@@ -265,6 +266,7 @@ def train():
 
         # Calculate validation metrics
         val_accuracy = val_correct / val_samples
+        val_loss = val_loss / val_samples
         print(f"Epoch {epoch+1}/{epochs} - Validation Loss: {val_loss:.4f}, Accuracy: {val_accuracy:.4%}")
 
         # Save the model if validation accuracy improves
