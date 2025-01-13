@@ -421,6 +421,9 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
 
     # Step 2 and 3: Iterate over brep_edges to find the matching edge
     for edge in brep_edges:
+        if edge[-1] != 1:
+            continue
+        
         edge_point1 = edge[:3]
         edge_point2 = edge[3:6]
         edge_mid_point = (edge_point1 + edge_point2) / 2

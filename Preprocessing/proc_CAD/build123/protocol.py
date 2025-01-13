@@ -4,9 +4,44 @@ import os
 import numpy as np
 
 
+
+def calculate_normal_from_points(points):
+    """
+    Calculate the normal of a planar face using three unique points.
+
+    Parameters:
+    - points (list of tuple): List of points [(x1, y1, z1), (x2, y2, z2), (x3, y3, z3), ...].
+
+    Returns:
+    - normal (tuple): The normal vector of the face as (nx, ny, nz).
+    """
+    if len(points) < 3:
+        raise ValueError("At least three points are required to calculate the normal.")
+
+    # Ensure unique points (to handle duplicates)
+    unique_points = list({tuple(p) for p in points})
+    if len(unique_points) < 3:
+        raise ValueError("At least three unique points are required for a valid normal calculation.")
+
+    # Use the first three unique points to calculate the normal
+    p1, p2, p3 = np.array(unique_points[0]), np.array(unique_points[1]), np.array(unique_points[2])
+    v1 = p2 - p1
+    v2 = p3 - p1
+
+    # Compute cross product and normalize
+    normal = np.cross(v1, v2)
+    normal = normal / np.linalg.norm(normal)  # Normalize the vector
+
+    return tuple(normal)
+
+
+
+
 def build_sketch(count, canvas, Points_list, output, data_dir):
     brep_dir = os.path.join(data_dir, "canvas", f"brep_{count}.step")
     stl_dir = os.path.join(data_dir, "canvas", f"vis_{count}.stl")
+
+    normal = calculate_normal_from_points([tuple(p) for p in Points_list])
 
     if count == 0:
         with BuildSketch():
@@ -34,7 +69,7 @@ def build_sketch(count, canvas, Points_list, output, data_dir):
             _ = perimeter.export_stl(stl_dir)
             _ = perimeter.export_step(brep_dir)
 
-        return perimeter
+        return perimeter, normal
     
     else:
         with canvas: 
@@ -64,7 +99,10 @@ def build_sketch(count, canvas, Points_list, output, data_dir):
                 _ = canvas.part.export_step(brep_dir)
 
 
-    return perimeter
+    return perimeter, normal
+
+
+
 
 
 def build_circle(count, radius, point, normal, output, data_dir):
