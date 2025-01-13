@@ -39,7 +39,7 @@ data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 # --------------------- Directory --------------------- #
 current_dir = os.getcwd()
-output_dir = os.path.join(current_dir, 'program_output')
+output_dir = os.path.join(current_dir, 'program_output_test')
 
 
 
@@ -111,7 +111,16 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
             cur_particle.generate_next_step()
 
         # resample particles
-        particle_list = whole_process_helper.helper.resample_particles(particle_list, cur_output_dir)
+        particle_list, finished_particles= whole_process_helper.helper.resample_particles(particle_list, cur_output_dir)
 
+
+    highest_particle = max(finished_particles, key=lambda p: p.fidelity_score)
+
+    # Rename the directory for the highest fidelity particle
+    old_dir = os.path.join(cur_output_dir, f'particle_{highest_particle.particle_id}')
+    new_dir = os.path.join(cur_output_dir, f'particle_{highest_particle.particle_id}_output')
+
+    if os.path.exists(old_dir):
+        os.rename(old_dir, new_dir)
 
     data_produced += 1

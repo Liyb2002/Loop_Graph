@@ -142,18 +142,45 @@ class Fidelity_Decoder(nn.Module):
         self.num_loop_nodes = num_loop_nodes
         self.num_stroke_nodes = num_stroke_nodes
 
-    def forward(self, x_dict):
-        # Extract embeddings
-        loop_embeddings = x_dict['loop']  # Shape: [batch_size * num_loop_nodes, feature_dim]
-        stroke_embeddings = x_dict['stroke']  # Shape: [batch_size * num_stroke_nodes, feature_dim]
+    def forward(self, x_dict, for_particle = False):
 
-        # Compute batch size dynamically
-        batch_size = loop_embeddings.size(0) // self.num_loop_nodes  # Calculate from loop embeddings
-        feature_dim = loop_embeddings.size(-1)  # Feature dimension (e.g., 128)
+        if not for_particle: 
+            # Extract embeddings
+            loop_embeddings = x_dict['loop']  # Shape: [batch_size * num_loop_nodes, feature_dim]
+            stroke_embeddings = x_dict['stroke']  # Shape: [batch_size * num_stroke_nodes, feature_dim]
 
-        # Reshape embeddings to separate batch and node dimensions
-        loop_embeddings = loop_embeddings.view(batch_size, self.num_loop_nodes, feature_dim)  # Shape: [batch_size, num_loop_nodes, feature_dim]
-        stroke_embeddings = stroke_embeddings.view(batch_size, self.num_stroke_nodes, feature_dim)  # Shape: [batch_size, num_stroke_nodes, feature_dim]
+            # if loop_embeddings or stroke_embeddings has shape just one size, compute and reshape it to [batch_size * num_loop_nodes, feature_dim]
+            # Compute batch size dynamically
+            batch_size = loop_embeddings.size(0) // self.num_loop_nodes  # Calculate from loop embeddings
+            feature_dim = loop_embeddings.size(-1)  # Feature dimension (e.g., 128)
+
+            # Reshape embeddings to separate batch and node dimensions
+            loop_embeddings = loop_embeddings.view(batch_size, self.num_loop_nodes, feature_dim)  # Shape: [batch_size, num_loop_nodes, feature_dim]
+            stroke_embeddings = stroke_embeddings.view(batch_size, self.num_stroke_nodes, feature_dim)  # Shape: [batch_size, num_stroke_nodes, feature_dim]
+        else:
+            loop_embeddings = x_dict['loop']  # Shape: [batch_size * num_loop_nodes, feature_dim]
+            stroke_embeddings = x_dict['stroke']  # Shape: [batch_size * num_stroke_nodes, feature_dim]
+            feature_dim = loop_embeddings.size(-1)  # Assuming loop_embeddings and stroke_embeddings have the same feature_dim
+
+            # Padding loop_embeddings
+            if loop_embeddings.size(0) < self.num_loop_nodes:
+                padding_size = self.num_loop_nodes - loop_embeddings.size(0)
+                loop_embeddings = F.pad(loop_embeddings, (0, 0, 0, padding_size))  # Pad along the node dimension
+            else:
+                loop_embeddings = loop_embeddings[:self.num_loop_nodes]  # Truncate if more than 400 nodes
+
+            # Padding stroke_embeddings
+            if stroke_embeddings.size(0) < self.num_stroke_nodes:
+                padding_size = self.num_stroke_nodes - stroke_embeddings.size(0)
+                stroke_embeddings = F.pad(stroke_embeddings, (0, 0, 0, padding_size))  # Pad along the node dimension
+            else:
+                stroke_embeddings = stroke_embeddings[:self.num_stroke_nodes]  # Truncate if more than 400 nodes
+
+            # Reshape to batch_size=1
+            loop_embeddings = loop_embeddings.unsqueeze(0)  # Shape: [1, 400, 128]
+            stroke_embeddings = stroke_embeddings.unsqueeze(0)  # Shape: [1, 400, 128]
+
+
 
         # Decode logits for each node
         loop_logits = self.loop_decoder(loop_embeddings)  # Shape: [batch_size, num_loop_nodes, num_bins]

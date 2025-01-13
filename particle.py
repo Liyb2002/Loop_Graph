@@ -32,7 +32,7 @@ import os
 import shutil
 import numpy as np
 import random
-
+import torch.nn.functional as F  
 
 class Particle():
     def __init__(self, gt_brep_file_path, data_produced, stroke_node_features):
@@ -189,8 +189,11 @@ class Particle():
                 stroke_to_edge
             )
 
-            Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+            # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
             # Encoders.helper.vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), self.stroke_cloud_loops)
+
+            # compute particle score
+            self.fidelity_score = do_fidelity_score_prediction(gnn_graph)
 
             if len(self.past_programs) == 1:
                 # Find all feature edges
@@ -242,7 +245,7 @@ class Particle():
 
 
             # 5.5) Read brep file
-            cur_relative_output_dir = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}')
+            cur_relative_output_dir = os.path.join(output_dir_name, f'data_{self.data_produced}', f'particle_{self.particle_id}')
 
             brep_files = [file_name for file_name in os.listdir(os.path.join(cur_relative_output_dir, 'canvas'))
                     if file_name.startswith('brep_') and file_name.endswith('.step')]
@@ -251,7 +254,7 @@ class Particle():
 
             # 5.6) Update brep data
             prev_brep_edges = self.brep_edges
-            brep_path = os.path.join('program_output/', f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
+            brep_path = os.path.join(output_dir_name, f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
             self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
             new_edges_in_current_step = torch.tensor(get_final_brep(brep_path, brep_files[-1]))
 
@@ -332,10 +335,6 @@ class Particle():
             self.valid_particle = False
 
 
-        # compute particle score
-        self.fidelity_score = do_fidelity_score_prediction(gnn_graph)
-
-
         if self.program_terminated(gnn_graph):
             self.valid_particle = False
             self.success_terminate = True
@@ -362,7 +361,8 @@ class Particle():
 
 # --------------------- Directory --------------------- #
 current_dir = os.getcwd()
-output_dir = os.path.join(current_dir, 'program_output')
+output_dir_name = 'program_output_test'
+output_dir = os.path.join(current_dir, output_dir_name)
 
 
 # --------------------- Skecth Network --------------------- #
@@ -539,7 +539,7 @@ fidelity_graph_decoder.load_state_dict(torch.load(os.path.join(fidelity_dir, 'gr
 
 def do_fidelity_score_prediction(gnn_graph):
     x_dict = fidelity_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
-    output_logits = fidelity_graph_decoder(x_dict)
+    output_logits = fidelity_graph_decoder(x_dict, True)
     predicted_bin = torch.argmax(output_logits, dim=1)
     return predicted_bin.item()
 

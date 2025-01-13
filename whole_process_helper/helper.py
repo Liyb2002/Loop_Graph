@@ -732,6 +732,7 @@ def resample_particles(particle_list, cur_output_dir_outerFolder):
     success_terminate_particles = []
     failed_particles = []
     resampled_list = []
+    finished_particles = []
 
     for cur_particle in particle_list:
         if cur_particle.valid_particle:
@@ -763,13 +764,20 @@ def resample_particles(particle_list, cur_output_dir_outerFolder):
     elif len(success_terminate_particles) != 0:
         for failed_particle in failed_particles:
             failed_particle.remove_particle()
+    
+    else: 
+        for failed_particle in failed_particles:
+            finished_particles.append(failed_particle)
 
 
     for succeed_particle in success_terminate_particles:
+        finished_particles.append(succeed_particle)
         old_dir = os.path.join(cur_output_dir_outerFolder, f'particle_{succeed_particle.particle_id}')
         new_dir = os.path.join(cur_output_dir_outerFolder, f'particle_{succeed_particle.particle_id}_succeed')
         if os.path.exists(old_dir):
             os.rename(old_dir, new_dir)
 
 
-    return resampled_list
+    return resampled_list, finished_particles
+
+# --------------------------------------------------------------------------- #
