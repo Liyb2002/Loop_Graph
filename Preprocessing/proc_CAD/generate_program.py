@@ -159,9 +159,6 @@ class Brep:
 
 
             if sketch_face.is_circle:
-                print('extrude_target_point', extrude_target_point)
-                print('sketch_face.center', sketch_face.center)
-
                 center = sketch_face.center  # Circle's center
 
                 # Compute the difference between the center and the extrude target point
@@ -181,9 +178,6 @@ class Brep:
 
             if random.random() < 0.5 and len(self.op) > 2:
                 amount = -amount
-
-
-
 
 
         num_vertices = len(new_vertices)

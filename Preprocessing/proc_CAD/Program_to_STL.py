@@ -66,7 +66,7 @@ class parsed_program():
         # Add the first point again at the end to close the loop
         new_point_list.append(point_list[0])
 
-        self.prev_sketch, self.prev_sketch_normal = Preprocessing.proc_CAD.build123.protocol.build_sketch(self.Op_idx, self.canvas, new_point_list, self.output, self.data_directory)
+        self.prev_sketch = Preprocessing.proc_CAD.build123.protocol.build_sketch(self.Op_idx, self.canvas, new_point_list, self.output, self.data_directory)
         self.Op_idx += 1
 
     def parse_circle(self, Op):
@@ -84,6 +84,7 @@ class parsed_program():
     def parse_extrude(self, Op, sketch_Op):
 
         sketch_point_list = [vert['coordinates'] for vert in sketch_Op['vertices']]
+        sketch_face_normal = sketch_Op['faces'][0]['normal']
         extrude_amount = Op['operation'][2]
         isSubtract = (extrude_amount < 0)
         
