@@ -122,7 +122,7 @@ def compute_accuracy_eval(output, program_gt_batch, program_existing_batch, prog
         # Ensure remaining_tokens is not empty
         if remaining_tokens.numel() == 0:
             continue  # Skip if there are no remaining tokens
-
+        
         # Check if the predicted class is in the remaining tokens
         if predicted_classes[i].item() in remaining_tokens.tolist():
             correct_predictions += 1
@@ -164,8 +164,8 @@ def train():
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
         
-        if program[-1] == 'terminate':
-            continue
+        # if program[-1] == 'terminate':
+        #     continue
 
         # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
@@ -186,7 +186,9 @@ def train():
         existing_programs.append(Encoders.helper.program_mapping(program[:-1], device))
         gt_programs.append(Encoders.helper.program_gt_mapping([program[-1]], device))
 
-        if len(graphs) > 20000:
+        print("given program", program[:-1])
+        print("next token", program[-1])
+        if len(graphs) > 30000:
             break
 
 
@@ -312,7 +314,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole_eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -326,8 +328,8 @@ def eval():
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
-        if program[-1] == 'terminate':
-            continue
+        # if program[-1] == 'terminate':
+        #     continue
 
         # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
@@ -347,6 +349,9 @@ def eval():
         existing_programs.append(Encoders.helper.program_mapping(program[:-1], device))
         gt_tokens.append(Encoders.helper.program_gt_mapping([program[-1]], device))
         program_wholes.append(Encoders.helper.program_mapping(program_whole, device))
+
+        if len(graphs) > 10:
+            break
         
 
 
@@ -407,6 +412,7 @@ def eval():
 
             # Accumulate the confusion matrix for the current batch
             all_confusion_matrices += torch.tensor(conf_matrix)
+            
 
             
 
@@ -425,4 +431,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

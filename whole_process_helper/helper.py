@@ -592,35 +592,37 @@ def find_valid_sketch(gnn_graph, sketch_selection_mask):
 
 
 def sample_operation(operation_predictions):
-    logits_subset = operation_predictions[:, 1:5].squeeze(0)
+    logits_subset = operation_predictions[:, 0:5].squeeze(0)
 
     # Apply softmax to convert logits into probabilities
     probabilities = F.softmax(logits_subset, dim=0)
 
     alpha = 0.3
-    p3 = probabilities[2]
-    p4 = probabilities[3]
+    p_fillet = probabilities[3]
+    p_chamfer = probabilities[4]
 
     # Symmetric adjustment
-    adjustment = alpha * (p4 - p3)
-    p3_new = p3 + adjustment
-    p4_new = p4 - adjustment
+    adjustment = alpha * (p_chamfer - p_fillet)
+    p_fillet_new = p_fillet + adjustment
+    p_chamfer_new = p_chamfer - adjustment
 
 
     # Construct the new tensor
     new_probabilities = torch.tensor([
         probabilities[0].item(),
         probabilities[1].item(),
-        p3_new.item(),
-        p4_new.item()
+        probabilities[2].item(),
+        p_fillet_new.item(),
+        p_chamfer_new.item()
     ])
 
     # Sample an index from the probabilities
     sampled_index = torch.multinomial(new_probabilities, num_samples=1)
     sampled_class_prob = new_probabilities[sampled_index].item()
     
-    # Map back to the original class indices (1-5)
-    sampled_class = sampled_index.item() + 1
+    # Map back to the original class indices (0-5)
+    sampled_class = sampled_index.item()
+
     return sampled_class, sampled_class_prob
 
 
@@ -745,10 +747,10 @@ def resample_particles(particle_list, cur_output_dir_outerFolder):
 
     for succeed_particle in success_terminate_particles:
         finished_particles.append(succeed_particle)
-        old_dir = os.path.join(cur_output_dir_outerFolder, f'particle_{succeed_particle.particle_id}')
-        new_dir = os.path.join(cur_output_dir_outerFolder, f'particle_{succeed_particle.particle_id}_succeed')
-        if os.path.exists(old_dir):
-            os.rename(old_dir, new_dir)
+        # old_dir = os.path.join(cur_output_dir_outerFolder, f'particle_{succeed_particle.particle_id}')
+        # new_dir = os.path.join(cur_output_dir_outerFolder, f'particle_{succeed_particle.particle_id}_succeed')
+        # if os.path.exists(old_dir):
+        #     os.rename(old_dir, new_dir)
 
 
     return resampled_list, finished_particles

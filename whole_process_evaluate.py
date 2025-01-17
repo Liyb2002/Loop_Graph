@@ -9,9 +9,12 @@ import Preprocessing.SBGCN.brep_read
 import Preprocessing.proc_CAD.helper
 import Encoders.helper
 
+
+import fidelity_score
+
 # --------------------- Dataloader for output --------------------- #
 class Evaluation_Dataset(Dataset):
-    def __init__(self, dataset):
+    def __init__(self, dataset, mode = 1):
         self.data_path = os.path.join(os.getcwd(), dataset)
         self.data_dirs = [
             os.path.join(self.data_path, d) 
@@ -21,35 +24,82 @@ class Evaluation_Dataset(Dataset):
 
         # List of sublist. Each sublist is all the particles in a data piece
         self.data_particles = []
-                
-        for data_dir in self.data_dirs:
-            found_folder = False
-            for subfolder in os.listdir(data_dir):
-                if os.path.isdir(os.path.join(data_dir, subfolder)):
-                    self.data_particles.append([os.path.join(data_dir, subfolder)])
-                    found_folder = True
-                    break
-            if not found_folder:
-                self.data_particles.append([])
+        
+        # mode 1: sample a particle
+        if mode == 1:
+            for data_dir in self.data_dirs:
+                found_folder = False
+                for subfolder in os.listdir(data_dir):
+                    if os.path.isdir(os.path.join(data_dir, subfolder)):
+                        self.data_particles.append([os.path.join(data_dir, subfolder)])
+                        found_folder = True
+                        break
+                if not found_folder:
+                    self.data_particles.append([])
+        
+        # mode 2: find all particles
+        if mode == 2:
+            self.data_particles = [
+            [
+                os.path.join(data_dir, subfolder)
+                for subfolder in os.listdir(data_dir)
+                if os.path.isdir(os.path.join(data_dir, subfolder))
+            ]
+            for data_dir in self.data_dirs
+        ]
 
-        # all particles
+        if mode == 3:
+            # mode 3: only find particles that ends with _output
+            for data_dir in self.data_dirs:
+                found_folder = False
+                for subfolder in os.listdir(data_dir):
+                    # Check if the item is a directory and ends with '_output'
+                    if os.path.isdir(os.path.join(data_dir, subfolder)) and subfolder.endswith('_output'):
+                        self.data_particles.append([os.path.join(data_dir, subfolder)])
+                        found_folder = True
+                        break
+                if not found_folder:
+                    self.data_particles.append([])
+
+
+
+        # all flatter all the particles
         self.flatted_particle_folders = [
             folder
             for sublist in self.data_particles
             for folder in sublist
         ]
 
+        print("self.flatted_particle_folders", self.data_particles)
+
         # Collect all data pieces: (folder_path, file_index)
         self.data_pieces = []
-        for folder in self.flatted_particle_folders:
-            canvas_dir = os.path.join(folder, 'canvas')
-            if os.path.exists(canvas_dir) and os.path.isdir(canvas_dir):
-                shape_files = sorted(
-                    f for f in os.listdir(canvas_dir) if f.endswith('_eval_info.pkl')
-                )
-                for shape_file in shape_files:
-                    index = int(shape_file.split('_')[0])
-                    self.data_pieces.append((folder, index))
+
+        if mode == 1 or mode == 2:
+            for folder in self.flatted_particle_folders:
+                canvas_dir = os.path.join(folder, 'canvas')
+                if os.path.exists(canvas_dir) and os.path.isdir(canvas_dir):
+                    shape_files = sorted(
+                        f for f in os.listdir(canvas_dir) if f.endswith('_eval_info.pkl')
+                    )
+                    for shape_file in shape_files:
+                        index = int(shape_file.split('_')[0])
+                        self.data_pieces.append((folder, index))
+
+        if mode == 3:
+            for folder in self.flatted_particle_folders:
+                canvas_dir = os.path.join(folder, 'canvas')
+                if os.path.exists(canvas_dir) and os.path.isdir(canvas_dir):
+                    shape_files = [
+                        f for f in os.listdir(canvas_dir) if f.endswith('_eval_info.pkl')
+                    ]
+                    if shape_files:  # Ensure there are files to process
+                        # Get the file with the highest index
+                        max_shape_file = max(
+                            shape_files, key=lambda x: int(x.split('_')[0])
+                        )
+                        index = int(max_shape_file.split('_')[0])
+                        self.data_pieces.append((folder, index))
 
         print(f"Total number of data pieces: {len(self.data_pieces)}")
 
@@ -79,7 +129,6 @@ class Evaluation_Dataset(Dataset):
         # Convert numpy arrays to tensors
         gt_brep_edges = torch.tensor(shape_data['gt_brep_edges'], dtype=torch.float32)
         cur_fidelity_score = torch.tensor(shape_data['cur_fidelity_score'], dtype=torch.float32)
-        contained_in_strokeCloud = torch.tensor(shape_data['contained_in_strokeCloud'], dtype=torch.float32)
         strokes_perpendicular = torch.tensor(shape_data['strokes_perpendicular'], dtype=torch.float32)
         loop_neighboring_vertical = torch.tensor(shape_data['loop_neighboring_vertical'], dtype=torch.long)  # Adjacency typically uses torch.long
         loop_neighboring_horizontal = torch.tensor(shape_data['loop_neighboring_horizontal'], dtype=torch.long)
@@ -90,7 +139,7 @@ class Evaluation_Dataset(Dataset):
 
         return (
             stroke_node_features, output_brep_edges, gt_brep_edges,
-            cur_fidelity_score, contained_in_strokeCloud,
+            cur_fidelity_score,
             shape_data['stroke_cloud_loops'], 
             strokes_perpendicular, loop_neighboring_vertical,
             loop_neighboring_horizontal, loop_neighboring_contained,
@@ -99,59 +148,13 @@ class Evaluation_Dataset(Dataset):
 
 
 
-# --------------------- Chamfer Distance Computation --------------------- #
-
-
-def brep_difference(prev_brep_edges, new_brep_edges):
-    """
-    Returns the edges in new_brep_edges that are not present in prev_brep_edges.
-
-    Two edges are considered the same if they have the same two points [:3] and [3:6],
-    regardless of the order of the points.
-
-    Parameters:
-    - prev_brep_edges (numpy.ndarray or torch.Tensor): Array or tensor of shape (num_prev_edges, 10),
-      where the first 6 values represent two 3D points defining an edge (start and end points).
-    - new_brep_edges (numpy.ndarray or torch.Tensor): Array or tensor of shape (num_new_edges, 10),
-      where the first 6 values represent two 3D points defining an edge (start and end points).
-
-    Returns:
-    - unique_new_edges (torch.Tensor): Tensor of edges in new_brep_edges that are not in prev_brep_edges.
-    """
-
-    if prev_brep_edges is None:
-        return new_brep_edges
-    
-    # Ensure inputs are tensors
-    if isinstance(prev_brep_edges, torch.Tensor):
-        prev_brep_edges = prev_brep_edges.cpu().numpy()
-    if isinstance(new_brep_edges, torch.Tensor):
-        new_brep_edges = new_brep_edges.cpu().numpy()
-
-    # Helper function to normalize edges (sort start and end points)
-    def normalize_edge(edge):
-        start, end = edge[:3], edge[3:6]
-        return tuple(sorted([tuple(start), tuple(end)]))
-
-    # Normalize and create sets of edges
-    prev_edge_set = {normalize_edge(edge) for edge in prev_brep_edges}
-    unique_edges = []
-
-    for edge in new_brep_edges:
-        if normalize_edge(edge) not in prev_edge_set:
-            unique_edges.append(edge)
-
-    # Convert the unique edges back to a tensor
-    unique_new_edges = torch.tensor(unique_edges, dtype=torch.float32)
-
-    return unique_new_edges
 
 # --------------------- Main Code --------------------- #
 
 
 def run_eval():
     # Set up dataloader
-    dataset = Evaluation_Dataset('program_output')
+    dataset = Evaluation_Dataset('program_output_test', 3)
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
     total_correct = 0
@@ -160,7 +163,7 @@ def run_eval():
     prev_brep_edges = None
 
     for data in tqdm(data_loader, desc="Evaluating CAD Programs"):
-        stroke_node_features, output_brep_edges, gt_brep_edges, cur_fidelity_score, contained_in_strokeCloud, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        stroke_node_features, output_brep_edges, gt_brep_edges, cur_fidelity_score, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
         stroke_node_features = stroke_node_features.squeeze(0)
         stroke_node_features = torch.round(stroke_node_features * 10000) / 10000
@@ -171,7 +174,7 @@ def run_eval():
         gt_brep_edges = gt_brep_edges.squeeze(0)
         gt_brep_edges = torch.round(gt_brep_edges * 10000) / 10000
 
-
+        print("cur_fidelity_score", cur_fidelity_score)
         Encoders.helper.vis_brep(output_brep_edges)
         Encoders.helper.vis_brep(gt_brep_edges)
 

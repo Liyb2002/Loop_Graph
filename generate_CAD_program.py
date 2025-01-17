@@ -100,7 +100,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     base_particle = particle.Particle(gt_brep_file_path, data_produced, stroke_node_features.squeeze(0).cpu().numpy())
     base_particle.set_gt_program(program)
     particle_list = []
-    for particle_id in range (1):
+    for particle_id in range (30):
         new_particle = copy.deepcopy(base_particle)
         new_particle.set_particle_id(particle_id, cur_output_dir)
         particle_list.append(new_particle)
@@ -114,6 +114,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         particle_list, finished_particles= whole_process_helper.helper.resample_particles(particle_list, cur_output_dir)
 
 
+    print("len finished_particles", len(finished_particles))
     highest_particle = max(finished_particles, key=lambda p: p.fidelity_score)
 
     # Rename the directory for the highest fidelity particle

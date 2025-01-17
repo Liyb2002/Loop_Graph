@@ -1240,9 +1240,14 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
     
     # Step 1: Find matching between stroke_node_features and final_brep_edges
     for stroke_idx, stroke in enumerate(stroke_node_features):
+        if stroke[-1] != 1:
+            continue
         stroke_points = set(map(tuple, [stroke[:3], stroke[3:6]]))  # Get the start and end points of the stroke
         
         for brep_edge in final_brep_edges:
+            if brep_edge[-1] != 1 or brep_edge[7] != 0:
+                continue
+
             brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))  # Get the start and end points of the BRep edge
             
             stroke_match = all(
@@ -1263,36 +1268,56 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
     return stroke_used_matrix
 
 
+
+
 def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
     num_strokes = stroke_node_features.shape[0]
     stroke_used_matrix = np.zeros((num_strokes, 1), dtype=np.float32)
-    
-    for j, brep_edge in enumerate(final_brep_edges):        
-        brep_center = np.array(brep_edge[:3])  # First 3 values are the center
-        radius = brep_edge[7]  # The radius is at index 7
 
-        for i, stroke in enumerate(stroke_node_features):
-            if stroke[-1] == 2 and brep_edge[-1] == 2:
-                # circle stroke <---> circle edge 
-                stroke_center = np.array(stroke[:3])
-                dist = np.linalg.norm(stroke_center - brep_center)
-                if dist < 0.1:
+    # Step 1: Find paired brep circle faces
+    paired_circle_faces = []
+    for brep_edge in final_brep_edges:
+        if brep_edge[-1] != 2:
+            continue
+
+        brep_center = np.array(brep_edge[:3])  # Center of the circle
+        radius = brep_edge[7]
+
+        # Check for pairing conditions
+        paired = False
+        for pair in paired_circle_faces:
+            center1, center2, rad = pair
+            if rad == radius and np.sum(np.isclose(center1 - center2, 0)) == 2:
+                paired = True
+                break
+
+        if not paired:
+            paired_circle_faces.append([brep_center, brep_center, radius])
+
+    # Step 2: Map strokes to brep edges
+    for i, stroke in enumerate(stroke_node_features):
+        if stroke[-1] == 2:  # Circle stroke
+            stroke_center = np.array(stroke[:3])
+            for center1, center2, radius in paired_circle_faces:
+                if any(np.linalg.norm(stroke_center - center) < 0.1 for center in [center1, center2]):
                     stroke_used_matrix[i] = 1
-            
-            if stroke[-1] == 1 and brep_edge[-1] == 2:
-                # straight stroke <---> cylinder face
-                point1 = np.array(stroke[:3])
-                point2 = np.array(stroke[3:6])  
+                    break
 
-
-                dist1 = np.linalg.norm(point1 - brep_center)
-                dist2 = np.linalg.norm(point2 - brep_center)
-
-                if np.isclose(dist1, radius) or np.isclose(dist2, radius):
-                    # print(f"Stroke {i} has a point on brep_edge {j}")
+        elif stroke[-1] == 1:  # Straight stroke
+            point1 = np.array(stroke[:3])
+            point2 = np.array(stroke[3:6])
+            for center1, center2, radius in paired_circle_faces:
+                if any(
+                    np.isclose(np.linalg.norm(point - center), radius)
+                    for point in [point1, point2]
+                    for center in [center1, center2]
+                ):
                     stroke_used_matrix[i] = 1
+                    break
 
     return stroke_used_matrix
+
+
 
 def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_brep_edges):
     """
@@ -1344,14 +1369,23 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
 
     # Step 3: Find corresponding loops
     for stroke_loop_idx, stroke_loop in enumerate(stroke_cloud_loops):
+        if len(stroke_loop) == 1:
+            continue
         stroke_loop_set = set(stroke_loop)  # Convert stroke loop to a set for fast lookup
         for brep_loop_idx, brep_loop in enumerate(brep_loops):
+            if len(brep_loop) == 1:
+                continue
             # Check if all strokes in the stroke loop map to the BRep edges in the BRep loop
             if all(
                 brep_to_stroke_map.get(brep_edge_idx, None) in stroke_loop_set
                 for brep_edge_idx in brep_loop
             ):
                 correspondence_matrix[stroke_loop_idx, brep_loop_idx] = 1.0
+
+
+    brep_loops_used = np.any(correspondence_matrix == 1, axis=0)
+    new_loops_mark_off = np.sum(brep_loops_used)
+    # print("striaght loops", new_loops_mark_off)
 
     return correspondence_matrix
 
@@ -1364,6 +1398,7 @@ def stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, 
     num_stroke_cloud_loops = len(stroke_cloud_loops)
     num_brep_loops = len(brep_loops)
     correspondence_matrix = np.zeros((num_stroke_cloud_loops, num_brep_loops), dtype=np.float32)
+    
 
     for i, stroke_loop in enumerate(stroke_cloud_loops):
         for j, brep_loop in enumerate(brep_loops):
@@ -1372,14 +1407,24 @@ def stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, 
                 continue
 
             if len(stroke_loop) == 1 and len(brep_loop) ==1:
-
+                
                 stroke_circle_edge = stroke_node_features[stroke_loop[0]]
                 brep_circle_edge = final_brep_edges[brep_loop[0]]
 
                 if (stroke_circle_edge[:3] == brep_circle_edge[:3]).all():
                     correspondence_matrix[i, j] = 1.0
 
+                    # print("stroke_circle_edge", stroke_circle_edge[:3])
+                    # print("brep_circle_edge", brep_circle_edge[:3])
+                    # print("----------")
+
+
+    brep_loops_used = np.any(correspondence_matrix == 1, axis=0)
+    new_loops_mark_off = np.sum(brep_loops_used)
+    # print("circle loops", new_loops_mark_off)
+
     return correspondence_matrix
+
 
 
 def union_matrices(stroke_to_loop_lines, stroke_to_loop_circle):
@@ -1566,3 +1611,40 @@ def vis_brep(brep):
     plt.show()
 
 
+
+#----------------------------------------------------------------------------------#
+
+
+def remove_duplicate_circle_breps(brep_loops, final_brep_edges):
+    """
+    Removes duplicate circle breps based on their center points.
+    
+    Args:
+        brep_loops (list of lists): List of brep loops, where each loop contains indices to final_brep_edges.
+        final_brep_edges (list of lists): List of brep edges, where each edge contains information including center points.
+        
+    Returns:
+        list: The filtered brep_loops after removing duplicates.
+    """
+    seen_centers = set()  # To track unique center points
+    unique_brep_loops = []  # To store the resulting brep_loops
+
+    for brep_loop in brep_loops:
+        # Only consider brep_loops with a single edge
+        if len(brep_loop) != 1:
+            unique_brep_loops.append(brep_loop)
+            continue
+
+        if len(brep_loop) == 1:
+            edge_index = brep_loop[0]
+            brep_circle_edge = final_brep_edges[edge_index]
+
+            # Extract the center point (assuming it's the first three elements of the edge)
+            center_point = tuple(brep_circle_edge[:3])  # Convert to tuple for hashing in the set
+
+            # If this center point is unique, add it to the result
+            if center_point not in seen_centers:
+                seen_centers.add(center_point)
+                unique_brep_loops.append(brep_loop)
+
+    return unique_brep_loops

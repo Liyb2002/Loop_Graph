@@ -88,6 +88,32 @@ def compute_accuracy(predictions, ground_truth):
 
     return correct, total
 
+
+def compute_accuracy_relaxed(predictions, ground_truth):
+    """
+    Computes relaxed accuracy for classification predictions.
+    A prediction is considered correct if it is within +-1 bin of the ground truth.
+
+    Args:
+        predictions (torch.Tensor): Predicted logits, shape (batch_size, num_bins).
+        ground_truth (torch.Tensor): Ground truth bin indices, shape (batch_size).
+
+    Returns:
+        correct (int): Number of relaxed correct predictions.
+        total (int): Total number of predictions.
+        accuracy (float): The percentage of relaxed correct predictions.
+    """
+    # Get the predicted bin index by finding the max logit
+    predicted_bins = torch.argmax(predictions, dim=1)  # Shape: (batch_size,)
+
+    # Compare with ground truth within a tolerance of +-1 bin
+    correct = ((predicted_bins == ground_truth) | 
+               (predicted_bins == ground_truth + 1) | 
+               (predicted_bins == ground_truth - 1)).sum().item()
+    total = ground_truth.size(0)
+
+    return correct, total
+
 # ------------------------------------------------------------------------------# 
 
 def calculate_bins_with_min_score(S_min=0.3, S_max=1.0, gamma=2, num_bins=10):
@@ -96,7 +122,10 @@ def calculate_bins_with_min_score(S_min=0.3, S_max=1.0, gamma=2, num_bins=10):
 
     # Rescale bin edges to the range [S_min, S_max]
     original_bin_edges = S_min + (transformed_bin_edges ** (1 / gamma)) * (S_max - S_min)
-    return original_bin_edges
+    # return original_bin_edges
+
+    return torch.linspace(0, 1, num_bins + 1)
+
 
 
 def compute_bin_score(cur_fidelity_score, bins):
@@ -145,7 +174,7 @@ def train():
     bins = calculate_bins_with_min_score()
 
     for data in tqdm(dataset, desc="Evaluating CAD Programs"):
-        stroke_node_features, output_brep_edges, gt_brep_edges, cur_fidelity_score, contained_in_strokeCloud, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        stroke_node_features, output_brep_edges, gt_brep_edges, cur_fidelity_score, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
     
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
@@ -173,6 +202,7 @@ def train():
 
         # if len(graphs) > 40:
         #     break
+
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -279,5 +309,90 @@ def train():
 
 
 
+def eval():
+    """
+    Evaluate the model on the validation dataset.
+    """
+    # Load models
+    load_models()
+    
+    # Set up dataset
+    dataset = whole_process_evaluate.Evaluation_Dataset('program_output')
 
-train()
+    # Preprocess graphs
+    graphs = []
+    gt_fidelity_score = []
+    bins = calculate_bins_with_min_score()
+
+    for data in tqdm(dataset, desc="Preprocessing Validation Dataset"):
+        stroke_node_features, output_brep_edges, gt_brep_edges, cur_fidelity_score, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+
+        gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
+            stroke_cloud_loops, 
+            stroke_node_features, 
+            strokes_perpendicular, 
+            loop_neighboring_vertical, 
+            loop_neighboring_horizontal, 
+            loop_neighboring_contained,
+            stroke_to_loop,
+            stroke_to_edge
+        )
+        gnn_graph.to_device_withPadding(device)
+        graphs.append(gnn_graph)
+
+        cur_fidelity_score = cur_fidelity_score.to(device)
+        binned_score = compute_bin_score(cur_fidelity_score, bins)  # Get the bin index (0-based)
+        gt_fidelity_score.append(binned_score)  # Append the bin index as the ground truth
+
+
+        print("binned_score", binned_score)
+        Encoders.helper.vis_brep(output_brep_edges)
+        Encoders.helper.vis_brep(gt_brep_edges)
+
+
+        if len(graphs) > 200:
+            break
+
+    print(f"Total number of validation graphs: {len(graphs)}")
+
+    # Convert validation graphs to HeteroData
+    hetero_val_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in graphs]
+
+    # Create DataLoaders for validation graphs/masks
+    graph_val_loader = DataLoader(hetero_val_graphs, batch_size=16, shuffle=False)
+    score_val_loader = DataLoader(gt_fidelity_score, batch_size=16, shuffle=False)
+
+    graph_encoder.eval()
+    graph_decoder.eval()
+
+    val_loss = 0.0
+    val_correct = 0
+    val_samples = 0
+
+    with torch.no_grad():
+        for hetero_batch, batch_scores in tqdm(zip(graph_val_loader, score_val_loader), 
+                                              desc="Evaluating Validation Dataset", 
+                                              dynamic_ncols=True, 
+                                              total=len(graph_val_loader)):
+            # Forward pass
+            x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
+            output = graph_decoder(x_dict)
+
+            # Compute loss
+            loss = criterion(output, batch_scores)
+            val_loss += loss.item()
+
+            # Compute accuracy
+            correct, total = compute_accuracy_relaxed(output, batch_scores)
+            val_correct += correct
+            val_samples += total
+
+    # Calculate validation metrics
+    val_accuracy = val_correct / val_samples
+    val_loss = val_loss / val_samples
+    
+    print(f"Validation Loss: {val_loss:.4f}, Accuracy: {val_accuracy:.4%}")
+
+
+
+eval()
