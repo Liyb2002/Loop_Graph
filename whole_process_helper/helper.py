@@ -702,12 +702,11 @@ def brep_to_stl_and_copy(gt_brep_file_path, output_dir, cur_brep_file_path):
 
 # --------------------------------------------------------------------------- #
 
-def resample_particles(particle_list, cur_output_dir_outerFolder):
+def resample_particles(particle_list, finished_particles):
     can_process_particles = []
     success_terminate_particles = []
     failed_particles = []
     resampled_list = []
-    finished_particles = []
 
     for cur_particle in particle_list:
         if cur_particle.valid_particle:
@@ -716,6 +715,7 @@ def resample_particles(particle_list, cur_output_dir_outerFolder):
             failed_particles.append(cur_particle)
         if cur_particle.success_terminate:  
             success_terminate_particles.append(cur_particle)
+            finished_particles.append(cur_particle)
     
 
     print("-----------")
@@ -729,30 +729,66 @@ def resample_particles(particle_list, cur_output_dir_outerFolder):
 
     if len(can_process_particles) != 0:
         for failed_particle in failed_particles:
-            failed_particle.remove_particle()
             failed_id = failed_particle.particle_id
 
             random_particle = random.choice(can_process_particles)
             new_particle = random_particle.deepcopy_particle(failed_id)
             resampled_list.append(new_particle)
 
-    elif len(success_terminate_particles) != 0:
-        for failed_particle in failed_particles:
-            failed_particle.remove_particle()
-    
-    else: 
-        for failed_particle in failed_particles:
-            finished_particles.append(failed_particle)
-
-
-    for succeed_particle in success_terminate_particles:
-        finished_particles.append(succeed_particle)
-        # old_dir = os.path.join(cur_output_dir_outerFolder, f'particle_{succeed_particle.particle_id}')
-        # new_dir = os.path.join(cur_output_dir_outerFolder, f'particle_{succeed_particle.particle_id}_succeed')
-        # if os.path.exists(old_dir):
-        #     os.rename(old_dir, new_dir)
-
 
     return resampled_list, finished_particles
 
 # --------------------------------------------------------------------------- #
+
+def find_top_different_particles(finished_particles, cur_output_dir, num_output_particles = 3):
+    """
+    Finds the top 3 particles with different brep_edges and renames their directories.
+
+    Parameters:
+    - finished_particles: List of particle objects with `brep_edges`, `fidelity_score`, and `particle_id` attributes.
+    - cur_output_dir: The base directory containing particle output directories.
+    """
+    # Compare brep_edges between particles and identify unique ones
+    unique_brep_map = {}
+
+    for particle in finished_particles:
+        added_to_group = False
+        for key_brep in unique_brep_map:
+            if particle.brep_edges is not None and np.array_equal(particle.brep_edges, key_brep):
+                added_to_group = True
+                break
+        if not added_to_group:
+            unique_brep_map[particle.brep_edges.tobytes()] = particle
+
+    # Extract representative particles
+    unique_particles = list(unique_brep_map.values())
+
+
+    # Sort unique particles by fidelity_score in descending order
+    unique_particles.sort(key=lambda p: p.fidelity_score, reverse=True)
+
+    print("len finished_particles", len(finished_particles))
+    print("unique_particles", len(unique_particles))
+    
+    # Process the top 3 (or fewer) unique particles
+    top_particles = unique_particles[:]
+    for particle in top_particles:
+        old_dir = os.path.join(cur_output_dir, f'particle_{particle.particle_id}')
+        new_dir = os.path.join(cur_output_dir, f'particle_{particle.particle_id}_output')
+
+        if os.path.exists(old_dir):
+            os.rename(old_dir, new_dir)
+
+
+
+    # Remove directories for all other particles
+    top_particle_ids = {p.particle_id for p in top_particles}
+    for particle in finished_particles:
+        if particle.particle_id not in top_particle_ids:
+            dir_to_remove = os.path.join(cur_output_dir, f'particle_{particle.particle_id}')
+            if os.path.exists(dir_to_remove):
+                shutil.rmtree(dir_to_remove, ignore_errors=True)
+                print(f"Removed directory: {dir_to_remove}")
+
+
+    return len(top_particles)  # Return the count of processed particles

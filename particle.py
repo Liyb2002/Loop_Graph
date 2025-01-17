@@ -208,7 +208,7 @@ class Particle():
             stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
 
             if not self.mark_off_new_strokes(stroke_to_loop, stroke_to_edge):
-                print("stop")
+                self.remove_particle()
                 self.valid_particle = False
                 return
 
@@ -231,7 +231,7 @@ class Particle():
 
             # compute particle score
             self.fidelity_score = do_fidelity_score_prediction(gnn_graph)
-            print("predicted fidelity_score", self.fidelity_score)
+            # print("predicted fidelity_score", self.fidelity_score)
 
             if len(self.past_programs) == 1:
                 # Find all feature edges
@@ -301,6 +301,7 @@ class Particle():
             if self.current_op == 2 and len(self.past_programs) > 2:
                 if prev_brep_edges.shape[0] == self.brep_edges.shape[0]:
                     self.valid_particle = False
+                    self.remove_particle()
                     return 
 
 
@@ -365,6 +366,7 @@ class Particle():
         except Exception as e:
             print(f"An error occurred: {e}")
             self.valid_particle = False
+            self.remove_particle()
 
 
         if self.current_op == 0:
