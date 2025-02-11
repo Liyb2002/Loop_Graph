@@ -33,13 +33,13 @@ import copy
 import re
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/test', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 
 # --------------------- Directory --------------------- #
 current_dir = os.getcwd()
-output_dir = os.path.join(current_dir, 'program_output_test')
+output_dir = os.path.join(current_dir, 'program_output_dataset')
 
 
 
@@ -65,7 +65,7 @@ def compute_start_idx():
 
 # --------------------- Main Code --------------------- #
 data_produced = compute_start_idx()
-data_limit = 2000
+data_limit = 50
 if os.path.exists(os.path.join(output_dir, f'data_{data_produced}')):
     shutil.rmtree(os.path.join(output_dir, f'data_{data_produced}'))
 os.makedirs(os.path.join(output_dir, f'data_{data_produced}'), exist_ok=True)
@@ -74,14 +74,13 @@ print("data_produced", data_produced)
 
 for data in tqdm(data_loader, desc="Generating CAD Programs"):
     program, stroke_node_features, data_path= data
-    
+
     if data_produced >= data_limit:
         break
 
     if program[-1][0] != 'terminate':
         continue
     
-
     # try:
     cur_output_dir = os.path.join(output_dir, f'data_{data_produced}')
     if os.path.exists(cur_output_dir):

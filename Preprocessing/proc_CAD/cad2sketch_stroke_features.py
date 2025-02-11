@@ -340,7 +340,7 @@ def compute_normal(points):
 
 
 
-def vis_stroke_cloud(final_edges_json):
+def vis_final_edges(final_edges_json):
     """
     Visualize strokes in 3D space from the provided JSON data.
     Each stroke is defined by a series of 3D points.
@@ -357,6 +357,8 @@ def vis_stroke_cloud(final_edges_json):
     # Loop through all strokes in the JSON
     for key in final_edges_json.keys():
         stroke = final_edges_json[key]
+        print('stroke', stroke)
+        print("-----")
         geometry = stroke["geometry"]
 
         node_features = build_node_features(geometry)
@@ -396,4 +398,36 @@ def vis_stroke_cloud(final_edges_json):
     ax.set_zlabel('Z')
 
     # Show the plot
+    plt.show()
+
+
+
+
+def via_all_edges(all_edges_json):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+
+    # Loop through all strokes in the JSON
+    for stroke in all_edges_json:
+        geometry = stroke['geometry']
+        
+        # Ensure geometry has at least two points
+        if len(geometry) < 2:
+            continue
+
+        # Extract x, y, z coordinates
+        x_values = [point[0] for point in geometry]
+        y_values = [point[1] for point in geometry]
+        z_values = [point[2] for point in geometry]
+
+        # Plot the line
+        ax.plot(x_values, y_values, z_values, color='black', linewidth=0.5)
+
+    # Set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # Show plot
     plt.show()

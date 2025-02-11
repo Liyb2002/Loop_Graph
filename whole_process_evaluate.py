@@ -70,8 +70,6 @@ class Evaluation_Dataset(Dataset):
             for folder in sublist
         ]
 
-        print("self.flatted_particle_folders", self.data_particles)
-
         # Collect all data pieces: (folder_path, file_index)
         self.data_pieces = []
 

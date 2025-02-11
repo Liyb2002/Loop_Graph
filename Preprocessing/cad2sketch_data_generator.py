@@ -64,6 +64,7 @@ class cad2sketch_dataset_generator():
     
     def process_subfolder(self, folder_path, subfolder_path):
         json_file_path = os.path.join(subfolder_path, 'final_edges.json')
+        all_edges_file_path = os.path.join(subfolder_path, 'all_edges.json')
         strokes_dict_path = os.path.join(subfolder_path, 'strokes_dict.json')
 
         if not os.path.exists(json_file_path):
@@ -90,8 +91,12 @@ class cad2sketch_dataset_generator():
 
         # Node Features
         json_data = self.read_json(json_file_path)
-        # Preprocessing.proc_CAD.cad2sketch_stroke_features.vis_stroke_cloud(json_data)
-        self.compute_shape_info(json_data, connected_stroke_nodes, target_path, shape_info_folder)
+        Preprocessing.proc_CAD.cad2sketch_stroke_features.vis_final_edges(json_data)
+
+        all_edges_data = self.read_json(all_edges_file_path)
+        Preprocessing.proc_CAD.cad2sketch_stroke_features.via_all_edges(all_edges_data)
+
+        # self.compute_shape_info(json_data, connected_stroke_nodes, target_path, shape_info_folder)
 
 
 

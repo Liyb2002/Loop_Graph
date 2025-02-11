@@ -78,7 +78,6 @@ class Particle():
         self.success_terminate = False
         self.score = 1
         self.used_loops = -1
-        self.used_strokes = -1
 
 
         # Feature_strokes
@@ -167,19 +166,16 @@ class Particle():
         return self.valid_particle
 
 
-    def mark_off_new_strokes(self, stroke_to_loop, stroke_to_edge):
+    def mark_off_new_strokes(self, stroke_to_loop):
 
         brep_loops_used = np.any(stroke_to_loop == 1, axis=0)
         new_loops_mark_off = np.sum(brep_loops_used)
-
-        new_strokes_mark_off = stroke_to_edge.sum().item()
 
         print("new_loops_mark_off", new_loops_mark_off)
         print("self.used_loops", self.used_loops)
 
         if self.used_loops == -1 and self.used_loops == -1:
             self.used_loops = new_loops_mark_off
-            self.used_strokes = new_strokes_mark_off
             return True
         
         if self.used_loops < new_loops_mark_off:
@@ -207,11 +203,6 @@ class Particle():
             stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
             stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
 
-            if not self.mark_off_new_strokes(stroke_to_loop, stroke_to_edge):
-                self.remove_particle()
-                self.valid_particle = False
-                return
-
 
             # 2) Build graph
             gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
@@ -225,9 +216,21 @@ class Particle():
                 stroke_to_edge
             )
 
+
             # Encoders.helper.vis_brep(self.brep_edges)
             # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
             # Encoders.helper.vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), self.stroke_cloud_loops)
+            
+            if self.past_programs[-1] != 2:
+                self.mark_off_new_strokes(stroke_to_loop)
+            else:
+                if not self.mark_off_new_strokes(stroke_to_loop):
+                    self.remove_particle()
+                    print("No new feature added")
+                    self.valid_particle = False
+                    return
+
+
 
             # compute particle score
             self.fidelity_score = do_fidelity_score_prediction(gnn_graph)
@@ -294,24 +297,17 @@ class Particle():
             prev_brep_edges = self.brep_edges
             brep_path = os.path.join(output_dir_name, f'data_{self.data_produced}', f'particle_{self.particle_id}', 'canvas')
             self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
-            self.brep_loops = Preprocessing.proc_CAD.helper.remove_duplicate_circle_breps(self.brep_loops, self.brep_edges)
-            new_edges_in_current_step = torch.tensor(get_final_brep(brep_path, brep_files[-1]))
-
-            # Check if extrude op really adds something new
-            if self.current_op == 2 and len(self.past_programs) > 2:
-                if prev_brep_edges.shape[0] == self.brep_edges.shape[0]:
-                    self.valid_particle = False
-                    self.remove_particle()
-                    return 
+            # self.brep_loops = Preprocessing.proc_CAD.helper.remove_duplicate_circle_breps(self.brep_loops, self.brep_edges)
 
 
             # Compute Chamfer Distance
-            cur_fidelity_score = fidelity_score.compute_fidelity_score(self.gt_brep_file_path, os.path.join(brep_path, brep_files[-1]))
-            print("true cur_fidelity_score", cur_fidelity_score)
+            # cur_fidelity_score = fidelity_score.compute_fidelity_score(self.gt_brep_file_path, os.path.join(brep_path, brep_files[-1]))
+            cur_fidelity_score = -1
 
             self.past_programs.append(self.current_op)
             self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
             self.score = self.score * op_prob
+
 
             print("----------------")
             print("self.past_programs", self.past_programs)
@@ -362,16 +358,21 @@ class Particle():
 
             whole_process_helper.helper.brep_to_stl_and_copy(self.gt_brep_file_path, self.cur_output_dir,os.path.join(self.cur_output_dir, 'gt_brep.step'))
 
-            
+                
         except Exception as e:
             print(f"An error occurred: {e}")
+            print("error building")
             self.valid_particle = False
-            self.remove_particle()
+            
+            if len(self.past_programs) > 8 and random.random() > 0.5:
+                self.success_terminate = True
+            else:
+                self.remove_particle()
 
 
         if self.current_op == 0:
-            self.valid_particle = False
-            self.success_terminate = True
+            # do a final check
+            self.correct_termination_check()
             return 
 
 
@@ -388,6 +389,36 @@ class Particle():
         shutil.rmtree(self.cur_output_dir)
 
 
+    def correct_termination_check(self):
+        if self.past_programs[-1] != 2 and len(self.past_programs) > 3:
+            self.valid_particle = False
+            self.success_terminate = True
+            return 
+
+
+        if self.past_programs[-1] == 1 or len(self.past_programs) < 3:
+            self.remove_particle()
+            self.valid_particle = False
+            return 
+
+        else:
+            stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
+            stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
+            stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
+            stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
+
+            if not self.mark_off_new_strokes(stroke_to_loop):
+                self.remove_particle()
+                print("No new feature added")
+                self.valid_particle = False
+                return
+
+            self.valid_particle = False
+            self.success_terminate = True
+
+        return 
+
+
 
 # ---------------------------------------------------------------------------------------------------------------------------------- #
 
@@ -395,7 +426,7 @@ class Particle():
 
 # --------------------- Directory --------------------- #
 current_dir = os.getcwd()
-output_dir_name = 'program_output_test'
+output_dir_name = 'program_output_dataset'
 output_dir = os.path.join(current_dir, output_dir_name)
 
 
@@ -472,10 +503,12 @@ def predict_fillet(gnn_graph):
     x_dict = fillet_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     fillet_selection_mask = fillet_graph_decoder(x_dict)
 
+
     fillet_stroke_idx =  (fillet_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
     # _, fillet_stroke_idx = torch.topk(fillet_selection_mask.flatten(), k=1)
     # _, fillet_stroke_idx = torch.max(fillet_selection_mask, dim=0)
 
+    # print("gnn_graph['stroke'].x", gnn_graph['stroke'].x.shape)
     # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
     return fillet_selection_mask
 
@@ -504,6 +537,8 @@ def predict_chamfer(gnn_graph):
     # gnn_graph.padding()
     x_dict = chamfer_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     chamfer_selection_mask = chamfer_graph_decoder(x_dict)
+
+    # print("gnn_graph['stroke'].x", gnn_graph['stroke'].x.shape)
 
     # chamfer_stroke_idx =  (chamfer_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
     # _, chamfer_stroke_idx = torch.topk(chamfer_selection_mask.flatten(), k=2)
