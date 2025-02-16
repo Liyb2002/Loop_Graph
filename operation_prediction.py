@@ -149,7 +149,7 @@ def trim_confusion_matrix(conf_matrix):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/rand_length')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -185,9 +185,6 @@ def train():
         
         existing_programs.append(Encoders.helper.program_mapping(program[:-1], device))
         gt_programs.append(Encoders.helper.program_gt_mapping([program[-1]], device))
-
-        print("given program", program[:-1])
-        print("next token", program[-1])
         if len(graphs) > 30000:
             break
 
@@ -431,4 +428,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

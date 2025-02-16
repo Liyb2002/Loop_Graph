@@ -174,7 +174,7 @@ def train():
     bins = calculate_bins_with_min_score()
 
     for data in tqdm(dataset, desc="Evaluating CAD Programs"):
-        stroke_node_features, output_brep_edges, gt_brep_edges, cur_fidelity_score, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        particle_value, stroke_node_features, output_brep_edges, gt_brep_edges, cur_fidelity_score, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
     
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
@@ -191,9 +191,7 @@ def train():
 
 
 
-        cur_fidelity_score = cur_fidelity_score.to(device)
-        binned_score = compute_bin_score(cur_fidelity_score, bins)  # Get the bin index (0-based)
-        gt_fidelity_score.append(binned_score)  # Append the bin index as the ground truth
+        particle_value = particle_value.to(device)
 
         # Vis
         # print("binned_score", binned_score)
