@@ -44,7 +44,7 @@ graph_decoder = Encoders.gnn.gnn.Fidelity_Decoder()
 graph_encoder.to(device)
 graph_decoder.to(device)
 
-criterion = nn.CrossEntropyLoss()
+criterion = nn.MSELoss()
 optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.parameters()), lr=0.0004)
 batch_size = 16
 
@@ -160,7 +160,7 @@ def compute_bin_score(cur_fidelity_score, bins):
 def train():
 
     # Set up dataloader
-    dataset = whole_process_evaluate.Evaluation_Dataset('program_output')
+    dataset = whole_process_evaluate.Evaluation_Dataset('program_output_dataset')
 
     total_correct = 0
     total = 0
@@ -169,12 +169,10 @@ def train():
     epochs = 30
 
     graphs = []
-    gt_fidelity_score = []
-
-    bins = calculate_bins_with_min_score()
+    gt_state_value = []
 
     for data in tqdm(dataset, desc="Evaluating CAD Programs"):
-        particle_value, stroke_node_features, output_brep_edges, gt_brep_edges, cur_fidelity_score, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        particle_value, stroke_node_features, output_brep_edges, gt_brep_edges, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
     
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
@@ -191,15 +189,11 @@ def train():
 
 
 
-        particle_value = particle_value.to(device)
+        particle_value = torch.tensor(particle_value, dtype=torch.float32)
+        gt_state_value.append(particle_value)
 
-        # Vis
-        # print("binned_score", binned_score)
-        # Encoders.helper.vis_brep(output_brep_edges)
-        # Encoders.helper.vis_brep(gt_brep_edges)
-
-        # if len(graphs) > 40:
-        #     break
+        if len(graphs) > 20:
+            break
 
 
 
@@ -209,7 +203,7 @@ def train():
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
     train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
-    train_scores, val_scores = gt_fidelity_score[:split_index], gt_fidelity_score[split_index:]
+    train_scores, val_scores = gt_state_value[:split_index], gt_state_value[split_index:]
 
     # Convert train and validation graphs to HeteroData
     hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]
@@ -393,4 +387,4 @@ def eval():
 
 
 
-eval()
+train()
