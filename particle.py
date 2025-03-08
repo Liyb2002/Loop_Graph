@@ -236,10 +236,6 @@ class Particle():
             self.fidelity_score = do_fidelity_score_prediction(gnn_graph)
             # print("predicted fidelity_score", self.fidelity_score)
 
-            if len(self.past_programs) == 1:
-                # Find all feature edges
-                self.predicted_feature_strokes = do_stroke_type_prediction(gnn_graph)
-
 
             if self.current_op == 1:
                 print("Build sketch")
@@ -574,25 +570,6 @@ def program_prediction(gnn_graph, past_programs):
 
     predicted_class, class_prob = whole_process_helper.helper.sample_operation(output)
     return predicted_class, class_prob
-
-
-# --------------------- Stroke Type Prediction Network --------------------- #
-strokeType_graph_encoder = Encoders.gnn.gnn.SemanticModule()
-strokeType_graph_decoder= Encoders.gnn.gnn.Stroke_type_Decoder()
-strokeType_dir = os.path.join(current_dir, 'checkpoints', 'stroke_type_prediction')
-strokeType_graph_encoder.eval()
-strokeType_graph_decoder.eval()
-strokeType_graph_encoder.load_state_dict(torch.load(os.path.join(strokeType_dir, 'graph_encoder.pth'), weights_only=True))
-strokeType_graph_decoder.load_state_dict(torch.load(os.path.join(strokeType_dir, 'graph_decoder.pth'), weights_only=True))
-
-
-def do_stroke_type_prediction(gnn_graph):
-    x_dict = strokeType_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
-    output_mask = strokeType_graph_decoder(x_dict)
-
-    predicted_stroke_idx = (output_mask > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), predicted_stroke_idx)
-    return output_mask
 
 
 
