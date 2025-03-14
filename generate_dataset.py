@@ -1,12 +1,10 @@
 
-import Preprocessing.generate_dataset_baseline
-import Preprocessing.cad2sketch_data_generator
-import sys
+import Preprocessing.process_felix_dataset
 
 
 def run():
     
-    d_generator = Preprocessing.generate_dataset_baseline.dataset_generator()
+    d_generator = Preprocessing.process_felix_dataset.cad2sketch_dataset_loader()
     # cad2sketch_generator = Preprocessing.cad2sketch_data_generator.cad2sketch_dataset_generator()
 
 

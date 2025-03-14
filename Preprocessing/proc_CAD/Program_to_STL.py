@@ -3,7 +3,6 @@ import os
 from copy import deepcopy
 
 import Preprocessing.proc_CAD.build123.protocol
-from Preprocessing.proc_CAD.basic_class import Face, Edge, Vertex
 import Preprocessing.proc_CAD.helper
 
 
@@ -160,3 +159,5 @@ def run(data_directory = None):
     parsed_program_class.read_json_file()
     
     return parsed_program_class.is_valid_parse()
+
+run()
