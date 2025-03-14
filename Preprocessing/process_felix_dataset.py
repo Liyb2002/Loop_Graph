@@ -2,8 +2,9 @@ import os
 import json
 import torch
 from torch.utils.data import Dataset
-import cad2sketch_stroke_features
+import Preprocessing.cad2sketch_stroke_features
 import shutil
+import re
 
 from tqdm import tqdm
 from pathlib import Path
@@ -15,8 +16,10 @@ class cad2sketch_dataset_loader(Dataset):
         """
 
         print("cad2sketch_dataset_loader cad2sketch_dataset_loader cad2sketch_dataset_loader")
-        
+
         self.data_path = os.path.join(os.getcwd(), 'dataset', 'selected_dataset')
+
+        self.subfolder_paths = []
 
         self.load_dataset()
 
@@ -46,7 +49,7 @@ class cad2sketch_dataset_loader(Dataset):
 
             # subfolder = 49.39_144.98
             for subfolder in subfolders:
-                subfolder_path = os.path.join(folder_path, subfolders[0])
+                subfolder_path = os.path.join(folder_path, subfolder)
                 self.subfolder_paths.append(subfolder_path)  # Store paths instead of processing
             
 
@@ -76,21 +79,33 @@ class cad2sketch_dataset_loader(Dataset):
             # print(f"Skipping {subfolder_path}: Missing files: {', '.join(missing_files)}")
             return None, None, None
 
-
+        # Do some vis
         # Load and visualize only feature lines version
         final_edges_data = self.read_json(final_edges_file_path)
-        feature_lines = cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
-        # cad2sketch_stroke_features.vis_feature_lines(feature_lines)
+        feature_lines = Preprocessing.cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
+        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(feature_lines)
 
 
         # Load and visualize only final edges (feature + construction lines)
-        all_lines = cad2sketch_stroke_features.extract_all_lines(final_edges_data)
-        cad2sketch_stroke_features.vis_feature_lines(all_lines)
+        all_lines = Preprocessing.cad2sketch_stroke_features.extract_all_lines(final_edges_data)
+        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
 
 
         # Load and visualize only construction lines (construction lines)
-        construction_lines = cad2sketch_stroke_features.extract_only_construction_lines(final_edges_data)
-        # cad2sketch_stroke_features.vis_feature_lines(construction_lines)
+        construction_lines = Preprocessing.cad2sketch_stroke_features.extract_only_construction_lines(final_edges_data)
+        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(construction_lines)
+
+
+        # get the generation process
+        parent_folder = os.path.dirname(subfolder_path)
+        output_folder_path = os.path.join(parent_folder, 'output', 'canvas')
+
+        if os.path.exists(output_folder_path) and os.path.isdir(output_folder_path):
+            step_files = [f for f in os.listdir(output_folder_path) if f.endswith('.step')]
+            step_files.sort(key=lambda x: int(re.search(r'step_(\d+)\.step', x).group(1)) if re.search(r'step_(\d+)\.step', x) else float('inf'))
+            for file in step_files:
+                print(file)
+
 
         return None
 
