@@ -2,9 +2,23 @@ import os
 import json
 import torch
 from torch.utils.data import Dataset
-import Preprocessing.cad2sketch_stroke_features
 import shutil
 import re
+
+
+import Preprocessing.cad2sketch_stroke_features
+
+
+import Preprocessing.proc_CAD.proc_gen
+import Preprocessing.proc_CAD.CAD_to_stroke_cloud
+import Preprocessing.proc_CAD.render_images
+import Preprocessing.proc_CAD.Program_to_STL
+import Preprocessing.proc_CAD.helper
+import Preprocessing.proc_CAD.render_images
+import Preprocessing.proc_CAD.draw_all_lines_baseline
+
+import Preprocessing.gnn_graph
+import Preprocessing.SBGCN.brep_read
 
 from tqdm import tqdm
 from pathlib import Path
@@ -88,7 +102,7 @@ class cad2sketch_dataset_loader(Dataset):
 
         # Load and visualize only final edges (feature + construction lines)
         all_lines = Preprocessing.cad2sketch_stroke_features.extract_all_lines(final_edges_data)
-        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
+        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
 
 
         # Load and visualize only construction lines (construction lines)
@@ -96,16 +110,18 @@ class cad2sketch_dataset_loader(Dataset):
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(construction_lines)
 
 
-        # get the generation process
+        # get the brep generation process
         parent_folder = os.path.dirname(subfolder_path)
         output_folder_path = os.path.join(parent_folder, 'output', 'canvas')
 
         if os.path.exists(output_folder_path) and os.path.isdir(output_folder_path):
             step_files = [f for f in os.listdir(output_folder_path) if f.endswith('.step')]
             step_files.sort(key=lambda x: int(re.search(r'step_(\d+)\.step', x).group(1)) if re.search(r'step_(\d+)\.step', x) else float('inf'))
-            for file in step_files:
-                print(file)
 
+        # Now start information processing
+        stroke_node_features = Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
+        print("stroke_node_features", stroke_node_features.shape)
+        
 
         return None
 

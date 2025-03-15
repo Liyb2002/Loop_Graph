@@ -160,4 +160,4 @@ def run(data_directory = None):
     
     return parsed_program_class.is_valid_parse()
 
-run()
+# run()
