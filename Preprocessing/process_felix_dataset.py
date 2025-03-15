@@ -120,6 +120,9 @@ class cad2sketch_dataset_loader(Dataset):
 
         # Now start information processing
         stroke_node_features = Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
+        # this tells you which stroke is corresponding to the current operation
+        stroke_operations_order_matrix = ? 
+
         print("stroke_node_features", stroke_node_features.shape)
         
 

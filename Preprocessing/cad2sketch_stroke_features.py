@@ -382,6 +382,35 @@ def compute_normal(points):
 # ------------------------------------------------------------------------------------# 
 
 
+def build_intersection_matrix(strokes_dict_data):
+    """
+    Builds an intersection matrix indicating which strokes intersect with others.
+    
+    Parameters:
+    - strokes_dict_data (list): A list of dictionaries where each dictionary represents a stroke 
+      and contains an 'intersections' key, which is a list of sublists with intersecting stroke indices.
+
+    Returns:
+    - numpy.ndarray: A matrix of shape (num_strokes_dict_data, num_strokes_dict_data),
+      where a value of 1 indicates that a stroke intersects another stroke in a one-way manner.
+    """
+    num_strokes = len(strokes_dict_data)
+    intersection_matrix = np.zeros((num_strokes, num_strokes), dtype=np.int32)  # Initialize with 0s
+
+    for idx, stroke_dict in enumerate(strokes_dict_data):
+        intersect_strokes = stroke_dict.get("intersections", [])  # Get intersection lists
+        
+        # Unfold the sublists to get all intersecting stroke indices
+        intersecting_indices = {stroke_idx for sublist in intersect_strokes for stroke_idx in sublist}
+
+        # Mark intersections in the matrix (acyclic, so only row updates)
+        for intersecting_idx in intersecting_indices:
+            if 0 <= intersecting_idx < num_strokes:  # Ensure index is valid
+                intersection_matrix[idx, intersecting_idx] = 1  # One-way intersection
+
+    return intersection_matrix
+
+
 # ------------------------------------------------------------------------------------# 
 
 
