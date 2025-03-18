@@ -29,8 +29,6 @@ class cad2sketch_dataset_loader(Dataset):
         Initializes the dataset generator by setting paths and loading the dataset.
         """
 
-        print("cad2sketch_dataset_loader cad2sketch_dataset_loader cad2sketch_dataset_loader")
-
         self.data_path = os.path.join(os.getcwd(), 'dataset', 'selected_dataset')
 
         self.subfolder_paths = []
@@ -102,7 +100,7 @@ class cad2sketch_dataset_loader(Dataset):
 
         # Load and visualize only final edges (feature + construction lines)
         all_lines = Preprocessing.cad2sketch_stroke_features.extract_all_lines(final_edges_data)
-        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
+        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
 
 
         # Load and visualize only construction lines (construction lines)
@@ -112,19 +110,23 @@ class cad2sketch_dataset_loader(Dataset):
 
         # get the brep generation process
         parent_folder = os.path.dirname(subfolder_path)
-        output_folder_path = os.path.join(parent_folder, 'output', 'canvas')
+        output_folder_path = os.path.join(parent_folder, 'output')
+        files_in_dir = os.listdir(output_folder_path)
+        stroke_operations_file = [f for f in files_in_dir if f.lower().endswith('.json')][0]
+        stroke_operations_path = os.path.join(output_folder_path, stroke_operations_file)
 
-        if os.path.exists(output_folder_path) and os.path.isdir(output_folder_path):
-            step_files = [f for f in os.listdir(output_folder_path) if f.endswith('.step')]
-            step_files.sort(key=lambda x: int(re.search(r'step_(\d+)\.step', x).group(1)) if re.search(r'step_(\d+)\.step', x) else float('inf'))
+        with open(stroke_operations_path, 'r') as f:
+            stroke_operations_data = json.load(f)
+
+
+
 
         # Now start information processing
         stroke_node_features = Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
         # this tells you which stroke is corresponding to the current operation
-        stroke_operations_order_matrix = ? 
-
-        print("stroke_node_features", stroke_node_features.shape)
+        # stroke_operations_order_matrix = ? 
         
+        print("stroke_operations_data", stroke_operations_data)
 
         return None
 
