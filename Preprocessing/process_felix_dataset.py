@@ -108,25 +108,26 @@ class cad2sketch_dataset_loader(Dataset):
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(construction_lines)
 
 
-        # get the brep generation process
-        parent_folder = os.path.dirname(subfolder_path)
-        output_folder_path = os.path.join(parent_folder, 'output')
-        files_in_dir = os.listdir(output_folder_path)
-        stroke_operations_file = [f for f in files_in_dir if f.lower().endswith('.json')][0]
-        stroke_operations_path = os.path.join(output_folder_path, stroke_operations_file)
-
-        with open(stroke_operations_path, 'r') as f:
-            stroke_operations_data = json.load(f)
-
-
-
-
+        # ------------------------------------------------------------ #
         # Now start information processing
         stroke_node_features = Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
-        # this tells you which stroke is corresponding to the current operation
-        # stroke_operations_order_matrix = ? 
-        
-        print("stroke_operations_data", stroke_operations_data)
+
+
+        # get the brep generation process
+        parent_folder = os.path.dirname(subfolder_path)
+        output_folder_path = os.path.join(parent_folder, 'output', 'canvas')
+        if os.path.exists(output_folder_path) and os.path.isdir(output_folder_path):
+            step_files = [f for f in os.listdir(output_folder_path) if f.endswith('.step')]
+            step_files.sort(key=lambda x: int(re.search(r'step_(\d+)\.step', x).group(1)) if re.search(r'step_(\d+)\.step', x) else float('inf'))
+
+
+        # now, process the brep files
+        for step_file in step_files:
+            edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(output_folder_path, step_file))
+
+            print("edge_features_list", len(edge_features_list))
+            print("cylinder_features", len(cylinder_features))
+            print("----")
 
         return None
 

@@ -76,6 +76,7 @@ def build_all_edges_json(all_edges_json):
 
 def build_node_features(geometry):
     num_points = len(geometry)
+    alpha_value = 0
 
     # Case 1: Check if the geometry has low residual fitting straight line  -> (Straight Line)
     residual = fit_straight_line(geometry)
@@ -85,7 +86,7 @@ def build_node_features(geometry):
         point1 = geometry[0]
         point2 = geometry[1]
 
-        return point1 + point2 + [0, 0, 0, 1]
+        return point1 + point2 + [alpha_value] + [0, 0, 0, 1]
 
     # Check if geometry is closed
     distance, closed = is_closed_shape(geometry)
@@ -97,13 +98,13 @@ def build_node_features(geometry):
             # Case 3: Arc
             point1 = geometry[0]
             point2 = geometry[-1]
-            return point1 + point2 + center_circle + [3]
+            return point1 + point2 + [alpha_value] + center_circle + [3]
 
         # Case 6: Curved Line
         point1 = geometry[0]
         point2 = geometry[-1]
         random_point = geometry[len(geometry) // 2]
-        return point1 + point2 + random_point + [6]
+        return point1 + point2 + [alpha_value] + random_point + [6]
 
     # Try fitting a circle
     center_circle, radius_circle, normal_circle, circle_residual = fit_circle_3d(geometry)
@@ -114,7 +115,7 @@ def build_node_features(geometry):
         point2 = geometry[-1]
         random_point = geometry[len(geometry) // 2]
 
-        return point1 + point2 + random_point + [5]
+        return point1 + point2 + [alpha_value] + random_point + [5]
 
 
 
@@ -124,11 +125,39 @@ def build_node_features(geometry):
 
     if abs(major_axis - minor_axis) < threshold:
         # Case 4: Ellipse
-        return center_ellipse + normal_ellipse+ [major_axis, minor_axis, 0, 4]
+        return center_ellipse + normal_ellipse+ [alpha_value] + [major_axis, minor_axis, 0, 4]
     
     # Case 2: Circle
-    return center_circle + normal_circle + [radius_circle, 0, 0, 2]
+    return center_circle + normal_circle +  [alpha_value] + [radius_circle, 0, 0, 2]
 
+
+
+# ------------------------------------------------------------------------------------# 
+
+
+
+def build_stroke_operation_matrix(final_edges_data):
+    # Step 1: Get the number of strokes and unique feature_ids
+    num_strokes = len(final_edges_data)
+    feature_ids = set()  # to store all unique feature_ids
+
+    # Step 2: Collect all unique feature_ids from final_edges_data
+    for stroke in final_edges_data.values():
+        feature_ids.add(stroke['feature_id'])
+
+    # Step 3: Convert the set of feature_ids to a sorted list
+    feature_ids = sorted(feature_ids)
+
+    # Step 4: Create the matrix with shape (num_strokes, num_feature_ids)
+    matrix = np.zeros((num_strokes, len(feature_ids)), dtype=int)
+
+    # Step 5: Fill the matrix
+    for i, (key, stroke) in enumerate(final_edges_data.items()):
+        feature_id = stroke['feature_id']
+        feature_id_index = feature_ids.index(feature_id)  # find the index of the feature_id
+        matrix[i, feature_id_index] = 1  # Mark this position as 1 for the correct feature_id
+
+    return matrix
 
 
 # ------------------------------------------------------------------------------------# 
@@ -480,6 +509,103 @@ def vis_feature_lines(feature_lines):
     # Show the plot
     plt.show()
 
+
+
+
+def vis_feature_lines_with_op_matrix(feature_lines, stroke_operations_order_matrix, target_op):
+    """
+    Visualize only the feature_line strokes in 3D space without axes, background, or automatic zooming.
+
+    Parameters:
+    - feature_lines (list): List of stroke dictionaries containing geometry (list of 3D points).
+    - stroke_operations_order_matrix (2D array): Matrix representing the operation sequence for each stroke.
+    - target_op (int): The operation index to highlight specific strokes.
+    """
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Remove axis labels, ticks, and background
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.set_frame_on(False)
+    ax.grid(False)
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_zticklabels([])
+    ax.set_axis_off()  # Hides the axis completely
+
+    # Initialize bounding box variables
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # First, loop through all feature_line strokes to plot black strokes
+    for stroke_id, stroke in enumerate(feature_lines):
+        geometry = stroke["geometry"]
+
+        if len(geometry) < 2:
+            continue  # Ensure there are enough points to plot
+
+        # Plot each segment of the stroke
+        for j in range(1, len(geometry)):
+            start = geometry[j - 1]
+            end = geometry[j]
+
+            # Update bounding box
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+            # Extract coordinates for plotting
+            x_values = [start[0], end[0]]
+            y_values = [start[1], end[1]]
+            z_values = [start[2], end[2]]
+
+            # Plot the stroke segment as black
+            if stroke_operations_order_matrix[stroke_id, target_op] != 1:
+                ax.plot(x_values, y_values, z_values, color='black', linewidth=0.5)
+
+    # Second, loop through all feature_line strokes to plot red strokes (with linewidth=1)
+    for stroke_id, stroke in enumerate(feature_lines):
+        geometry = stroke["geometry"]
+
+        if len(geometry) < 2:
+            continue  # Ensure there are enough points to plot
+
+        # Plot each segment of the stroke
+        for j in range(1, len(geometry)):
+            start = geometry[j - 1]
+            end = geometry[j]
+
+            # Update bounding box
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+            # Extract coordinates for plotting
+            x_values = [start[0], end[0]]
+            y_values = [start[1], end[1]]
+            z_values = [start[2], end[2]]
+
+            # Plot the stroke segment as red with linewidth=1
+            if stroke_operations_order_matrix[stroke_id, target_op] == 1:
+                ax.plot(x_values, y_values, z_values, color='red', linewidth=1)
+
+    # Compute the center and rescale
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Show the plot
+    plt.show()
+
 # ------------------------------------------------------------------------------------# 
 
 
@@ -505,20 +631,10 @@ def extract_feature_lines(final_edges_data):
 
 
 def extract_all_lines(final_edges_data):
-    """
-    Extracts strokes from final_edges_data where type is 'feature_line'.
-
-    Parameters:
-    - final_edges_data (dict): A dictionary where keys are stroke IDs and values contain stroke properties.
-
-    Returns:
-    - list: A list of strokes that are labeled as 'feature_line'.
-    """
     feature_lines = []
 
     for key, stroke in final_edges_data.items():
-        stroke_type = stroke['type']
-
+        
         feature_lines.append(stroke)
 
     return feature_lines
