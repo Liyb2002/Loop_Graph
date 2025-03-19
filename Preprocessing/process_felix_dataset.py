@@ -111,6 +111,24 @@ class cad2sketch_dataset_loader(Dataset):
         # ------------------------------------------------------------ #
         # Now start information processing
         stroke_node_features = Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
+        stroke_operations_order_matrix = None
+
+
+        connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(stroke_node_features)
+        strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, connected_stroke_nodes)
+
+
+        # 2) Get the loops
+        stroke_cloud_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
+        stroke_cloud_loops = Preprocessing.proc_CAD.helper.reorder_loops(stroke_cloud_loops)
+        stroke_cloud_loops = [list(loop) for loop in stroke_cloud_loops]
+
+
+        # 3) Compute Loop Neighboring Information
+        loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(stroke_cloud_loops)
+        loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(stroke_cloud_loops, stroke_node_features, loop_neighboring_all)
+        loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(loop_neighboring_all, loop_neighboring_vertical)
+        loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(stroke_cloud_loops, stroke_node_features)
 
 
         # get the brep generation process
@@ -122,12 +140,38 @@ class cad2sketch_dataset_loader(Dataset):
 
 
         # now, process the brep files
+    
+        final_brep_edges = []
+        final_cylinder_features = []
+        new_features = []
+        file_count = 0
         for step_file in step_files:
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(output_folder_path, step_file))
 
-            print("edge_features_list", len(edge_features_list))
-            print("cylinder_features", len(cylinder_features))
-            print("----")
+            if len(final_brep_edges) == 0:
+                final_brep_edges = edge_features_list
+                final_cylinder_features = cylinder_features
+            else:
+                # We already have brep
+                new_features= Preprocessing.cad2sketch_stroke_features.find_new_features(final_brep_edges, edge_features_list) 
+                final_brep_edges += new_features
+                final_cylinder_features += cylinder_features
+        
+            output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
+            brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(output_brep_edges) + Preprocessing.proc_CAD.helper.face_aggregate_circle_brep(output_brep_edges)
+            brep_loops = [list(loop) for loop in brep_loops]
+
+
+            # 5) Stroke_Cloud - Brep Connection
+            stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, output_brep_edges)
+            stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, output_brep_edges)
+            stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
+            
+            stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
+            stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, output_brep_edges)
+            stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
+
+            
 
         return None
 

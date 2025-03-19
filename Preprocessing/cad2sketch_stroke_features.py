@@ -161,6 +161,118 @@ def build_stroke_operation_matrix(final_edges_data):
 
 
 # ------------------------------------------------------------------------------------# 
+
+
+def find_new_features(prev_brep_edges, new_edge_features):
+    prev_brep_edges = [[round(coord, 4) for coord in line] for line in prev_brep_edges]
+    new_edge_features = [[round(coord, 4) for coord in line] for line in new_edge_features]
+
+    def is_same_direction(line1, line2):
+        """Check if two lines have the same direction."""
+        vector1 = np.array(line1[3:6]) - np.array(line1[:3])
+        vector2 = np.array(line2[3:6]) - np.array(line2[:3])
+        return np.allclose(vector1 / np.linalg.norm(vector1), vector2 / np.linalg.norm(vector2))
+
+    def is_point_on_line(point, line):
+        """Check if a point lies on a given line segment."""
+        start, end = np.array(line[:3]), np.array(line[3:6])
+
+        # Check if the point is collinear (still important to check)
+        if not np.allclose(np.cross(end - start, point - start), 0):
+            return False
+        
+        # Check if point lies within the bounds of the line segment
+        min_x, max_x = min(start[0], end[0]), max(start[0], end[0])
+        min_y, max_y = min(start[1], end[1]), max(start[1], end[1])
+        min_z, max_z = min(start[2], end[2]), max(start[2], end[2])
+        
+        return (min_x <= point[0] <= max_x) and (min_y <= point[1] <= max_y) and (min_z <= point[2] <= max_z)
+
+    def is_line_contained(line1, line2):
+        """Check if line1 is contained within line2."""
+        return is_point_on_line(np.array(line1[:3]), line2) and is_point_on_line(np.array(line1[3:6]), line2)
+
+
+
+    def find_unique_points(new_edge_line, prev_brep_line):
+        """Find the two unique points between new_edge_line and prev_brep_line."""
+        points = [
+            tuple(new_edge_line[:3]),   # new_edge_line start
+            tuple(new_edge_line[3:6]),   # new_edge_line end
+            tuple(prev_brep_line[:3]),  # prev_brep_line start
+            tuple(prev_brep_line[3:6]),  # prev_brep_line end
+        ]
+
+        # Find unique points
+        unique_points = [point for point in points if points.count(point) == 1]
+
+        # Ensure there are exactly two unique points
+        if len(unique_points) == 2:
+            return unique_points
+        return None
+
+    new_features = []
+
+    for new_edge_line in new_edge_features:
+        if new_edge_line[-1] != 0:
+            new_features.append(new_edge_line)
+            continue
+
+        relation_found = False
+
+        edge_start, edge_end = np.array(new_edge_line[:3]), np.array(new_edge_line[3:6])
+        
+        for prev_brep_line in prev_brep_edges:
+            if prev_brep_line[-1] != 0:
+                continue
+
+            brep_start, brep_end = np.array(prev_brep_line[:3]), np.array(prev_brep_line[3:6])
+
+            # This is a circle edge
+            if (edge_start == edge_end).all():
+                break
+
+            # Check if the lines are the same, either directly or in reverse order
+            if (np.allclose(edge_start, brep_start) and np.allclose(edge_end, brep_end)) or \
+            (np.allclose(edge_start, brep_end) and np.allclose(edge_end, brep_start)):
+                # Relation 1: The two lines are exactly the same
+                relation_found = True
+                break
+            
+            elif is_same_direction(new_edge_line, prev_brep_line) and is_line_contained(new_edge_line, prev_brep_line):
+                # new feature is in prev brep
+                relation_found = True
+                
+                unique_points = find_unique_points(new_edge_line, prev_brep_line)
+                if unique_points:
+                    # Create a new line using the unique points
+                    new_line = list(unique_points[0]) + list(unique_points[1])
+                    new_features.append(new_line)
+                    relation_found = True
+                    break
+                break
+            
+            elif is_same_direction(new_edge_line, prev_brep_line) and is_line_contained(prev_brep_line, new_edge_line):
+                # prev brep is in new feature
+                relation_found = True
+                
+                unique_points = find_unique_points(new_edge_line, prev_brep_line)
+                if unique_points:
+                    # Create a new line using the unique points
+                    new_line = list(unique_points[0]) + list(unique_points[1])
+                    new_features.append(new_line)
+                    relation_found = True
+                    break
+
+                break
+        
+        if not relation_found:
+            # Relation 4: None of the relations apply
+            new_features.append(new_edge_line)
+
+    return new_features
+
+# ------------------------------------------------------------------------------------# 
 def fit_straight_line(points):
     """
     Fits a straight line to a set of 3D points by using the first and last points as endpoints.
