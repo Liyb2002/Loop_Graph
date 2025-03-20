@@ -272,6 +272,35 @@ def find_new_features(prev_brep_edges, new_edge_features):
 
     return new_features
 
+
+
+def find_new_features_simple(prev_brep_edges, new_edge_features):
+    unique_edges = []
+    
+    for new_edge_line in new_edge_features:
+        edge_start, edge_end = np.array(new_edge_line[:3]), np.array(new_edge_line[3:6])
+        
+        # Assume this new edge is unique unless we find a match
+        is_unique = True
+        
+        for prev_brep_line in prev_brep_edges:
+            brep_start, brep_end = np.array(prev_brep_line[:3]), np.array(prev_brep_line[3:6])
+            
+            # Check if the new edge matches the existing one (in direct or reversed order)
+            if (np.allclose(edge_start, brep_start) and np.allclose(edge_end, brep_end)) or \
+               (np.allclose(edge_start, brep_end)   and np.allclose(edge_end,   brep_start)):
+                # The new edge is not unique; break out of this loop
+                is_unique = False
+                break
+        
+        # If after checking all prev_brep_edges we found no match, store the new edge
+        if is_unique:
+            unique_edges.append(new_edge_line)
+
+    return unique_edges
+
+
+
 # ------------------------------------------------------------------------------------# 
 def fit_straight_line(points):
     """
@@ -623,15 +652,14 @@ def vis_feature_lines(feature_lines):
 
 
 
-
-def vis_feature_lines_with_op_matrix(feature_lines, stroke_operations_order_matrix, target_op):
+def vis_feature_lines_selected(feature_lines, new_stroke_to_edge_matrix):
     """
-    Visualize only the feature_line strokes in 3D space without axes, background, or automatic zooming.
+    Visualize 3D strokes, with a subset of chosen strokes highlighted in red.
 
     Parameters:
     - feature_lines (list): List of stroke dictionaries containing geometry (list of 3D points).
-    - stroke_operations_order_matrix (2D array): Matrix representing the operation sequence for each stroke.
-    - target_op (int): The operation index to highlight specific strokes.
+    - new_stroke_to_edge_matrix (np.ndarray or list): An array of shape (num_lines, 1)
+      with value == 1 if a stroke is chosen and should be highlighted.
     """
     # Initialize the 3D plot
     fig = plt.figure()
@@ -653,14 +681,13 @@ def vis_feature_lines_with_op_matrix(feature_lines, stroke_operations_order_matr
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
-    # First, loop through all feature_line strokes to plot black strokes
-    for stroke_id, stroke in enumerate(feature_lines):
+    # First pass: plot all strokes in black (and compute bounding box)
+    for idx, stroke in enumerate(feature_lines):
         geometry = stroke["geometry"]
 
         if len(geometry) < 2:
-            continue  # Ensure there are enough points to plot
+            continue
 
-        # Plot each segment of the stroke
         for j in range(1, len(geometry)):
             start = geometry[j - 1]
             end = geometry[j]
@@ -670,40 +697,12 @@ def vis_feature_lines_with_op_matrix(feature_lines, stroke_operations_order_matr
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
 
-            # Extract coordinates for plotting
-            x_values = [start[0], end[0]]
-            y_values = [start[1], end[1]]
-            z_values = [start[2], end[2]]
-
-            # Plot the stroke segment as black
-            if stroke_operations_order_matrix[stroke_id, target_op] != 1:
-                ax.plot(x_values, y_values, z_values, color='black', linewidth=0.5)
-
-    # Second, loop through all feature_line strokes to plot red strokes (with linewidth=1)
-    for stroke_id, stroke in enumerate(feature_lines):
-        geometry = stroke["geometry"]
-
-        if len(geometry) < 2:
-            continue  # Ensure there are enough points to plot
-
-        # Plot each segment of the stroke
-        for j in range(1, len(geometry)):
-            start = geometry[j - 1]
-            end = geometry[j]
-
-            # Update bounding box
-            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
-            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
-            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-
-            # Extract coordinates for plotting
-            x_values = [start[0], end[0]]
-            y_values = [start[1], end[1]]
-            z_values = [start[2], end[2]]
-
-            # Plot the stroke segment as red with linewidth=1
-            if stroke_operations_order_matrix[stroke_id, target_op] == 1:
-                ax.plot(x_values, y_values, z_values, color='red', linewidth=1)
+            # Plot the stroke (black lines)
+            ax.plot([start[0], end[0]], 
+                    [start[1], end[1]], 
+                    [start[2], end[2]], 
+                    color='black', 
+                    linewidth=0.5)
 
     # Compute the center and rescale
     x_center = (x_min + x_max) / 2
@@ -714,6 +713,23 @@ def vis_feature_lines_with_op_matrix(feature_lines, stroke_operations_order_matr
     ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
     ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
     ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Second pass: highlight chosen strokes in red (linewidth=1)
+    for idx, stroke in enumerate(feature_lines):
+        # Check if stroke is chosen
+        if new_stroke_to_edge_matrix[idx] == 1:
+            geometry = stroke["geometry"]
+            if len(geometry) < 2:
+                continue
+
+            for j in range(1, len(geometry)):
+                start = geometry[j - 1]
+                end = geometry[j]
+                ax.plot([start[0], end[0]], 
+                        [start[1], end[1]], 
+                        [start[2], end[2]], 
+                        color='red', 
+                        linewidth=1)
 
     # Show the plot
     plt.show()

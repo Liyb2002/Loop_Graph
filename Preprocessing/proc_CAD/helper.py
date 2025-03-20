@@ -1217,7 +1217,7 @@ def pad_brep_features(final_brep_edges):
 
 
 #----------------------------------------------------------------------------------#
-def points_match(point1, point2, tolerance=0.05):
+def points_match(point1, point2, tolerance=0.0005):
     return all(abs(a - b) < tolerance for a, b in zip(point1, point2))
 
 
@@ -1249,7 +1249,6 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
                 continue
 
             brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))  # Get the start and end points of the BRep edge
-            
             stroke_match = all(
                 any(points_match(stroke_point, brep_point) for brep_point in brep_points)
                 for stroke_point in stroke_points

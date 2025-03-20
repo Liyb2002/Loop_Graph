@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import Dataset
 import shutil
 import re
+import numpy as np
 
 
 import Preprocessing.cad2sketch_stroke_features
@@ -63,6 +64,7 @@ class cad2sketch_dataset_loader(Dataset):
             for subfolder in subfolders:
                 subfolder_path = os.path.join(folder_path, subfolder)
                 self.subfolder_paths.append(subfolder_path)  # Store paths instead of processing
+                break
             
 
         for subfolder_path in tqdm(self.subfolder_paths, desc=f"Cleaning Data",):
@@ -143,19 +145,27 @@ class cad2sketch_dataset_loader(Dataset):
     
         final_brep_edges = []
         final_cylinder_features = []
+
         new_features = []
+        new_features_cylinder = []
+
         file_count = 0
         for step_file in step_files:
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(output_folder_path, step_file))
 
             if len(final_brep_edges) == 0:
+                new_features = edge_features_list
+                new_features_cylinder = cylinder_features
+
                 final_brep_edges = edge_features_list
                 final_cylinder_features = cylinder_features
             else:
                 # We already have brep
-                new_features= Preprocessing.cad2sketch_stroke_features.find_new_features(final_brep_edges, edge_features_list) 
+                new_features = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_brep_edges, edge_features_list) 
+                new_features_cylinder = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_cylinder_features, cylinder_features)
+
                 final_brep_edges += new_features
-                final_cylinder_features += cylinder_features
+                final_cylinder_features += new_features_cylinder
         
             output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
             brep_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(output_brep_edges) + Preprocessing.proc_CAD.helper.face_aggregate_circle_brep(output_brep_edges)
@@ -170,6 +180,14 @@ class cad2sketch_dataset_loader(Dataset):
             stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
             stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, output_brep_edges)
             stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
+
+            # 6) We need to build the stroke_operations_order_matrix
+            new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_features)
+            # new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, output_brep_edges)
+            # new_stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
+            
+            print("len(new_features)", len(new_features))
+            Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, new_stroke_to_edge_matrix)
 
             
 
