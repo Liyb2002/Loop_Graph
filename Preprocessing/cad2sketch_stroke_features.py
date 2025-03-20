@@ -274,29 +274,79 @@ def find_new_features(prev_brep_edges, new_edge_features):
 
 
 
-def find_new_features_simple(prev_brep_edges, new_edge_features):
-    unique_edges = []
+import numpy as np
+
+def is_line_contained(container_line, test_line, tol=1e-7):
+    """
+    Returns True if the bounding box of test_line is fully contained
+    within the bounding box of container_line.
     
+    container_line and test_line are each [x1, y1, z1, x2, y2, z2].
+    tol is used to allow for small floating-point variations.
+    
+    NOTE: This only checks bounding-box containment, not strict collinearity.
+    In other words, as long as test_line’s endpoints fall within container_line’s
+    min/max x, y, z ranges (within the tolerance), we consider it "contained."
+    """
+    # Convert lines to arrays
+    c1 = np.array(container_line[:3])
+    c2 = np.array(container_line[3:6])
+    t1 = np.array(test_line[:3])
+    t2 = np.array(test_line[3:6])
+    
+    # Compute min/max for container_line
+    c_min = np.minimum(c1, c2)
+    c_max = np.maximum(c1, c2)
+    
+    # Compute min/max for test_line
+    t_min = np.minimum(t1, t2)
+    t_max = np.maximum(t1, t2)
+    
+    # Check all coordinates are inside container_line’s bounding box (with tolerance)
+    if np.all(t_min >= c_min - tol) and np.all(t_max <= c_max + tol):
+        return True
+    else:
+        return False
+
+
+def find_new_features_simple(prev_brep_edges, new_edge_features):
+    """
+    - Returns a list of unique edges that do NOT exactly match any edge in prev_brep_edges.
+    - Also returns a set of indices for any prev_brep_edges that are used, i.e.:
+      either matched exactly or found to be contained in a new edge.
+    """
+    unique_edges = []
+    used_prev_edges = set()  # store indices of prev_brep_edges considered used
+    
+    print("new_edge_features", new_edge_features)
     for new_edge_line in new_edge_features:
-        edge_start, edge_end = np.array(new_edge_line[:3]), np.array(new_edge_line[3:6])
+        print("new_edge_line", new_edge_line)
+        edge_start = np.array(new_edge_line[:3])
+        edge_end   = np.array(new_edge_line[3:6])
         
-        # Assume this new edge is unique unless we find a match
-        is_unique = True
+        is_unique = True  # assume new_edge_line is unique unless we find an exact match
         
-        for prev_brep_line in prev_brep_edges:
-            brep_start, brep_end = np.array(prev_brep_line[:3]), np.array(prev_brep_line[3:6])
+        for i, prev_brep_line in enumerate(prev_brep_edges):
+            brep_start = np.array(prev_brep_line[:3])
+            brep_end   = np.array(prev_brep_line[3:6])
             
-            # Check if the new edge matches the existing one (in direct or reversed order)
+            # 1) Check if new edge exactly matches an existing one (forward or reversed).
             if (np.allclose(edge_start, brep_start) and np.allclose(edge_end, brep_end)) or \
-               (np.allclose(edge_start, brep_end)   and np.allclose(edge_end,   brep_start)):
-                # The new edge is not unique; break out of this loop
+               (np.allclose(edge_start, brep_end)   and np.allclose(edge_end, brep_start)):
+                # The new edge is not unique; also consider the old edge "used"
+                is_unique = False
+                break
+            
+            # 2) Check if the new edge *contains* this previous edge
+            if is_line_contained(prev_brep_line, new_edge_line):
                 is_unique = False
                 break
         
-        # If after checking all prev_brep_edges we found no match, store the new edge
+        # After comparing with all prev edges:
         if is_unique:
             unique_edges.append(new_edge_line)
-
+    
+    print("-------------")
     return unique_edges
 
 
