@@ -59,6 +59,7 @@ def read_step_file(filename):
     else:
         raise Exception("Error reading STEP file.")
 
+
 def create_face_node(face):
     vertices = []
     unique_vertices = set()  # To store unique vertices
@@ -92,6 +93,7 @@ def create_face_node_gnn(face):
     
     adaptor_surface = BRepAdaptor_Surface(face)
     circle_features = []
+
 
     # cylinder surface
     if adaptor_surface.GetType() == GeomAbs_Cylinder:
@@ -174,14 +176,24 @@ def create_face_node_gnn(face):
 
 
 # What this code does:
-# 1)Arc: Point_1 (3 value), Point_2 (3 value), Center (3 value), 4
-# 2)Straight Line: Point_1 (3 value), Point_2 (3 value), 0, 0, 0, 1
+# 1)Straight Line: Point_1 (3 value), Point_2 (3 value), 0, 0, 0, 1
+# 2)Cicles: Center (3 value), normal (3 value), 0, radius, 0, 2
+# 3)Cylinder face: Center (3 value), normal (3 value), height, radius, 0, 3
+# 4)Arc: Point_1 (3 value), Point_2 (3 value), Center (3 value), 4
 def create_edge_node(edge):
 
     # Get the underlying geometry of the edge
     edge_curve_handle, first, last = BRep_Tool.Curve(edge)
     adaptor = GeomAdaptor_Curve(edge_curve_handle)
     curve_type = adaptor.GetType()
+
+    start_point = edge_curve_handle.Value(first)
+    end_point = edge_curve_handle.Value(last)
+
+    if start_point.Distance(end_point) < 1e-6:
+        
+        return [start_point.X(), start_point.Y(), start_point.Z(), end_point.X(), end_point.Y(), end_point.Z(), 0, 0, 0 , 2]
+ 
 
     if curve_type == GeomAbs_Circle and abs(last - first) < 6.27:
         start_point = adaptor.Value(first)
@@ -205,6 +217,7 @@ def create_edge_node(edge):
         vertex_coords = BRep_Tool.Pnt(vertex)
         vertices.append([vertex_coords.X(), vertex_coords.Y(), vertex_coords.Z()])
         vertex_explorer.Next()
+
 
 
     return [vertices[0][0], vertices[0][1], vertices[0][2], vertices[1][0], vertices[1][1], vertices[1][2], 0, 0, 0, 1]

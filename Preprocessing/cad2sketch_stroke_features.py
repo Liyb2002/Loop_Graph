@@ -318,9 +318,7 @@ def find_new_features_simple(prev_brep_edges, new_edge_features):
     unique_edges = []
     used_prev_edges = set()  # store indices of prev_brep_edges considered used
     
-    print("new_edge_features", new_edge_features)
     for new_edge_line in new_edge_features:
-        print("new_edge_line", new_edge_line)
         edge_start = np.array(new_edge_line[:3])
         edge_end   = np.array(new_edge_line[3:6])
         

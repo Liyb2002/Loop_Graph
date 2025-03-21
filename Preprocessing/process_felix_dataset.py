@@ -160,7 +160,7 @@ class cad2sketch_dataset_loader(Dataset):
             else:
                 # We already have brep
                 new_features = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_brep_edges, edge_features_list) 
-                # new_features_cylinder = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_cylinder_features, cylinder_features)
+                new_features_cylinder = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_cylinder_features, cylinder_features)
 
                 final_brep_edges += new_features
                 final_cylinder_features += new_features_cylinder
@@ -184,7 +184,7 @@ class cad2sketch_dataset_loader(Dataset):
             # new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, output_brep_edges)
             # new_stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
             
-            print("len(new_features)", len(new_features))
+            # print("new_stroke_to_edge_circle", new_stroke_to_edge_circle)
             Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, new_stroke_to_edge_matrix)
 
             
