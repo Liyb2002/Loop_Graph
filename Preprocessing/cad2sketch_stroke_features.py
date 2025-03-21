@@ -144,6 +144,15 @@ def rotate_matrix(edge_features_list, cylinder_features, rotation_matrix):
     rotated_edges = []
     rotated_cylinder_edges = []
 
+    rotation_matrix = np.array(rotation_matrix)
+
+
+    scale_x = np.linalg.norm(rotation_matrix[:3, 0])
+    scale_y = np.linalg.norm(rotation_matrix[:3, 1])
+    scale_z = np.linalg.norm(rotation_matrix[:3, 2])
+    average_scale = (scale_x + scale_y + scale_z) / 3
+
+
     # Rotate edge endpoints
     for edge in edge_features_list:
         point_1 = np.array(edge[0:3] + [1.0])
@@ -158,8 +167,11 @@ def rotate_matrix(edge_features_list, cylinder_features, rotation_matrix):
     # Rotate cylinder centers
     for cylinder_edge in cylinder_features:
         center = np.array(cylinder_edge[0:3] + [1.0])  # Assuming center is at [0:3]
+        radius = cylinder_edge[7]
+        scaled_radius = radius * average_scale
+
         rotated_center = rotation_matrix @ center
-        rotated_cylinder = rotated_center[:3].tolist() + cylinder_edge[3:]  # Keep other cylinder data
+        rotated_cylinder = rotated_center[:3].tolist() + cylinder_edge[3:7] + [scaled_radius] + cylinder_edge[8:]
         rotated_cylinder_edges.append(rotated_cylinder)
 
     return rotated_edges, rotated_cylinder_edges

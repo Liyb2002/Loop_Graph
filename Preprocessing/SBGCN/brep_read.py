@@ -118,7 +118,6 @@ def create_face_node_gnn(face):
 
         cylinder = adaptor_surface.Cylinder()
         radius = cylinder.Radius()
-        print("radius", radius)
 
         axis = cylinder.Axis()
         axis_direction = axis.Direction()
@@ -166,7 +165,6 @@ def create_face_node_gnn(face):
                     center_coords = [circle_center.X(), circle_center.Y(), circle_center.Z()]
                     normal_coords = [circle_normal.X(), circle_normal.Y(), circle_normal.Z()]
                     radius = circle_radius
-                    print("radius", radius)
 
                     cylinder_data = center_coords + normal_coords + [0, circle_radius] + [0, 2]
                     circle_features.append(cylinder_data)

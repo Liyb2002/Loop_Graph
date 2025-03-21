@@ -1318,7 +1318,6 @@ def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
                     dist2 = np.linalg.norm(point2 - cylinder_center)
 
                     # should also apply scaling to radius!
-                    print("dist1", dist1, "dist2", dist2, "cylinder_radius", cylinder_radius)
                     if np.isclose(dist1, cylinder_radius, atol=1e-3) or np.isclose(dist2, cylinder_radius, atol=1e-3):
                         stroke_used_matrix[i] = 1
                         break
