@@ -118,6 +118,7 @@ def create_face_node_gnn(face):
 
         cylinder = adaptor_surface.Cylinder()
         radius = cylinder.Radius()
+        print("radius", radius)
 
         axis = cylinder.Axis()
         axis_direction = axis.Direction()
@@ -165,6 +166,7 @@ def create_face_node_gnn(face):
                     center_coords = [circle_center.X(), circle_center.Y(), circle_center.Z()]
                     normal_coords = [circle_normal.X(), circle_normal.Y(), circle_normal.Z()]
                     radius = circle_radius
+                    print("radius", radius)
 
                     cylinder_data = center_coords + normal_coords + [0, circle_radius] + [0, 2]
                     circle_features.append(cylinder_data)
@@ -186,13 +188,6 @@ def create_edge_node(edge):
     edge_curve_handle, first, last = BRep_Tool.Curve(edge)
     adaptor = GeomAdaptor_Curve(edge_curve_handle)
     curve_type = adaptor.GetType()
-
-    start_point = edge_curve_handle.Value(first)
-    end_point = edge_curve_handle.Value(last)
-
-    if start_point.Distance(end_point) < 1e-6:
-        
-        return [start_point.X(), start_point.Y(), start_point.Z(), end_point.X(), end_point.Y(), end_point.Z(), 0, 0, 0 , 2]
  
 
     if curve_type == GeomAbs_Circle and abs(last - first) < 6.27:
@@ -213,13 +208,12 @@ def create_edge_node(edge):
     vertices = []
     vertex_explorer = TopExp_Explorer(edge, TopAbs_VERTEX)
     while vertex_explorer.More():
+
         vertex = topods.Vertex(vertex_explorer.Current())
         vertex_coords = BRep_Tool.Pnt(vertex)
         vertices.append([vertex_coords.X(), vertex_coords.Y(), vertex_coords.Z()])
         vertex_explorer.Next()
-
-
-
+        
     return [vertices[0][0], vertices[0][1], vertices[0][2], vertices[1][0], vertices[1][1], vertices[1][2], 0, 0, 0, 1]
 
 def create_vertex_node(vertex):

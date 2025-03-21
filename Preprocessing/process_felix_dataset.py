@@ -169,7 +169,6 @@ class cad2sketch_dataset_loader(Dataset):
                 new_features_cylinder = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_cylinder_features, cylinder_features)
 
                 final_brep_edges += new_features
-                print("new_features_cylinder", new_features_cylinder)
                 final_cylinder_features += new_features_cylinder
         
             output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)

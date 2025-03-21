@@ -1249,6 +1249,7 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
                 continue
 
             brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))  # Get the start and end points of the BRep edge
+
             stroke_match = all(
                 any(points_match(stroke_point, brep_point) for brep_point in brep_points)
                 for stroke_point in stroke_points
@@ -1276,23 +1277,23 @@ def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
     # Step 1: Find paired brep circle faces
     paired_circle_faces = []
     for brep_edge in final_brep_edges:
-        if brep_edge[-1] != 2:
-            continue
+        if brep_edge[-1] == 2:
 
-        brep_center = np.array(brep_edge[:3])  # Center of the circle
-        radius = brep_edge[7]
+            brep_center = np.array(brep_edge[:3])  # Center of the circle
+            radius = brep_edge[7]
 
-        # Check for pairing conditions
-        paired = False
-        for pair in paired_circle_faces:
-            center1, center2, rad = pair
-            if rad == radius and np.sum(np.isclose(center1 - center2, 0)) == 2:
-                paired = True
-                break
+            # Check for pairing conditions
+            paired = False
+            for pair in paired_circle_faces:
+                center1, center2, rad = pair
+                if rad == radius and np.sum(np.isclose(center1 - center2, 0)) == 2:
+                    paired = True
+                    break
 
-        if not paired:
-            paired_circle_faces.append([brep_center, brep_center, radius])
+            if not paired:
+                paired_circle_faces.append([brep_center, brep_center, radius])
 
+            
     # Step 2: Map strokes to brep edges
     for i, stroke in enumerate(stroke_node_features):
         if stroke[-1] == 2:  # Circle stroke
@@ -1305,14 +1306,22 @@ def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
         elif stroke[-1] == 1:  # Straight stroke
             point1 = np.array(stroke[:3])
             point2 = np.array(stroke[3:6])
-            for center1, center2, radius in paired_circle_faces:
-                if any(
-                    np.isclose(np.linalg.norm(point - center), radius)
-                    for point in [point1, point2]
-                    for center in [center1, center2]
-                ):
-                    stroke_used_matrix[i] = 1
-                    break
+
+            # map the cylinder face
+            for brep_edge in final_brep_edges:
+                # this is a cylinder ace
+                if brep_edge[-1] == 3:
+                    cylinder_center = np.array(brep_edge[:3])  # Center of the circle
+                    cylinder_radius = brep_edge[7]
+
+                    dist1 = np.linalg.norm(point1 - cylinder_center)
+                    dist2 = np.linalg.norm(point2 - cylinder_center)
+
+                    # should also apply scaling to radius!
+                    print("dist1", dist1, "dist2", dist2, "cylinder_radius", cylinder_radius)
+                    if np.isclose(dist1, cylinder_radius, atol=1e-3) or np.isclose(dist2, cylinder_radius, atol=1e-3):
+                        stroke_used_matrix[i] = 1
+                        break
 
     return stroke_used_matrix
 
