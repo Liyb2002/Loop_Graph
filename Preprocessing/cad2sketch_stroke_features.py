@@ -132,6 +132,37 @@ def build_node_features(geometry):
 
 
 
+# Brep edge format:
+# 1)Straight Line: Point_1 (3 value), Point_2 (3 value), 0, 0, 0, 1
+# 2)Cicles: Center (3 value), normal (3 value), 0, radius, 0, 2
+# 3)Cylinder face: Center (3 value), normal (3 value), height, radius, 0, 3
+# 4)Arc: Point_1 (3 value), Point_2 (3 value), Center (3 value), 4
+
+
+import numpy as np
+
+def rotate_matrix(edge_features_list, rotation_matrix):
+    rotated_edges = []
+
+    for edge in edge_features_list:
+        # Extract original 3D points
+        point_1 = np.array(edge[0:3] + [1.0])  # Make it [x, y, z, 1]
+        point_2 = np.array(edge[3:6] + [1.0])
+
+        # Apply the 4x4 transformation matrix
+        rotated_point_1 = rotation_matrix @ point_1
+        rotated_point_2 = rotation_matrix @ point_2
+
+        # Drop the homogeneous coordinate
+        rotated_point_1 = rotated_point_1[:3]
+        rotated_point_2 = rotated_point_2[:3]
+
+        # Reconstruct edge with rotated points and original remaining features
+        rotated_edge = rotated_point_1.tolist() + rotated_point_2.tolist() + edge[6:]
+        rotated_edges.append(rotated_edge)
+
+    return rotated_edges
+
 # ------------------------------------------------------------------------------------# 
 
 

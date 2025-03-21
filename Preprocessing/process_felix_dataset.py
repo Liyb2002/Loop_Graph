@@ -147,10 +147,16 @@ class cad2sketch_dataset_loader(Dataset):
         final_cylinder_features = []
         new_features = []
 
+        matrix_path = os.path.join(output_folder_path, "matrix.json")
+
+        with open(matrix_path, 'r') as f:
+            rotation_matrix = json.load(f)
+
         file_count = 0
         for step_file in step_files:
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(output_folder_path, step_file))
-
+            edge_features_list = Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, rotation_matrix)
+            
             if len(final_brep_edges) == 0:
                 new_features = edge_features_list
                 new_features_cylinder = cylinder_features
