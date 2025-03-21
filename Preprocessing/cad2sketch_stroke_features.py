@@ -139,29 +139,30 @@ def build_node_features(geometry):
 # 4)Arc: Point_1 (3 value), Point_2 (3 value), Center (3 value), 4
 
 
-import numpy as np
 
-def rotate_matrix(edge_features_list, rotation_matrix):
+def rotate_matrix(edge_features_list, cylinder_features, rotation_matrix):
     rotated_edges = []
+    rotated_cylinder_edges = []
 
+    # Rotate edge endpoints
     for edge in edge_features_list:
-        # Extract original 3D points
-        point_1 = np.array(edge[0:3] + [1.0])  # Make it [x, y, z, 1]
+        point_1 = np.array(edge[0:3] + [1.0])
         point_2 = np.array(edge[3:6] + [1.0])
 
-        # Apply the 4x4 transformation matrix
         rotated_point_1 = rotation_matrix @ point_1
         rotated_point_2 = rotation_matrix @ point_2
 
-        # Drop the homogeneous coordinate
-        rotated_point_1 = rotated_point_1[:3]
-        rotated_point_2 = rotated_point_2[:3]
-
-        # Reconstruct edge with rotated points and original remaining features
-        rotated_edge = rotated_point_1.tolist() + rotated_point_2.tolist() + edge[6:]
+        rotated_edge = rotated_point_1[:3].tolist() + rotated_point_2[:3].tolist() + edge[6:]
         rotated_edges.append(rotated_edge)
 
-    return rotated_edges
+    # Rotate cylinder centers
+    for cylinder_edge in cylinder_features:
+        center = np.array(cylinder_edge[0:3] + [1.0])  # Assuming center is at [0:3]
+        rotated_center = rotation_matrix @ center
+        rotated_cylinder = rotated_center[:3].tolist() + cylinder_edge[3:]  # Keep other cylinder data
+        rotated_cylinder_edges.append(rotated_cylinder)
+
+    return rotated_edges, rotated_cylinder_edges
 
 # ------------------------------------------------------------------------------------# 
 

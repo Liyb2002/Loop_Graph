@@ -155,7 +155,7 @@ class cad2sketch_dataset_loader(Dataset):
         file_count = 0
         for step_file in step_files:
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(output_folder_path, step_file))
-            edge_features_list = Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, rotation_matrix)
+            edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
             
             if len(final_brep_edges) == 0:
                 new_features = edge_features_list
@@ -169,6 +169,7 @@ class cad2sketch_dataset_loader(Dataset):
                 new_features_cylinder = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_cylinder_features, cylinder_features)
 
                 final_brep_edges += new_features
+                print("new_features_cylinder", new_features_cylinder)
                 final_cylinder_features += new_features_cylinder
         
             output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
@@ -186,11 +187,10 @@ class cad2sketch_dataset_loader(Dataset):
             # stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
 
             # 6) We need to build the stroke_operations_order_matrix
-            new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_features)
-            # new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, output_brep_edges)
-            # new_stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
+            new_stroke_to_edge_straight = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_features)
+            new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, new_features_cylinder)
+            new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.union_matrices(new_stroke_to_edge_straight, new_stroke_to_edge_circle)
             
-            # print("new_stroke_to_edge_circle", new_stroke_to_edge_circle)
             Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, new_stroke_to_edge_matrix)
 
             
