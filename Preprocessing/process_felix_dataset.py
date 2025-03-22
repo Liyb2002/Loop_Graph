@@ -152,6 +152,9 @@ class cad2sketch_dataset_loader(Dataset):
         with open(matrix_path, 'r') as f:
             rotation_matrix = json.load(f)
 
+
+        stroke_operations_order_matrix = None
+
         file_count = 0
         for step_file in step_files:
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(output_folder_path, step_file))
@@ -181,16 +184,21 @@ class cad2sketch_dataset_loader(Dataset):
             # stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(stroke_cloud_loops, brep_loops, stroke_node_features, output_brep_edges)
             # stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
             
-            # stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
-            # stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, output_brep_edges)
-            # stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
+            stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
+            stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle_full(stroke_node_features, output_brep_edges)
+            stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
+            Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_to_edge)
 
             # 6) We need to build the stroke_operations_order_matrix
             new_stroke_to_edge_straight = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_features)
             new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, new_features_cylinder)
             new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.union_matrices(new_stroke_to_edge_straight, new_stroke_to_edge_circle)
             
-            Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, new_stroke_to_edge_matrix)
+            if stroke_operations_order_matrix is None:
+                stroke_operations_order_matrix = new_stroke_to_edge_matrix
+            else:
+                stroke_operations_order_matrix = np.hstack((stroke_operations_order_matrix, new_stroke_to_edge_matrix))
+            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, new_stroke_to_edge_matrix)
 
             
 

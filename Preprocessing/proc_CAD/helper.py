@@ -1301,7 +1301,6 @@ def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
                 if brep_edge[-1] == 3:  # Cylinder edge
                     cylinder_center = np.array(brep_edge[:3])
                     cylinder_radius = brep_edge[7]  # Assuming radius is stored at index 7
-
                     dist1 = np.linalg.norm(point1 - cylinder_center)
                     dist2 = np.linalg.norm(point2 - cylinder_center)
 
@@ -1320,12 +1319,66 @@ def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
                 for brep_edge in final_brep_edges:
                     if brep_edge[-1] == 2:  # Circle edge
                         brep_center = np.array(brep_edge[:3])
+
                         if match(stroke_center, brep_center):
                             stroke_used_matrix[i] = 1
                             break
 
     return stroke_used_matrix
 
+
+
+
+def stroke_to_edge_circle_full(stroke_node_features, final_brep_edges):
+    num_strokes = stroke_node_features.shape[0]
+    stroke_used_matrix = np.zeros((num_strokes, 1), dtype=np.float32)
+
+    # Step 1: Find paired brep circle faces
+    paired_circle_faces = []
+    for brep_edge in final_brep_edges:
+        if brep_edge[-1] != 2:
+            continue
+
+        brep_center = np.array(brep_edge[:3])  # Center of the circle
+        radius = brep_edge[7]
+
+        # Check for pairing conditions
+        paired = False
+        for pair in paired_circle_faces:
+            center1, center2, rad = pair
+            if rad == radius and np.sum(np.isclose(center1 - center2, 0)) == 2:
+                paired = True
+                break
+
+        if not paired:
+            paired_circle_faces.append([brep_center, brep_center, radius])
+
+    # Step 2: Map strokes to brep edges
+    for i, stroke in enumerate(stroke_node_features):
+        if stroke[-1] == 2:  # Circle stroke
+            stroke_center = np.array(stroke[:3])
+            for center1, center2, radius in paired_circle_faces:
+                if any(np.linalg.norm(stroke_center - center) < 0.1 for center in [center1, center2]):
+                    stroke_used_matrix[i] = 1
+                    break
+
+        elif stroke[-1] == 1:  # Straight stroke
+            point1 = np.array(stroke[:3])
+            point2 = np.array(stroke[3:6])
+
+            for brep_edge in final_brep_edges:
+                if brep_edge[-1] == 3:  # Cylinder edge
+                    cylinder_center = np.array(brep_edge[:3])
+                    cylinder_radius = brep_edge[7]  # Assuming radius is stored at index 7
+                    dist1 = np.linalg.norm(point1 - cylinder_center)
+                    dist2 = np.linalg.norm(point2 - cylinder_center)
+
+                    if np.isclose(dist1, cylinder_radius, atol=1e-3) or np.isclose(dist2, cylinder_radius, atol=1e-3):
+                        stroke_used_matrix[i] = 1
+                        break
+
+    
+    return stroke_used_matrix
 
 
 
