@@ -186,7 +186,7 @@ def create_edge_node(edge):
     edge_curve_handle, first, last = BRep_Tool.Curve(edge)
     adaptor = GeomAdaptor_Curve(edge_curve_handle)
     curve_type = adaptor.GetType()
- 
+
 
     if curve_type == GeomAbs_Circle and abs(last - first) < 6.27:
         start_point = adaptor.Value(first)

@@ -1240,89 +1240,86 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
     
     # Step 1: Find matching between stroke_node_features and final_brep_edges
     for stroke_idx, stroke in enumerate(stroke_node_features):
-        if stroke[-1] != 1:
-            continue
-        stroke_points = set(map(tuple, [stroke[:3], stroke[3:6]]))  # Get the start and end points of the stroke
-        
-        for brep_edge in final_brep_edges:
-            if brep_edge[-1] != 1 or brep_edge[7] != 0:
-                continue
+        if stroke[-1] == 1 or stroke[-1] == 3:
+            stroke_points = set(map(tuple, [stroke[:3], stroke[3:6]]))  # Get the start and end points of the stroke
+            
+            for brep_edge in final_brep_edges:
+                if brep_edge[-1] == 1 or brep_edge[-1] == 4:
+                    brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))  # Get the start and end points of the BRep edge
 
-            brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))  # Get the start and end points of the BRep edge
+                    stroke_match = all(
+                        any(points_match(stroke_point, brep_point) for brep_point in brep_points)
+                        for stroke_point in stroke_points
+                    )
 
-            stroke_match = all(
-                any(points_match(stroke_point, brep_point) for brep_point in brep_points)
-                for stroke_point in stroke_points
-            )
+                    brep_match = all(
+                        any(points_match(brep_point, stroke_point) for stroke_point in stroke_points)
+                        for brep_point in brep_points
+                    )
 
-            brep_match = all(
-                any(points_match(brep_point, stroke_point) for stroke_point in stroke_points)
-                for brep_point in brep_points
-            )
+                    # Check if stroke points are part of any brep edge
+                    if stroke_match or brep_match:
+                        stroke_used_matrix[stroke_idx] = 1  # Mark this stroke as used
+                        break  # No need to check further once a match is found
 
-            # Check if stroke points are part of any brep edge
-            if stroke_match or brep_match:
-                stroke_used_matrix[stroke_idx] = 1  # Mark this stroke as used
-                break  # No need to check further once a match is found
-    
+
     return stroke_used_matrix
 
 
 
 
+def match(center1, center2, tol=1e-3):
+    """Utility function to check if two centers are approximately equal."""
+    return np.linalg.norm(center1 - center2) < tol
+
 def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
+    """
+    Matches strokes to BREP edges and marks them as used if a match is found.
+    
+    Args:
+        stroke_node_features: numpy array of shape (N, F) where each row represents a stroke.
+                              Last element in each row indicates type: 2 = circle, 1 = straight.
+        final_brep_edges: numpy array or list where each item represents a BREP edge.
+                          Last element in each row indicates type: 2 = circle, 3 = cylinder.
+
+    Returns:
+        stroke_used_matrix: numpy array of shape (N, 1), where 1 indicates stroke is matched/used.
+    """
     num_strokes = stroke_node_features.shape[0]
     stroke_used_matrix = np.zeros((num_strokes, 1), dtype=np.float32)
 
-    # Step 1: Find paired brep circle faces
-    paired_circle_faces = []
-    for brep_edge in final_brep_edges:
-        if brep_edge[-1] == 2:
-
-            brep_center = np.array(brep_edge[:3])  # Center of the circle
-            radius = brep_edge[7]
-
-            # Check for pairing conditions
-            paired = False
-            for pair in paired_circle_faces:
-                center1, center2, rad = pair
-                if rad == radius and np.sum(np.isclose(center1 - center2, 0)) == 2:
-                    paired = True
-                    break
-
-            if not paired:
-                paired_circle_faces.append([brep_center, brep_center, radius])
-
-            
-    # Step 2: Map strokes to brep edges
     for i, stroke in enumerate(stroke_node_features):
-        if stroke[-1] == 2:  # Circle stroke
-            stroke_center = np.array(stroke[:3])
-            for center1, center2, radius in paired_circle_faces:
-                if any(np.linalg.norm(stroke_center - center) < 0.1 for center in [center1, center2]):
-                    stroke_used_matrix[i] = 1
-                    break
+        stroke_type = stroke[-1]
 
-        elif stroke[-1] == 1:  # Straight stroke
+        if stroke_type == 2:  # Circle stroke
+            stroke_center = np.array(stroke[:3])
+
+            for brep_edge in final_brep_edges:
+                if brep_edge[-1] == 2:  # Circle edge
+                    brep_center = np.array(brep_edge[:3])
+                    if match(stroke_center, brep_center):
+                        stroke_used_matrix[i] = 1
+                        break
+
+        elif stroke_type == 1:  # Straight stroke
             point1 = np.array(stroke[:3])
             point2 = np.array(stroke[3:6])
 
-            # map the cylinder face
             for brep_edge in final_brep_edges:
-                # this is a cylinder ace
-                if brep_edge[-1] == 3:
-                    cylinder_center = np.array(brep_edge[:3])  # Center of the circle
-                    cylinder_radius = brep_edge[7]
+                if brep_edge[-1] == 3:  # Cylinder edge
+                    cylinder_center = np.array(brep_edge[:3])
+                    cylinder_radius = brep_edge[7]  # Assuming radius is stored at index 7
 
                     dist1 = np.linalg.norm(point1 - cylinder_center)
                     dist2 = np.linalg.norm(point2 - cylinder_center)
 
-                    # should also apply scaling to radius!
+                    # Match if either point is approximately on the cylinder's circular face
                     if np.isclose(dist1, cylinder_radius, atol=1e-3) or np.isclose(dist2, cylinder_radius, atol=1e-3):
                         stroke_used_matrix[i] = 1
                         break
 
     return stroke_used_matrix
+
 
 
 
