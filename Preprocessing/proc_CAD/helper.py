@@ -1293,10 +1293,13 @@ def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
 
         if stroke_type == 2:  # Circle stroke
             stroke_center = np.array(stroke[:3])
+            print("--------")
+            print("stroke_center", stroke_center)
 
             for brep_edge in final_brep_edges:
                 if brep_edge[-1] == 2:  # Circle edge
                     brep_center = np.array(brep_edge[:3])
+                    print("brep_center", brep_center)
                     if match(stroke_center, brep_center):
                         stroke_used_matrix[i] = 1
                         break

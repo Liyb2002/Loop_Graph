@@ -388,7 +388,6 @@ def find_new_features_simple(prev_brep_edges, new_edge_features):
         if is_unique:
             unique_edges.append(new_edge_line)
     
-    print("-------------")
     return unique_edges
 
 
