@@ -1288,23 +1288,12 @@ def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
     num_strokes = stroke_node_features.shape[0]
     stroke_used_matrix = np.zeros((num_strokes, 1), dtype=np.float32)
 
+    straight_stroke_matched = False
+
+    # First pass: process straight strokes
     for i, stroke in enumerate(stroke_node_features):
         stroke_type = stroke[-1]
-
-        if stroke_type == 2:  # Circle stroke
-            stroke_center = np.array(stroke[:3])
-            print("--------")
-            print("stroke_center", stroke_center)
-
-            for brep_edge in final_brep_edges:
-                if brep_edge[-1] == 2:  # Circle edge
-                    brep_center = np.array(brep_edge[:3])
-                    print("brep_center", brep_center)
-                    if match(stroke_center, brep_center):
-                        stroke_used_matrix[i] = 1
-                        break
-
-        elif stroke_type == 1:  # Straight stroke
+        if stroke_type == 1:  # Straight stroke
             point1 = np.array(stroke[:3])
             point2 = np.array(stroke[3:6])
 
@@ -1316,10 +1305,24 @@ def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
                     dist1 = np.linalg.norm(point1 - cylinder_center)
                     dist2 = np.linalg.norm(point2 - cylinder_center)
 
-                    # Match if either point is approximately on the cylinder's circular face
                     if np.isclose(dist1, cylinder_radius, atol=1e-3) or np.isclose(dist2, cylinder_radius, atol=1e-3):
                         stroke_used_matrix[i] = 1
+                        straight_stroke_matched = True
                         break
+
+    # Second pass: process circle strokes *only if no straight stroke matched*
+    if not straight_stroke_matched:
+        for i, stroke in enumerate(stroke_node_features):
+            stroke_type = stroke[-1]
+            if stroke_type == 2:  # Circle stroke
+                stroke_center = np.array(stroke[:3])
+
+                for brep_edge in final_brep_edges:
+                    if brep_edge[-1] == 2:  # Circle edge
+                        brep_center = np.array(brep_edge[:3])
+                        if match(stroke_center, brep_center):
+                            stroke_used_matrix[i] = 1
+                            break
 
     return stroke_used_matrix
 
