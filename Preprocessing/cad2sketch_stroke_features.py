@@ -639,6 +639,20 @@ def compute_normal(points):
 
 
 
+# ------------------------------------------------------------------------------------# 
+def from_stroke_to_edge(stroke_to_edge, stroke_cloud_loops):
+    loop_choices = []
+
+    for loop in stroke_cloud_loops:
+        chosen_count = sum(stroke_to_edge[idx, 0] == 1 for idx in loop)
+        if chosen_count == len(loop):
+            loop_choices.append([1])
+        else:
+            loop_choices.append([0])
+
+    return np.array(loop_choices, dtype=int)
+
+
 
 # ------------------------------------------------------------------------------------# 
 
@@ -824,6 +838,89 @@ def vis_feature_lines_selected(feature_lines, new_stroke_to_edge_matrix):
 
     # Show the plot
     plt.show()
+
+
+def vis_feature_lines_loop_ver(feature_lines, stroke_to_loop, stroke_cloud_loops):
+    """
+    Visualize 3D strokes, with a subset of chosen loops' strokes highlighted in red.
+
+    Parameters:
+    - feature_lines (list): List of stroke dictionaries containing geometry (list of 3D points).
+    - stroke_to_loop (np.ndarray): Array of shape (num_loops, 1), 1 indicates loop is selected.
+    - stroke_cloud_loops (list of lists): Each sublist contains stroke indices forming a loop.
+    """
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Remove axis labels, ticks, and background
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.set_frame_on(False)
+    ax.grid(False)
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_zticklabels([])
+    ax.set_axis_off()
+
+    # Initialize bounding box variables
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # First pass: draw all strokes in black
+    for stroke in feature_lines:
+        geometry = stroke["geometry"]
+        if len(geometry) < 2:
+            continue
+        for j in range(1, len(geometry)):
+            start, end = geometry[j - 1], geometry[j]
+
+            # Update bounding box
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+            # Plot in black
+            ax.plot([start[0], end[0]],
+                    [start[1], end[1]],
+                    [start[2], end[2]],
+                    color='black',
+                    linewidth=0.5)
+
+    # Second pass: highlight strokes from selected loops in red
+    num_loops = len(stroke_cloud_loops)
+    for loop_idx in range(num_loops):
+        if stroke_to_loop[loop_idx] == 1:
+            stroke_indices = stroke_cloud_loops[loop_idx]
+            for stroke_idx in stroke_indices:
+                if stroke_idx >= len(feature_lines):
+                    continue
+                geometry = feature_lines[stroke_idx]["geometry"]
+                if len(geometry) < 2:
+                    continue
+                for j in range(1, len(geometry)):
+                    start, end = geometry[j - 1], geometry[j]
+                    ax.plot([start[0], end[0]],
+                            [start[1], end[1]],
+                            [start[2], end[2]],
+                            color='red',
+                            linewidth=1.0)
+
+    # Normalize view
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Show the plot
+    plt.show()
+
 
 # ------------------------------------------------------------------------------------# 
 
