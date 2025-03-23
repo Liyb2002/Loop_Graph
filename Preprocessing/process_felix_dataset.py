@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 import shutil
 import re
 import numpy as np
-
+import pickle
 
 import Preprocessing.cad2sketch_stroke_features
 
@@ -153,10 +153,10 @@ class cad2sketch_dataset_loader(Dataset):
             rotation_matrix = json.load(f)
 
 
-        stroke_operations_order_matrix = None
-
+        stroke_operations_order_matrix = np.zeros((stroke_node_features.shape[0], len(step_files)))
+        data_directory = os.path.join(parent_folder, 'output', 'infos')
         file_count = 0
-        for step_file in step_files:
+        for idx, step_file in enumerate(step_files):
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(output_folder_path, step_file))
             edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
             edge_features_list += Preprocessing.cad2sketch_stroke_features.split_and_stick(edge_features_list)
@@ -182,7 +182,7 @@ class cad2sketch_dataset_loader(Dataset):
             stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
             stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle_full(stroke_node_features, output_brep_edges)
             stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
-            Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_to_edge)
+            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_to_edge)
 
             stroke_to_loop = Preprocessing.cad2sketch_stroke_features.from_stroke_to_edge(stroke_to_edge, stroke_cloud_loops)
             # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_ver(all_lines, stroke_to_loop, stroke_cloud_loops)
@@ -193,14 +193,33 @@ class cad2sketch_dataset_loader(Dataset):
             new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, new_features_cylinder)
             new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.union_matrices(new_stroke_to_edge_straight, new_stroke_to_edge_circle)
             
-            if stroke_operations_order_matrix is None:
-                stroke_operations_order_matrix = new_stroke_to_edge_matrix
-            else:
-                stroke_operations_order_matrix = np.hstack((stroke_operations_order_matrix, new_stroke_to_edge_matrix))
+            stroke_operations_order_matrix[:, idx] = np.array(new_stroke_to_edge_matrix).flatten()
+
             # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, new_stroke_to_edge_matrix)
 
-            
+            # 7) Write the data to file
+            os.makedirs(os.path.join(data_directory, 'shape_info'), exist_ok=True)
+            output_file_path = os.path.join(data_directory, 'shape_info', f'shape_info_{file_count}.pkl')
+            with open(output_file_path, 'wb') as f:
+                pickle.dump({
+                    'stroke_cloud_loops': stroke_cloud_loops, 
 
+                    'stroke_node_features': stroke_node_features,
+                    'stroke_type_features': np.matrix([]),
+                    'strokes_perpendicular': strokes_perpendicular,
+                    'output_brep_edges': output_brep_edges,
+                    'stroke_operations_order_matrix': stroke_operations_order_matrix, 
+
+                    'loop_neighboring_vertical': loop_neighboring_vertical,
+                    'loop_neighboring_horizontal': loop_neighboring_horizontal,
+                    'loop_neighboring_contained': loop_neighboring_contained,
+
+                    'stroke_to_loop': stroke_to_loop,
+                    'stroke_to_edge': stroke_to_edge
+                }, f)
+            
+            file_count += 1
+  
         return None
 
 
