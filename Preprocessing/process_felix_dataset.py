@@ -159,7 +159,8 @@ class cad2sketch_dataset_loader(Dataset):
         for step_file in step_files:
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(output_folder_path, step_file))
             edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
-            
+            edge_features_list += Preprocessing.cad2sketch_stroke_features.split_and_stick(edge_features_list)
+
             if len(final_brep_edges) == 0:
                 new_features = edge_features_list
                 new_features_cylinder = cylinder_features
@@ -181,10 +182,11 @@ class cad2sketch_dataset_loader(Dataset):
             stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
             stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle_full(stroke_node_features, output_brep_edges)
             stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
-            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_to_edge)
+            Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_to_edge)
 
             stroke_to_loop = Preprocessing.cad2sketch_stroke_features.from_stroke_to_edge(stroke_to_edge, stroke_cloud_loops)
-            Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_ver(all_lines, stroke_to_loop, stroke_cloud_loops)
+            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_ver(all_lines, stroke_to_loop, stroke_cloud_loops)
+            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_cloud_loops)
 
             # 6) We need to build the stroke_operations_order_matrix
             new_stroke_to_edge_straight = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_features)

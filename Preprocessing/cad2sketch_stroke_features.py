@@ -637,6 +637,53 @@ def compute_normal(points):
     
     return normal
 
+# ------------------------------------------------------------------------------------# 
+
+
+import numpy as np
+
+def is_colinear(p1, p2, p3, tol=1e-6):
+    """Check if 3 points are colinear."""
+    v1 = p2 - p1
+    v2 = p3 - p1
+    cross_prod = np.cross(v1, v2)
+    return np.linalg.norm(cross_prod) < tol
+
+def split_and_stick(edge_features_list):
+    new_edges = []
+
+    for i, edge1 in enumerate(edge_features_list):
+        if edge1[-1] != 1:
+            continue
+
+        p11 = np.array(edge1[0:3])
+        p12 = np.array(edge1[3:6])
+
+        for j, edge2 in enumerate(edge_features_list):
+            if j <= i or edge2[-1] != 1:
+                continue
+
+            p21 = np.array(edge2[0:3])
+            p22 = np.array(edge2[3:6])
+
+            shared = None
+            # Find shared point
+            if np.allclose(p11, p21):
+                shared, p_a, p_b = p11, p12, p22
+            elif np.allclose(p11, p22):
+                shared, p_a, p_b = p11, p12, p21
+            elif np.allclose(p12, p21):
+                shared, p_a, p_b = p12, p11, p22
+            elif np.allclose(p12, p22):
+                shared, p_a, p_b = p12, p11, p21
+            else:
+                continue  # no shared point
+
+            if is_colinear(p_a, shared, p_b):
+                new_edge = list(p_a) + list(p_b) + [0, 0, 0, 1]
+                new_edges.append(new_edge)
+
+    return new_edges
 
 
 # ------------------------------------------------------------------------------------# 
@@ -645,7 +692,7 @@ def from_stroke_to_edge(stroke_to_edge, stroke_cloud_loops):
 
     for loop in stroke_cloud_loops:
         chosen_count = sum(stroke_to_edge[idx, 0] == 1 for idx in loop)
-        if chosen_count == len(loop):
+        if chosen_count >= len(loop):
             loop_choices.append([1])
         else:
             loop_choices.append([0])
@@ -920,6 +967,95 @@ def vis_feature_lines_loop_ver(feature_lines, stroke_to_loop, stroke_cloud_loops
 
     # Show the plot
     plt.show()
+
+
+
+
+def vis_feature_lines_loop_all(feature_lines, stroke_cloud_loops):
+    """
+    Visualize 3D strokes, highlighting one loop at a time in red.
+    A separate plot is generated for each loop.
+
+    Parameters:
+    - feature_lines (list): List of stroke dictionaries containing geometry (list of 3D points).
+    - stroke_cloud_loops (list of lists): Each sublist contains stroke indices forming a loop.
+    """
+    # Precompute bounding box across all strokes
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    for stroke in feature_lines:
+        geometry = stroke["geometry"]
+        if len(geometry) < 2:
+            continue
+        for j in range(1, len(geometry)):
+            start, end = geometry[j - 1], geometry[j]
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    # Loop over each loop and create a new plot
+    for loop_idx, stroke_indices in enumerate(stroke_cloud_loops):
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Remove axis labels, ticks, and background
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_zticks([])
+        ax.set_frame_on(False)
+        ax.grid(False)
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_zticklabels([])
+        ax.set_axis_off()
+
+        # Draw all strokes in black
+        for stroke in feature_lines:
+            geometry = stroke["geometry"]
+            if len(geometry) < 2:
+                continue
+            for j in range(1, len(geometry)):
+                start, end = geometry[j - 1], geometry[j]
+                ax.plot([start[0], end[0]],
+                        [start[1], end[1]],
+                        [start[2], end[2]],
+                        color='black',
+                        linewidth=0.5)
+
+        # Highlight current loop in red
+        for stroke_idx in stroke_indices:
+            if stroke_idx >= len(feature_lines):
+                continue
+            geometry = feature_lines[stroke_idx]["geometry"]
+            if len(geometry) < 2:
+                continue
+            for j in range(1, len(geometry)):
+                start, end = geometry[j - 1], geometry[j]
+                ax.plot([start[0], end[0]],
+                        [start[1], end[1]],
+                        [start[2], end[2]],
+                        color='red',
+                        linewidth=1.0)
+
+        # Set limits
+        ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+        ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+        ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+        # Optional: title
+        ax.set_title(f"Loop {loop_idx}", pad=20)
+
+        # Show current plot
+        plt.show()
+
+
 
 
 # ------------------------------------------------------------------------------------# 
