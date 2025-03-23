@@ -127,7 +127,7 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/selected_dataset')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -142,7 +142,9 @@ def train():
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
         if program[-1] != 'sketch':
             continue
-
+        
+        print("program", program)
+        print("program_whole",program_whole)
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
         chosen_strokes = (kth_operation == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
         
@@ -173,9 +175,8 @@ def train():
         gnn_graph.to_device_withPadding(device)
         loop_selection_mask = loop_selection_mask.to(device)
 
-        # Encoders.helper.vis_stroke_with_order(stroke_node_features)
-        # Encoders.helper.vis_brep(output_brep_edges)
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
+        Encoders.helper.vis_brep(output_brep_edges)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
 
         # Prepare the pair
         graphs.append(gnn_graph)

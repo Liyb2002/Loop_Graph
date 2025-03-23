@@ -882,7 +882,7 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, alpha_value=
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
-    perturb_factor = 0.002  # Adjusted perturbation factor for hand-drawn effect
+    perturb_factor = 0.000002  # Adjusted perturbation factor for hand-drawn effect
 
     # Plot all strokes in blue with perturbations
     for idx, stroke in enumerate(stroke_node_features):

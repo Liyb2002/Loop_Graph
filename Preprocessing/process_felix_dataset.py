@@ -70,7 +70,10 @@ class cad2sketch_dataset_loader(Dataset):
         for subfolder_path in tqdm(self.subfolder_paths, desc=f"Cleaning Data",):
             self.process_subfolder( subfolder_path)
 
-
+    # IDEA:
+    # We are in /selected_dataset/1600
+    # Henro's code will create a /canvas folder that put all the .step files and the rotation matrix
+    # process_subfolder() will give a /shape_info folder that stores all the .pkl files
     def process_subfolder(self, subfolder_path):
         """
         Processes an individual subfolder by reading JSON files and extracting relevant data.
@@ -113,6 +116,9 @@ class cad2sketch_dataset_loader(Dataset):
         # ------------------------------------------------------------ #
         # Now start information processing
         stroke_node_features = Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
+        Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
+        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
+
         stroke_operations_order_matrix = None
 
 
@@ -135,9 +141,9 @@ class cad2sketch_dataset_loader(Dataset):
 
         # get the brep generation process
         parent_folder = os.path.dirname(subfolder_path)
-        output_folder_path = os.path.join(parent_folder, 'output', 'canvas')
-        if os.path.exists(output_folder_path) and os.path.isdir(output_folder_path):
-            step_files = [f for f in os.listdir(output_folder_path) if f.endswith('.step')]
+        brep_folder_path = os.path.join(parent_folder, 'canvas')
+        if os.path.exists(brep_folder_path) and os.path.isdir(brep_folder_path):
+            step_files = [f for f in os.listdir(brep_folder_path) if f.endswith('.step')]
             step_files.sort(key=lambda x: int(re.search(r'step_(\d+)\.step', x).group(1)) if re.search(r'step_(\d+)\.step', x) else float('inf'))
 
 
@@ -147,17 +153,16 @@ class cad2sketch_dataset_loader(Dataset):
         final_cylinder_features = []
         new_features = []
 
-        matrix_path = os.path.join(output_folder_path, "matrix.json")
-
+        matrix_path = os.path.join(parent_folder, 'canvas', 'matrix.json')
         with open(matrix_path, 'r') as f:
             rotation_matrix = json.load(f)
 
 
         stroke_operations_order_matrix = np.zeros((stroke_node_features.shape[0], len(step_files)))
-        data_directory = os.path.join(parent_folder, 'output', 'infos')
+        data_directory = os.path.join(parent_folder, 'shape_info')
         file_count = 0
         for idx, step_file in enumerate(step_files):
-            edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(output_folder_path, step_file))
+            edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
             edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
             edge_features_list += Preprocessing.cad2sketch_stroke_features.split_and_stick(edge_features_list)
 
@@ -199,7 +204,7 @@ class cad2sketch_dataset_loader(Dataset):
 
             # 7) Write the data to file
             os.makedirs(os.path.join(data_directory, 'shape_info'), exist_ok=True)
-            output_file_path = os.path.join(data_directory, 'shape_info', f'shape_info_{file_count}.pkl')
+            output_file_path = os.path.join(data_directory, f'shape_info_{file_count}.pkl')
             with open(output_file_path, 'wb') as f:
                 pickle.dump({
                     'stroke_cloud_loops': stroke_cloud_loops, 

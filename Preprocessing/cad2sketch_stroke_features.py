@@ -128,6 +128,10 @@ def build_node_features(geometry):
         return center_ellipse + normal_ellipse+ [alpha_value] + [major_axis, minor_axis, 0, 4]
     
     # Case 2: Circle
+
+    # print("geometry", geometry)
+    # print("center_circle", center_circle)
+    # print("---------------")
     return center_circle + normal_circle +  [alpha_value] + [radius_circle, 0, 0, 2]
 
 
@@ -496,15 +500,16 @@ def fit_circle_3d(points):
     radius_opt = result.x[3]
     final_residuals = residuals(result.x, points, normal)
 
-    # print("points", points[0], points[-1])
+    # print("points", points)
     # print("center_init", center_init)
+    # print("-------")
     # print("center_opt:", center_opt)
     # print("radius_opt", radius_opt)
     # print("normal:", normal)
     # print("np.mean(np.abs(final_residuals))", np.mean(np.abs(final_residuals)))
     # print("-------")
 
-    return list(center_opt), radius_opt, list(normal), np.mean(np.abs(final_residuals))
+    return list(center_init), radius_opt, list(normal), np.mean(np.abs(final_residuals))
 
 
 
@@ -770,6 +775,13 @@ def vis_feature_lines(feature_lines):
 
         if len(geometry) < 2:
             continue  # Ensure there are enough points to plot
+            
+        if len(geometry) > 2:
+            print("-----------")
+            for j in range(0, len(geometry)):
+                pt = geometry[j]
+                print("point", pt)
+
 
         # Plot each segment of the stroke
         for j in range(1, len(geometry)):
@@ -1056,6 +1068,156 @@ def vis_feature_lines_loop_all(feature_lines, stroke_cloud_loops):
         plt.show()
 
 
+
+
+def vis_stroke_node_features(stroke_node_features):
+    # Initialize the 3D plot
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+    ax.axis('off')  # Turn off axis background and borders
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    perturb_factor = 0.000002  # Adjusted perturbation factor for hand-drawn effect
+
+    # Plot all strokes in blue with perturbations
+    for idx, stroke in enumerate(stroke_node_features):
+        start, end = stroke[:3], stroke[3:6]
+        
+        # Ignore invalid strokes marked with specific values        
+        color = 'black'
+
+        # Update min and max limits based on strokes (ignoring circles)
+        if stroke[-1] == 1:
+            # straight line
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+        
+        if stroke[-1] == 2:
+            # Circle face
+            x_values, y_values, z_values = plot_circle(stroke)
+            ax.plot(x_values, y_values, z_values, color='red', alpha=1)
+            continue
+
+        if stroke[-1] ==3:
+            # Arc
+            x_values, y_values, z_values = plot_arc(stroke)
+            ax.plot(x_values, y_values, z_values, color=color, alpha=1)
+            continue
+
+        else:
+            # Hand-drawn effect for regular stroke line
+            x_values = np.array([start[0], end[0]])
+            y_values = np.array([start[1], end[1]])
+            z_values = np.array([start[2], end[2]])
+            
+            # Add perturbations for hand-drawn effect
+            perturbations = np.random.normal(0, perturb_factor, (10, 3))
+            t = np.linspace(0, 1, 10)
+            x_interpolated = np.linspace(x_values[0], x_values[1], 10) + perturbations[:, 0]
+            y_interpolated = np.linspace(y_values[0], y_values[1], 10) + perturbations[:, 1]
+            z_interpolated = np.linspace(z_values[0], z_values[1], 10) + perturbations[:, 2]
+
+            # Smooth curve with cubic splines
+            cs_x = CubicSpline(t, x_interpolated)
+            cs_y = CubicSpline(t, y_interpolated)
+            cs_z = CubicSpline(t, z_interpolated)
+            smooth_t = np.linspace(0, 1, 100)
+            smooth_x = cs_x(smooth_t)
+            smooth_y = cs_y(smooth_t)
+            smooth_z = cs_z(smooth_t)
+
+            # Plot perturbed line
+            ax.plot(smooth_x, smooth_y, smooth_z, color=color, alpha=1, linewidth=0.5)
+
+
+    # Compute the center and rescale
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Remove axis ticks and labels
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+
+    # Show plot
+    plt.show()
+
+
+
+
+
+def plot_circle(stroke):
+    center = stroke[:3]
+    normal = stroke[3:6]
+    radius = stroke[7]
+
+    # Generate circle points in the XY plane
+    theta = np.linspace(0, 2 * np.pi, 30)  # Less dense with 30 points
+    x_values = radius * np.cos(theta)
+    y_values = radius * np.sin(theta)
+    z_values = np.zeros_like(theta)
+
+    # Combine the coordinates into a matrix (3, 30)
+    circle_points = np.array([x_values, y_values, z_values])
+
+    # Normalize the normal vector
+    normal = normal / np.linalg.norm(normal)
+
+    # Rotation logic using Rodrigues' formula
+    z_axis = np.array([0, 0, 1])  # Z-axis is the default normal for the circle
+
+    rotation_axis = np.cross(z_axis, normal)
+    if np.linalg.norm(rotation_axis) > 0:  # Check if rotation is needed
+        rotation_axis /= np.linalg.norm(rotation_axis)
+        angle = np.arccos(np.clip(np.dot(z_axis, normal), -1.0, 1.0))
+
+        # Create the rotation matrix using the rotation axis and angle (Rodrigues' rotation formula)
+        K = np.array([[0, -rotation_axis[2], rotation_axis[1]],
+                        [rotation_axis[2], 0, -rotation_axis[0]],
+                        [-rotation_axis[1], rotation_axis[0], 0]])
+
+        R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * np.dot(K, K)
+
+        # Rotate the circle points
+        rotated_circle_points = np.dot(R, circle_points)
+    else:
+        rotated_circle_points = circle_points
+
+    # Translate the circle to the center point
+    x_values = rotated_circle_points[0] + center[0]
+    y_values = rotated_circle_points[1] + center[1]
+    z_values = rotated_circle_points[2] + center[2]
+
+
+    return x_values, y_values, z_values
+
+
+
+def plot_arc(stroke):
+    import numpy as np
+
+    # Extract start and end points from the stroke
+    start_point = np.array(stroke[:3])
+    end_point = np.array(stroke[3:6])
+
+    # Generate a straight line with 100 points between start_point and end_point
+    t = np.linspace(0, 1, 100)  # Parameter for interpolation
+    line_points = (1 - t)[:, None] * start_point + t[:, None] * end_point
+
+    # Return x, y, z coordinates of the line points
+    return line_points[:, 0], line_points[:, 1], line_points[:, 2]
 
 
 # ------------------------------------------------------------------------------------# 
