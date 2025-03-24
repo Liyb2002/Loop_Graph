@@ -84,7 +84,7 @@ def build_node_features(geometry):
 
     if residual < threshold:
         point1 = geometry[0]
-        point2 = geometry[1]
+        point2 = geometry[-1]
 
         return point1 + point2 + [alpha_value] + [0, 0, 0, 1]
 
@@ -1089,8 +1089,6 @@ def vis_stroke_node_features(stroke_node_features):
     for idx, stroke in enumerate(stroke_node_features):
         start, end = stroke[:3], stroke[3:6]
         
-        # Ignore invalid strokes marked with specific values        
-        color = 'black'
 
         # Update min and max limits based on strokes (ignoring circles)
         if stroke[-1] == 1:
@@ -1102,13 +1100,13 @@ def vis_stroke_node_features(stroke_node_features):
         if stroke[-1] == 2:
             # Circle face
             x_values, y_values, z_values = plot_circle(stroke)
-            ax.plot(x_values, y_values, z_values, color='red', alpha=1)
+            ax.plot(x_values, y_values, z_values, color='red', alpha=1, linewidth=0.5)
             continue
 
         if stroke[-1] ==3:
             # Arc
             x_values, y_values, z_values = plot_arc(stroke)
-            ax.plot(x_values, y_values, z_values, color=color, alpha=1)
+            ax.plot(x_values, y_values, z_values, color='blue', alpha=1, linewidth=0.5)
             continue
 
         else:
@@ -1134,7 +1132,7 @@ def vis_stroke_node_features(stroke_node_features):
             smooth_z = cs_z(smooth_t)
 
             # Plot perturbed line
-            ax.plot(smooth_x, smooth_y, smooth_z, color=color, alpha=1, linewidth=0.5)
+            ax.plot(smooth_x, smooth_y, smooth_z, color='black', alpha=1, linewidth=0.5)
 
 
     # Compute the center and rescale
