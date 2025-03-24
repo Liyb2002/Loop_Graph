@@ -116,8 +116,7 @@ class cad2sketch_dataset_loader(Dataset):
         # ------------------------------------------------------------ #
         # Now start information processing
         stroke_node_features = Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
-        Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
-        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
+        # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
 
         stroke_operations_order_matrix = None
 
@@ -190,7 +189,7 @@ class cad2sketch_dataset_loader(Dataset):
             # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_to_edge)
 
             stroke_to_loop = Preprocessing.cad2sketch_stroke_features.from_stroke_to_edge(stroke_to_edge, stroke_cloud_loops)
-            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_ver(all_lines, stroke_to_loop, stroke_cloud_loops)
+            Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_ver(all_lines, stroke_to_loop, stroke_cloud_loops)
             # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_cloud_loops)
 
             # 6) We need to build the stroke_operations_order_matrix

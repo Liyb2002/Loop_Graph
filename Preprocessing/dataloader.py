@@ -52,7 +52,7 @@ class Program_Graph_Dataset(Dataset):
         program = program_whole[:int(index)+2]
 
         # 2) Load basic shape data
-        base_shape_file_path = os.path.join(self.data_path, data_dir, 'shape_info', 'shape_info_0.pkl')
+        base_shape_file_path = os.path.join(self.data_path, data_dir, 'shape_info', f'shape_info_{len(program_whole) - 2}.pkl')
         with open(base_shape_file_path, 'rb') as f:
             base_shape_data = pickle.load(f)
 
