@@ -150,7 +150,8 @@ def train():
 
         loop_chosen_mask = []
         for loop in stroke_cloud_loops:
-            if all(stroke in chosen_strokes for stroke in loop):
+            chosen_count = sum(1 for stroke in loop if stroke in chosen_strokes)
+            if chosen_count == len(loop) or chosen_count == len(loop) - 1:
                 loop_chosen_mask.append(1)  # Loop is chosen
             else:
                 loop_chosen_mask.append(0)  # Loop is not chosen
@@ -176,7 +177,7 @@ def train():
         loop_selection_mask = loop_selection_mask.to(device)
 
         # Encoders.helper.vis_brep(output_brep_edges)
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
 
         # Prepare the pair
         graphs.append(gnn_graph)

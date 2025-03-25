@@ -1355,8 +1355,7 @@ def split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix):
                 # Add feature stroke
                 new_line = list(new_line) + [0] + [0, 0, 0, 1]
                 add_feature_lines.append(new_line)
-
-    print('add_feature_lines', len(add_feature_lines))
+        
     updated_strokes = np.concatenate([stroke_node_features, np.array(add_feature_lines)], axis=0) \
         if add_feature_lines else stroke_node_features
 
