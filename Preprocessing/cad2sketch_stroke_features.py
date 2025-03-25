@@ -19,21 +19,30 @@ import os
 
 
 
+
 def build_final_edges_json(final_edges_json):
     node_features_list = []
 
-    for key in final_edges_json.keys():
+    num_edges = len(final_edges_json)
+    is_feature_line_matrix = np.zeros((num_edges, 1))
+
+    for i, key in enumerate(final_edges_json.keys()):
         stroke = final_edges_json[key]
 
         geometry = stroke["geometry"]
 
         node_feature = build_node_features(geometry)
-
         node_features_list.append(node_feature)
+
+        stroke_type = stroke['type']
+        if stroke_type in ['feature_line', 'extrude_line', 'fillet_line']:
+            is_feature_line_matrix[i] = 1
+        else:
+            is_feature_line_matrix[i] = 0
 
     node_features_matrix = np.array(node_features_list)
 
-    return node_features_matrix
+    return node_features_matrix, is_feature_line_matrix
 
 
 
@@ -777,10 +786,8 @@ def vis_feature_lines(feature_lines):
             continue  # Ensure there are enough points to plot
             
         if len(geometry) > 2:
-            print("-----------")
             for j in range(0, len(geometry)):
                 pt = geometry[j]
-                print("point", pt)
 
 
         # Plot each segment of the stroke
@@ -1272,6 +1279,88 @@ def extract_only_construction_lines(final_edges_data):
 
     return feature_lines
 
+
+
+def point_on_line(p, a, b, tol=1e-6):
+    """
+    Check if point p lies on line defined by a and b.
+    """
+    a, b, p = np.array(a), np.array(b), np.array(p)
+    ab = b - a
+    ap = p - a
+    cross = np.cross(ab, ap)
+    if np.linalg.norm(cross) > tol:
+        return False
+    dot = np.dot(ap, ab)
+    if dot < 0:
+        return False
+    if dot > np.dot(ab, ab):
+        return False
+    return True
+
+def split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix):
+    stroke_node_features = np.array(stroke_node_features)
+    add_feature_lines = []
+
+    # Step 1: Gather unique points from feature lines
+    unique_points = set()
+    for i, stroke in enumerate(stroke_node_features):
+        if stroke[-1] == 1 and is_feature_line_matrix[i]:
+            point_1 = tuple(np.round(stroke[:3], 4))
+            point_2 = tuple(np.round(stroke[3:6], 4))
+            unique_points.add(point_1)
+            unique_points.add(point_2)
+
+    unique_points = list(unique_points)
+
+    # Step 2: Find sets of collinear points
+    collinear_sets = []
+
+    for i, stroke in enumerate(stroke_node_features):
+        if stroke[-1] != 1 or not is_feature_line_matrix[i]:
+            continue
+        p1 = tuple(np.round(stroke[:3], 4))
+        p2 = tuple(np.round(stroke[3:6], 4))
+        points_on_line = set([p1, p2])
+
+        for p in unique_points:
+            if p != p1 and p != p2 and point_on_line(p, p1, p2):
+                points_on_line.add(p)
+
+        if len(points_on_line) > 2:
+            points_on_line = tuple(sorted(points_on_line))
+            if points_on_line not in collinear_sets:
+                collinear_sets.append(points_on_line)
+
+    # Step 3: From each collinear set, generate all segments (in order of distance)
+    for col_set in collinear_sets:
+        col_set_np = np.array(col_set)
+        # Sort by distance along the first axis
+        anchor = col_set_np[0]
+        sorted_points = sorted(col_set_np, key=lambda x: np.linalg.norm(x - anchor))
+        for i in range(len(sorted_points) - 1):
+            pt1 = sorted_points[i]
+            pt2 = sorted_points[i + 1]
+            new_line = np.concatenate([pt1, pt2])
+            # Check if line already exists
+            exists = False
+            for stroke in stroke_node_features:
+                s = np.round(stroke[:3], 4)
+                e = np.round(stroke[3:6], 4)
+                if (np.allclose(s, pt1) and np.allclose(e, pt2)) or \
+                   (np.allclose(s, pt2) and np.allclose(e, pt1)):
+                    exists = True
+                    break
+            if not exists:
+                # Add feature stroke
+                new_line = list(new_line) + [0] + [0, 0, 0, 1]
+                add_feature_lines.append(new_line)
+
+    print('add_feature_lines', len(add_feature_lines))
+    updated_strokes = np.concatenate([stroke_node_features, np.array(add_feature_lines)], axis=0) \
+        if add_feature_lines else stroke_node_features
+
+    return updated_strokes
 
 # ------------------------------------------------------------------------------------# 
 def extract_input_json(final_edges_data, strokes_dict_data, subfolder_path):

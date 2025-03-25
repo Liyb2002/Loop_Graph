@@ -99,7 +99,7 @@ class cad2sketch_dataset_loader(Dataset):
         # Do some vis
         # Load and visualize only feature lines version
         final_edges_data = self.read_json(final_edges_file_path)
-        feature_lines = Preprocessing.cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
+        # feature_lines = Preprocessing.cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(feature_lines)
 
 
@@ -109,13 +109,14 @@ class cad2sketch_dataset_loader(Dataset):
 
 
         # Load and visualize only construction lines (construction lines)
-        construction_lines = Preprocessing.cad2sketch_stroke_features.extract_only_construction_lines(final_edges_data)
+        # construction_lines = Preprocessing.cad2sketch_stroke_features.extract_only_construction_lines(final_edges_data)
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(construction_lines)
 
 
         # ------------------------------------------------------------ #
         # Now start information processing
-        stroke_node_features = Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
+        stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
+        stroke_node_features = Preprocessing.cad2sketch_stroke_features.split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix)
         # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
 
         stroke_operations_order_matrix = None
