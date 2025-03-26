@@ -995,7 +995,7 @@ def stroke_relations(stroke_node_features, connected_stroke_nodes):
     # All relations related to a circle is perpendicular
     for i in range(num_strokes):
         # Is circle
-        if stroke_node_features[i, 7] != 0:
+        if stroke_node_features[i, -1] == 2:
 
             for j in range(num_strokes):
                 if connected_stroke_nodes[i, j] == 1:
@@ -1181,7 +1181,7 @@ def connected_strokes(stroke_node_features):
     for i in range(num_strokes):
 
         # Is circle
-        if stroke_node_features[i, 7] != 0:
+        if stroke_node_features[i, -1] == 2:
             center = stroke_node_features[i, :3]
             radius = stroke_node_features[i, 7]
 
@@ -1189,7 +1189,9 @@ def connected_strokes(stroke_node_features):
                 stroke_j_start = stroke_node_features[j, :3]  
                 stroke_j_end = stroke_node_features[j, 3:6]
 
-                if dist(center, stroke_j_start) == radius or dist(center, stroke_j_end) == radius:
+
+                if math.isclose(dist(center, stroke_j_start), abs(radius), rel_tol=1e-5) or \
+                    math.isclose(dist(center, stroke_j_end), abs(radius), rel_tol=1e-5):
                     connected[i, j] = 1
                     connected[j, i] = 1  
 

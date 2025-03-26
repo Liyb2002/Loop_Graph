@@ -109,7 +109,7 @@ def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, padded_size
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/selected_dataset')
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0
@@ -131,8 +131,8 @@ def train():
         sketch_operation_mask = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-2)
         sketch_stroke_idx = (sketch_operation_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
 
-        if len(sketch_stroke_idx) == 1:
-            extrude_selection_mask = Encoders.helper.choose_extrude_strokes_from_circle(kth_operation, stroke_node_features)
+        if len(sketch_stroke_idx) <4 :
+            extrude_selection_mask = kth_operation
         else:
             extrude_selection_mask = Encoders.helper.choose_extrude_strokes(kth_operation, sketch_operation_mask, stroke_node_features)
 
@@ -321,7 +321,7 @@ def eval():
         sketch_operation_mask = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-2)
         sketch_stroke_idx = (sketch_operation_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
 
-        if len(sketch_stroke_idx) == 1:
+        if len(sketch_stroke_idx) < 4:
             extrude_selection_mask = Encoders.helper.choose_extrude_strokes_from_circle(kth_operation, stroke_node_features)
         else:
             extrude_selection_mask = Encoders.helper.choose_extrude_strokes(kth_operation, sketch_operation_mask, stroke_node_features)

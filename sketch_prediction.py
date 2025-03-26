@@ -177,7 +177,7 @@ def train():
         loop_selection_mask = loop_selection_mask.to(device)
 
         # Encoders.helper.vis_brep(output_brep_edges)
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
 
         # Prepare the pair
         graphs.append(gnn_graph)
