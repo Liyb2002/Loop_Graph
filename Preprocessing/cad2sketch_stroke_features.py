@@ -1870,3 +1870,5 @@ def assign_point_meanings(construction_lines, feature_lines, subfolder_path):
     # Save to file
     with open(json_path, "w") as f:
         json.dump(labeled_data, f, indent=4)
+
+    

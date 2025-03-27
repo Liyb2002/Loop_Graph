@@ -117,6 +117,7 @@ class cad2sketch_dataset_loader(Dataset):
         # Now start information processing
         stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
         stroke_node_features, added_feature_lines= Preprocessing.cad2sketch_stroke_features.split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix)
+        stroke_node_features = np.unique(stroke_node_features, axis=0)
         # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_highlights(stroke_node_features, added_feature_lines)
 
         stroke_operations_order_matrix = None

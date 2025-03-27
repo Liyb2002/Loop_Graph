@@ -131,7 +131,7 @@ def train():
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
-    epochs = 10
+    epochs = 500
     
     graphs = []
     loop_selection_masks = []
@@ -155,10 +155,20 @@ def train():
             else:
                 loop_chosen_mask.append(0)  # Loop is not chosen
         
-        loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
-        if not (loop_selection_mask == 1).any():
-            continue
         
+        loop_chosen_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).flatten()
+        
+        # Find the indices where the value is 1
+        ones_indices = (loop_chosen_mask == 1).nonzero(as_tuple=True)[0]
+        
+        if len(ones_indices) > 1:
+            # Set all to 0
+            loop_chosen_mask[ones_indices] = 0
+            # Set only the first occurrence to 1
+            loop_chosen_mask[ones_indices[0]] = 1
+
+        # Reshape to (-1, 1) as in the original
+        loop_selection_mask = loop_chosen_mask.reshape(-1, 1)
 
         # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
@@ -176,7 +186,8 @@ def train():
         loop_selection_mask = loop_selection_mask.to(device)
 
         # Encoders.helper.vis_brep(output_brep_edges)
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
+        # Encoders.helper. vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), stroke_cloud_loops)
 
         # Prepare the pair
         graphs.append(gnn_graph)
@@ -268,7 +279,7 @@ def train():
                 loss = criterion(valid_output, valid_batch_masks)
 
                 correct += compute_accuracy(valid_output, valid_batch_masks)
-                train_total += valid_batch_masks.shape[0] / 400
+                total += valid_batch_masks.shape[0] / 400
 
         
         val_loss /= len(val_graphs)
