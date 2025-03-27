@@ -80,7 +80,6 @@ def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
         predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
         gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
 
-        print("")
         total += 1
         if torch.all(condition_1 | condition_2):
             correct += 1
@@ -100,10 +99,10 @@ def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/selected_dataset')
     print(f"Total number of shape data: {len(dataset)}")
 
-    epochs = 30
+    epochs = 300
 
     graphs = []
     stroke_selection_masks = []
@@ -140,7 +139,7 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -148,8 +147,10 @@ def train():
 
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
-    train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
-    train_masks, val_masks = stroke_selection_masks[:split_index], stroke_selection_masks[split_index:]
+    # train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
+    # train_masks, val_masks = stroke_selection_masks[:split_index], stroke_selection_masks[split_index:]
+    train_graphs, val_graphs = graphs[:], graphs[:]
+    train_masks, val_masks = stroke_selection_masks[:], stroke_selection_masks[:]
 
     # Convert train and validation graphs to HeteroData
     hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]
@@ -210,7 +211,7 @@ def train():
 
             # Accuracy computation using the preferred method (only on valid values)
             correct += compute_accuracy(valid_output, valid_batch_masks)
-            total += batch_size 
+            total += valid_batch_masks.shape[0] / 400 
 
         train_accuracy = correct / total
         print(f"Epoch {epoch+1}/{epochs}, Training Loss: {train_loss / total_iterations:.5f}, Training Accuracy: {train_accuracy:.4f}")
@@ -251,7 +252,7 @@ def train():
 
                 # Accuracy computation using the preferred method (only on valid values)
                 correct += compute_accuracy(valid_output, valid_batch_masks)
-                total += batch_size
+                total += valid_batch_masks.shape[0] / 400
 
         val_accuracy = correct / total
         print(f"Validation Loss: {val_loss / total_iterations_val:.5f}, Validation Accuracy: {val_accuracy:.4f}")
