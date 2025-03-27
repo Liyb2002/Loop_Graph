@@ -131,7 +131,7 @@ def train():
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
-    epochs = 30
+    epochs = 10
     
     graphs = []
     loop_selection_masks = []
@@ -177,7 +177,8 @@ def train():
         loop_selection_mask = loop_selection_mask.to(device)
 
         # Encoders.helper.vis_brep(output_brep_edges)
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
+        print("loop_selection_mask", loop_selection_mask)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
 
         # Prepare the pair
         graphs.append(gnn_graph)
@@ -187,8 +188,10 @@ def train():
     print(f"Total number of preprocessed graphs: {len(graphs)}")
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
-    train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
-    train_masks, val_masks = loop_selection_masks[:split_index], loop_selection_masks[split_index:]
+    # train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
+    # train_masks, val_masks = loop_selection_masks[:split_index], loop_selection_masks[split_index:]
+    train_graphs, val_graphs = graphs[:], graphs[:]
+    train_masks, val_masks = loop_selection_masks[:], loop_selection_masks[:]
 
 
     # Convert train and validation graphs to HeteroData
@@ -208,7 +211,7 @@ def train():
 
 
     # Training loop
-    for epoch in range(0):
+    for epoch in range(epochs):
         train_loss = 0.0
         graph_encoder.train()
         graph_decoder.train()
@@ -234,7 +237,7 @@ def train():
             loss = criterion(valid_output, valid_batch_masks)
 
             train_correct += compute_accuracy(valid_output, valid_batch_masks)
-            train_total += 16
+            train_total += valid_batch_masks.shape[0] / 400
 
 
             loss.backward()
@@ -267,7 +270,7 @@ def train():
                 loss = criterion(valid_output, valid_batch_masks)
 
                 correct += compute_accuracy(valid_output, valid_batch_masks)
-                total += 16
+                train_total += valid_batch_masks.shape[0] / 400
 
         
         val_loss /= len(val_graphs)

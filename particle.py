@@ -135,15 +135,6 @@ class Particle():
 
 
     def program_terminated(self, gnn_graph):
-
-        # if self.predicted_feature_strokes is None:
-        #     return False
-        
-        # termination_prob, untouched_feature_idx= whole_process_helper.helper.sample_program_termination(gnn_graph['stroke'].x.cpu().numpy(), self.predicted_feature_strokes)
-        # # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), [])
-
-        # if random.random() < termination_prob or len(self.past_programs) > 20: 
-        #     return True
         
         if (len(self.gt_program) == len(self.past_programs)):
             stroke_features_file = os.path.join(self.cur_output_dir, 'stroke_cloud_features.json')
@@ -217,8 +208,8 @@ class Particle():
             )
 
 
-            # Encoders.helper.vis_brep(self.brep_edges)
-            # Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
+            Encoders.helper.vis_brep(self.brep_edges)
+            Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
             # Encoders.helper.vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), self.stroke_cloud_loops)
             
             if self.past_programs[-1] != 2:
@@ -443,7 +434,7 @@ def predict_sketch(gnn_graph):
     selected_loop_idx, idx_prob = whole_process_helper.helper.find_valid_sketch(gnn_graph, sketch_selection_mask)
     sketch_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
 
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx)
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx)
 
     return selected_loop_idx, sketch_selection_mask, idx_prob
 
@@ -473,7 +464,7 @@ def predict_extrude(gnn_graph, sketch_selection_mask):
     
     extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
     # _, extrude_stroke_idx = torch.max(extrude_selection_mask, dim=0)
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
     return extrude_selection_mask
 
 def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges):
@@ -505,7 +496,7 @@ def predict_fillet(gnn_graph):
     # _, fillet_stroke_idx = torch.max(fillet_selection_mask, dim=0)
 
     # print("gnn_graph['stroke'].x", gnn_graph['stroke'].x.shape)
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
     return fillet_selection_mask
 
 

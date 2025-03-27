@@ -33,7 +33,7 @@ import copy
 import re
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/selected_dataset', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 
@@ -89,8 +89,10 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     
 
     gt_brep_dir = os.path.join(data_path[0], 'canvas')
+    print("gt_brep_dir", gt_brep_dir)
     brep_files = [file_name for file_name in os.listdir(gt_brep_dir)
-            if file_name.startswith('brep_') and file_name.endswith('.step')]
+                if file_name.endswith('.step')]
+    print("brep_files", brep_files)
     brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
     gt_brep_file_path = os.path.join(gt_brep_dir, brep_files[-1])
 
@@ -99,7 +101,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     base_particle = particle.Particle(gt_brep_file_path, data_produced, stroke_node_features.squeeze(0).cpu().numpy())
     base_particle.set_gt_program(program)
     particle_list = []
-    for particle_id in range (50):
+    for particle_id in range (1):
         new_particle = copy.deepcopy(base_particle)
         new_particle.set_particle_id(particle_id, cur_output_dir)
         particle_list.append(new_particle)

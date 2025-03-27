@@ -1162,6 +1162,148 @@ def vis_stroke_node_features(stroke_node_features):
 
 
 
+def vis_stroke_node_features_and_highlights(stroke_node_features, added_feature_lines):
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+    ax.axis('off')  # Turn off axis background and borders
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    perturb_factor = 0.000002  # Adjusted perturbation factor for hand-drawn effect
+
+    # Plot all strokes in blue with perturbations
+    for idx, stroke in enumerate(stroke_node_features):
+        start, end = stroke[:3], stroke[3:6]
+
+        # Update min and max limits based on strokes (ignoring circles)
+        if stroke[-1] == 1:
+            # straight line
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+        if stroke[-1] == 2:
+            # Circle face
+            x_values, y_values, z_values = plot_circle(stroke)
+            ax.plot(x_values, y_values, z_values, color='black', alpha=1, linewidth=0.5)
+            continue
+
+        if stroke[-1] == 3:
+            # Arc
+            x_values, y_values, z_values = plot_arc(stroke)
+            ax.plot(x_values, y_values, z_values, color='black', alpha=1, linewidth=0.5)
+            continue
+
+        else:
+            # Hand-drawn effect for regular stroke line
+            x_values = np.array([start[0], end[0]])
+            y_values = np.array([start[1], end[1]])
+            z_values = np.array([start[2], end[2]])
+
+            # Add perturbations for hand-drawn effect
+            perturbations = np.random.normal(0, perturb_factor, (10, 3))
+            t = np.linspace(0, 1, 10)
+            x_interpolated = np.linspace(x_values[0], x_values[1], 10) + perturbations[:, 0]
+            y_interpolated = np.linspace(y_values[0], y_values[1], 10) + perturbations[:, 1]
+            z_interpolated = np.linspace(z_values[0], z_values[1], 10) + perturbations[:, 2]
+
+            # Smooth curve with cubic splines
+            cs_x = CubicSpline(t, x_interpolated)
+            cs_y = CubicSpline(t, y_interpolated)
+            cs_z = CubicSpline(t, z_interpolated)
+            smooth_t = np.linspace(0, 1, 100)
+            smooth_x = cs_x(smooth_t)
+            smooth_y = cs_y(smooth_t)
+            smooth_z = cs_z(smooth_t)
+
+            # Plot perturbed line
+            ax.plot(smooth_x, smooth_y, smooth_z, color='black', alpha=1, linewidth=0.5)
+
+    # Plot added feature lines in red
+    for line in added_feature_lines:
+        start, end = line[:3], line[3:6]
+        ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]],
+                color='red', linewidth=1.0, alpha=1)
+
+    # Compute the center and rescale
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Remove axis ticks and labels
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+
+    # Show plot
+    plt.show()
+
+
+
+def vis_points(unique_points):
+    """
+    Visualize only the 3D points in space without axes, background, or automatic zooming.
+
+    Parameters:
+    - unique_points (list or set): Collection of 3D points (tuples or lists).
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Remove axis labels, ticks, and background
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.set_frame_on(False)
+    ax.grid(False)
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_zticklabels([])
+    ax.set_axis_off()  # Hides the axis completely
+
+    # Initialize bounding box variables
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Extract coordinates
+    for pt in unique_points:
+        x, y, z = pt[0], pt[1], pt[2]
+
+        # Update bounding box
+        x_min, x_max = min(x_min, x), max(x_max, x)
+        y_min, y_max = min(y_min, y), max(y_max, y)
+        z_min, z_max = min(z_min, z), max(z_max, z)
+
+        # Plot the point
+        ax.scatter(x, y, z, color='black', s=4)
+
+    # Compute the center and rescale
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Show the plot
+    plt.show()
+ 
 
 def plot_circle(stroke):
     center = stroke[:3]
@@ -1273,7 +1415,7 @@ def extract_only_construction_lines(final_edges_data):
 
     for key, stroke in final_edges_data.items():
         stroke_type = stroke['type']
-
+        
         if stroke_type != 'feature_line' and stroke_type != 'extrude_line' and stroke_type != 'fillet_line':
             feature_lines.append(stroke)
 
@@ -1281,22 +1423,16 @@ def extract_only_construction_lines(final_edges_data):
 
 
 
-def point_on_line(p, a, b, tol=1e-6):
+def point_on_line_extension(p, a, b, tol=1e-7):
     """
-    Check if point p lies on line defined by a and b.
+    Check if point p lies on the infinite line defined by points a and b.
     """
     a, b, p = np.array(a), np.array(b), np.array(p)
     ab = b - a
     ap = p - a
     cross = np.cross(ab, ap)
-    if np.linalg.norm(cross) > tol:
-        return False
-    dot = np.dot(ap, ab)
-    if dot < 0:
-        return False
-    if dot > np.dot(ab, ab):
-        return False
-    return True
+    return np.linalg.norm(cross) < tol
+
 
 def split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix):
     stroke_node_features = np.array(stroke_node_features)
@@ -1313,24 +1449,42 @@ def split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix):
 
     unique_points = list(unique_points)
 
-    # Step 2: Find sets of collinear points
-    collinear_sets = []
+
+    # Step 2.1: Find sets of collinear points
+    collinear_candidate_sets = []
 
     for i, stroke in enumerate(stroke_node_features):
         if stroke[-1] != 1 or not is_feature_line_matrix[i]:
             continue
-        p1 = tuple(np.round(stroke[:3], 4))
-        p2 = tuple(np.round(stroke[3:6], 4))
-        points_on_line = set([p1, p2])
+        p1 = tuple(np.round(stroke[:3], 5))
+        p2 = tuple(np.round(stroke[3:6], 5))
+        collinear_candidate_sets.append(set([p1, p2]))
 
-        for p in unique_points:
-            if p != p1 and p != p2 and point_on_line(p, p1, p2):
-                points_on_line.add(p)
+    # Step 2.2: Enrich each set with all other points that lie on the same line
+    for point in unique_points:
+        for s in collinear_candidate_sets:
+            s_list = list(s)
+            if len(s_list) >= 2:
+                p1, p2 = s_list[0], s_list[1]
+                if point != p1 and point != p2 and point_on_line_extension(point, p1, p2):
+                    s.add(point)
 
-        if len(points_on_line) > 2:
-            points_on_line = tuple(sorted(points_on_line))
-            if points_on_line not in collinear_sets:
-                collinear_sets.append(points_on_line)
+    # Step 2.3: Sort and deduplicate sets
+    normalized_sets = []
+    seen_sets = set()
+
+    for s in collinear_candidate_sets:
+        if len(s) > 2:
+            sorted_tuple = tuple(sorted(s))
+            if sorted_tuple not in seen_sets:
+                seen_sets.add(sorted_tuple)
+                normalized_sets.append(sorted_tuple)
+
+    # Step 2.4: Final result
+    collinear_sets = normalized_sets
+
+    # for c_set in collinear_candidate_sets:
+    #     print("set", c_set)
 
     # Step 3: From each collinear set, generate all segments (in order of distance)
     for col_set in collinear_sets:
@@ -1359,7 +1513,7 @@ def split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix):
     updated_strokes = np.concatenate([stroke_node_features, np.array(add_feature_lines)], axis=0) \
         if add_feature_lines else stroke_node_features
 
-    return updated_strokes
+    return updated_strokes, np.array(add_feature_lines)
 
 # ------------------------------------------------------------------------------------# 
 def extract_input_json(final_edges_data, strokes_dict_data, subfolder_path):
