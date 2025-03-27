@@ -136,7 +136,6 @@ def create_face_node_gnn(face):
 
         height_vector = gp_Vec(point_start, point_end)
         height = height_vector.Magnitude()
-        print("height", height)
         cylinder_data = axis_location + axis_direction + [height, radius] + [0, 3]
         circle_features.append(cylinder_data)
 

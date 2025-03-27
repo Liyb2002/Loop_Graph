@@ -147,7 +147,6 @@ def train():
 
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
         chosen_strokes = (kth_operation == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-
         loop_chosen_mask = []
         for loop in stroke_cloud_loops:
             chosen_count = sum(1 for stroke in loop if stroke in chosen_strokes)

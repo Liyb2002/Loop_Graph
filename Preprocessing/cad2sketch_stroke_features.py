@@ -5,6 +5,7 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.interpolate import splprep, splev, CubicSpline
 
+from itertools import combinations
 
 from itertools import product
 
@@ -395,9 +396,9 @@ def find_new_features_simple(prev_brep_edges, new_edge_features):
                 break
             
             # 2) Check if the new edge *contains* this previous edge
-            if is_line_contained(prev_brep_line, new_edge_line):
-                is_unique = False
-                break
+            # if is_line_contained(prev_brep_line, new_edge_line):
+            #     is_unique = False
+            #     break
         
         # After comparing with all prev edges:
         if is_unique:
@@ -664,42 +665,6 @@ def is_colinear(p1, p2, p3, tol=1e-6):
     v2 = p3 - p1
     cross_prod = np.cross(v1, v2)
     return np.linalg.norm(cross_prod) < tol
-
-def split_and_stick(edge_features_list):
-    new_edges = []
-
-    for i, edge1 in enumerate(edge_features_list):
-        if edge1[-1] != 1:
-            continue
-
-        p11 = np.array(edge1[0:3])
-        p12 = np.array(edge1[3:6])
-
-        for j, edge2 in enumerate(edge_features_list):
-            if j <= i or edge2[-1] != 1:
-                continue
-
-            p21 = np.array(edge2[0:3])
-            p22 = np.array(edge2[3:6])
-
-            shared = None
-            # Find shared point
-            if np.allclose(p11, p21):
-                shared, p_a, p_b = p11, p12, p22
-            elif np.allclose(p11, p22):
-                shared, p_a, p_b = p11, p12, p21
-            elif np.allclose(p12, p21):
-                shared, p_a, p_b = p12, p11, p22
-            elif np.allclose(p12, p22):
-                shared, p_a, p_b = p12, p11, p21
-            else:
-                continue  # no shared point
-
-            if is_colinear(p_a, shared, p_b):
-                new_edge = list(p_a) + list(p_b) + [0, 0, 0, 1]
-                new_edges.append(new_edge)
-
-    return new_edges
 
 
 # ------------------------------------------------------------------------------------# 
@@ -1023,7 +988,6 @@ def vis_feature_lines_loop_all(feature_lines, stroke_cloud_loops):
 
     # Loop over each loop and create a new plot
     for loop_idx, stroke_indices in enumerate(stroke_cloud_loops):
-        print("stroke_indices", stroke_indices)
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
 
@@ -1345,11 +1309,9 @@ def vis_brep(brep):
     # Circle Feature: 2
     # Cylinder Face Feature: 3
     # Arc Feature: 4
-    print("---")
     for stroke in brep:
         
         if stroke[-1] == 3:
-            print("stroke", stroke)
 
             # Cylinder face
             center = stroke[:3]
@@ -1661,6 +1623,79 @@ def split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix):
         if add_feature_lines else stroke_node_features
 
     return updated_strokes, np.array(add_feature_lines)
+
+
+
+def split_and_merge_brep(edge_features_list):
+    add_feature_lines = []
+
+    # Step 1: Gather unique points from feature lines
+    unique_points = set()
+    for i, stroke in enumerate(edge_features_list):
+        if stroke[-1] == 1:
+            point_1 = tuple(np.round(stroke[:3], 4))
+            point_2 = tuple(np.round(stroke[3:6], 4))
+            unique_points.add(point_1)
+            unique_points.add(point_2)
+
+    unique_points = list(unique_points)
+
+
+    # Step 2.1: Find sets of collinear points
+    collinear_candidate_sets = []
+
+    for i, stroke in enumerate(edge_features_list):
+        if stroke[-1] != 1:
+            continue
+        p1 = tuple(np.round(stroke[:3], 5))
+        p2 = tuple(np.round(stroke[3:6], 5))
+        collinear_candidate_sets.append(set([p1, p2]))
+
+    # Step 2.2: Enrich each set with all other points that lie on the same line
+    for point in unique_points:
+        for s in collinear_candidate_sets:
+            s_list = list(s)
+            if len(s_list) >= 2:
+                p1, p2 = s_list[0], s_list[1]
+                if point != p1 and point != p2 and point_on_line_extension(point, p1, p2):
+                    s.add(point)
+
+    # Step 2.3: Sort and deduplicate sets
+    normalized_sets = []
+    seen_sets = set()
+
+    for s in collinear_candidate_sets:
+        if len(s) > 2:
+            sorted_tuple = tuple(sorted(s))
+            if sorted_tuple not in seen_sets:
+                seen_sets.add(sorted_tuple)
+                normalized_sets.append(sorted_tuple)
+
+    # Step 2.4: Final result
+    collinear_sets = normalized_sets
+
+    # for c_set in collinear_sets:
+    #     print("set", c_set)
+
+    # Step 3: From each collinear set, generate all segments (in order of distance)
+    for col_set in collinear_sets:
+        col_set_np = np.array(col_set)
+        sorted_points = sorted(col_set_np, key=lambda x: tuple(x))  # consistent ordering
+        for pt1, pt2 in combinations(sorted_points, 2):  # all point pairs
+            exists = False
+            for edge in edge_features_list:
+                s = np.round(edge[:3], 4)
+                e = np.round(edge[3:6], 4)
+                if (np.allclose(s, pt1) and np.allclose(e, pt2)) or \
+                (np.allclose(s, pt2) and np.allclose(e, pt1)):
+                    exists = True
+                    break
+            if not exists:
+                new_line = np.concatenate([pt1, pt2])
+                new_line = list(new_line) + [0, 0, 0, 1]  # dummy metadata
+                add_feature_lines.append(new_line)
+    
+    return edge_features_list + add_feature_lines, add_feature_lines
 
 # ------------------------------------------------------------------------------------# 
 def extract_input_json(final_edges_data, strokes_dict_data, subfolder_path):
