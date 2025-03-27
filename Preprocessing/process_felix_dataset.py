@@ -130,6 +130,7 @@ class cad2sketch_dataset_loader(Dataset):
         stroke_cloud_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
         stroke_cloud_loops = Preprocessing.proc_CAD.helper.reorder_loops(stroke_cloud_loops)
         stroke_cloud_loops = [list(loop) for loop in stroke_cloud_loops]
+        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_cloud_loops)
 
 
         # 3) Compute Loop Neighboring Information
@@ -181,7 +182,7 @@ class cad2sketch_dataset_loader(Dataset):
                 final_cylinder_features += new_features_cylinder
         
             output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
-
+            Preprocessing.cad2sketch_stroke_features.vis_brep(output_brep_edges)
 
             # 5) Stroke_Cloud - Brep Connection
             stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
@@ -191,7 +192,6 @@ class cad2sketch_dataset_loader(Dataset):
 
             stroke_to_loop = Preprocessing.cad2sketch_stroke_features.from_stroke_to_edge(stroke_to_edge, stroke_cloud_loops)
             # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_ver(all_lines, stroke_to_loop, stroke_cloud_loops)
-            Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_cloud_loops)
 
             # 6) We need to build the stroke_operations_order_matrix
             new_stroke_to_edge_straight = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_features)
