@@ -149,11 +149,11 @@ def trim_confusion_matrix(conf_matrix):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/rand_length')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/selected_dataset')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
-    epochs = 30
+    epochs = 200
     
     graphs = []
     existing_programs = []
@@ -166,6 +166,11 @@ def train():
         
         # if program[-1] == 'terminate':
         #     continue
+
+        print("existing_programs", program[:-1])
+        print("next token", program[-1])
+        print("------------------")
+
 
         # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
@@ -192,9 +197,12 @@ def train():
     print(f"Total number of preprocessed graphs: {len(graphs)}")
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
-    train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
-    train_existing_programs, val_existing_programs = existing_programs[:split_index], existing_programs[split_index:]
-    train_gt_programs, val_gt_programs = gt_programs[:split_index], gt_programs[split_index:]
+    # train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
+    # train_existing_programs, val_existing_programs = existing_programs[:split_index], existing_programs[split_index:]
+    # train_gt_programs, val_gt_programs = gt_programs[:split_index], gt_programs[split_index:]
+    train_graphs, val_graphs = graphs[:], graphs[:]
+    train_existing_programs, val_existing_programs = existing_programs[:], existing_programs[:]
+    train_gt_programs, val_gt_programs = gt_programs[:], gt_programs[:]
 
 
     # Convert train and validation graphs to HeteroData

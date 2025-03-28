@@ -37,9 +37,6 @@ import torch.nn.functional as F
 class Particle():
     def __init__(self, gt_brep_file_path, data_produced, stroke_node_features):
         
-
-        print("new particle!")
-
         stroke_node_features = np.round(stroke_node_features, 4)
         self.stroke_node_features = stroke_node_features
         
@@ -162,9 +159,6 @@ class Particle():
         brep_loops_used = np.any(stroke_to_loop == 1, axis=0)
         new_loops_mark_off = np.sum(brep_loops_used)
 
-        print("new_loops_mark_off", new_loops_mark_off)
-        print("self.used_loops", self.used_loops)
-
         if self.used_loops == -1 and self.used_loops == -1:
             self.used_loops = new_loops_mark_off
             return True
@@ -209,8 +203,7 @@ class Particle():
 
 
             Encoders.helper.vis_brep(self.brep_edges)
-            Encoders.helper.vis_left_graph(gnn_graph['stroke'].x.cpu().numpy())
-            # Encoders.helper.vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), self.stroke_cloud_loops)
+            Encoders.helper. vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), self.stroke_cloud_loops)
             
             if self.past_programs[-1] != 2:
                 self.mark_off_new_strokes(stroke_to_loop)

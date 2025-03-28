@@ -89,10 +89,8 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     
 
     gt_brep_dir = os.path.join(data_path[0], 'canvas')
-    print("gt_brep_dir", gt_brep_dir)
     brep_files = [file_name for file_name in os.listdir(gt_brep_dir)
                 if file_name.endswith('.step')]
-    print("brep_files", brep_files)
     brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
     gt_brep_file_path = os.path.join(gt_brep_dir, brep_files[-1])
 
