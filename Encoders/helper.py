@@ -59,12 +59,15 @@ def get_feature_strokes(gnn_graph):
 
 
 
+def is_perpendicular(line1, line2, tol=1e-6):
+    """Check if two lines (each defined by two 3D points) are perpendicular."""
+    vec1 = np.array(line1[1]) - np.array(line1[0])
+    vec2 = np.array(line2[1]) - np.array(line2[0])
+    dot_product = np.dot(vec1, vec2)
+    return abs(dot_product) < tol
 
 def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features):
-    """
-    Given stroke_selection_mask and sketch_selection_mask, find if a stroke in stroke_selection_mask
-    has one point in common with a stroke in sketch_selection_mask and mark it as chosen.
-    
+    """    
     Parameters:
     stroke_selection_mask (np.ndarray): A binary mask of shape (num_strokes, 1) for extrude strokes.
     sketch_selection_mask (np.ndarray): A binary mask of shape (num_strokes, 1) for sketch strokes.
@@ -73,43 +76,25 @@ def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_
     Returns:
     extrude_strokes (np.ndarray): A binary mask of shape (num_strokes, 1), indicating which extrude strokes are chosen.
     """
-    def is_on_circle(point, center, radius, tolerance=0.05):
-        distance = np.linalg.norm(point - center)
-        return abs(distance - radius) < tolerance
+    num_strokes = stroke_node_features.shape[0]
+    extrude_strokes = np.zeros((num_strokes, 1), dtype=int)
 
-    num_strokes = stroke_selection_mask.shape[0]
-    
-    # Initialize the output matrix with zeros
-    extrude_strokes = torch.zeros((num_strokes, 1), dtype=torch.float32)
-    
-    # Iterate through all strokes in stroke_selection_mask
+    # Get all sketch strokes as pairs of 3D points
+    sketch_lines = []
     for i in range(num_strokes):
-        # If the stroke is marked in stroke_selection_mask
+        if sketch_selection_mask[i] == 1:
+            point_1 = stroke_node_features[i][:3]
+            point_2 = stroke_node_features[i][3:6]
+            sketch_lines.append((point_1, point_2))
+
+    # Evaluate each stroke marked as extrude
+    for i in range(num_strokes):
         if stroke_selection_mask[i] == 1:
-            stroke_points = stroke_node_features[i]  # Get the 3D points of the stroke
-            chosen = False
+            point_1 = stroke_node_features[i][:3]
+            point_2 = stroke_node_features[i][3:6]
+            candidate_line = (point_1, point_2)
 
-            # Check if any stroke in sketch_selection_mask shares a point with this stroke
-            for j in range(num_strokes):
-                if sketch_selection_mask[j] == 1:
-                    sketch_points = stroke_node_features[j]  # Get the 3D points of the sketch stroke
-
-                    if sketch_points[-1] != 0:
-                        # the sketch is a circle:
-                        center = sketch_points[:3]
-                        radius = sketch_points[-1]
-                        if is_on_circle(stroke_points[:3], center, radius) or is_on_circle(stroke_points[3:6], center, radius):
-                            chosen = True
-                            break
-
-                    # Compare points of the stroke with the points of the sketch stroke using np.allclose
-                    if (np.allclose(stroke_points[:3], sketch_points[:3]) or np.allclose(stroke_points[:3], sketch_points[3:6]) or
-                        np.allclose(stroke_points[3:6], sketch_points[:3]) or np.allclose(stroke_points[3:6], sketch_points[3:6])):
-                        chosen = True
-                        break
-
-            # If the stroke has one of its points in any of the sketch strokes, mark it as chosen
-            if chosen:
+            if all(is_perpendicular(candidate_line, sketch_line) for sketch_line in sketch_lines):
                 extrude_strokes[i] = 1
 
     return extrude_strokes

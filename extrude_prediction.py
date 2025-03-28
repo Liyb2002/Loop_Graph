@@ -113,7 +113,6 @@ def train():
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0
-    epochs = 30
 
     graphs = []
     stroke_selection_masks = []
@@ -135,6 +134,7 @@ def train():
             extrude_selection_mask = kth_operation
         else:
             extrude_selection_mask = Encoders.helper.choose_extrude_strokes(kth_operation, sketch_operation_mask, stroke_node_features)
+            extrude_selection_mask = torch.tensor(extrude_selection_mask, dtype=torch.float)
 
         extrude_stroke_idx = (extrude_selection_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
 
@@ -170,16 +170,18 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
 
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx)
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
 
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
-    train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
-    train_masks, val_masks = stroke_selection_masks[:split_index], stroke_selection_masks[split_index:]
+    # train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
+    # train_masks, val_masks = stroke_selection_masks[:split_index], stroke_selection_masks[split_index:]
+    train_graphs, val_graphs = graphs[:], graphs[:]
+    train_masks, val_masks = stroke_selection_masks[:], stroke_selection_masks[:]
 
     # Convert train and validation graphs to HeteroData
     hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]
@@ -196,13 +198,13 @@ def train():
     mask_val_loader = DataLoader(padded_val_masks, batch_size=16, shuffle=False)
 
     # Training and validation loop
-    epochs = 30  # Number of epochs
+    epochs = 200  # Number of epochs
     best_accuracy = 0.0
 
     for epoch in range(epochs):
         train_loss = 0.0
         correct = 0
-        total = 0
+        train_total = 0
 
         graph_encoder.train()
         graph_decoder.train()
@@ -239,9 +241,9 @@ def train():
 
             # Accuracy computation using the preferred method (only on valid values)
             correct += compute_accuracy(valid_output, valid_batch_masks)
-            total += batch_size 
+            train_total += valid_batch_masks.shape[0] / 400
 
-        train_accuracy = correct / total
+        train_accuracy = correct / train_total
         print(f"Epoch {epoch+1}/{epochs}, Training Loss: {train_loss / total_iterations:.5f}, Training Accuracy: {train_accuracy:.4f}")
 
         # Validation loop
@@ -278,7 +280,7 @@ def train():
 
                 # Accuracy computation using the preferred method (only on valid values)
                 correct += compute_accuracy(valid_output, valid_batch_masks)
-                total += batch_size
+                total += valid_batch_masks.shape[0] / 400
 
         val_accuracy = correct / total
         print(f"Validation Loss: {val_loss / total_iterations_val:.5f}, Validation Accuracy: {val_accuracy:.4f}")
