@@ -2,6 +2,7 @@ import json
 import os
 from copy import deepcopy
 
+import numpy as np
 import Preprocessing.proc_CAD.build123.protocol
 import Preprocessing.proc_CAD.helper
 
@@ -69,6 +70,7 @@ class parsed_program():
         self.Op_idx += 1
 
 
+
     def parse_circle(self, Op):
         radius = Op['faces'][0]['radius']
         center = Op['faces'][0]['center']
@@ -80,16 +82,20 @@ class parsed_program():
         self.prev_sketch = Preprocessing.proc_CAD.build123.protocol.build_circle(self.Op_idx, radius, center, normal, self.output, self.data_directory)
         self.Op_idx += 1
         self.circle_center = center
-        
+
+
     def parse_extrude(self, Op, sketch_Op):
 
-
-        print("self.prev_sketch.normal_at()", self.prev_sketch.faces()[0].normal_at())
-
         sketch_point_list = [vert['coordinates'] for vert in sketch_Op['vertices']]
-        sketch_face_normal = sketch_Op['faces'][0]['normal']
-        extrude_amount = Op['operation'][2]
-        isSubtract = (extrude_amount < 0)
+        normal_vec = self.prev_sketch.faces()[0].normal_at()
+        sketch_face_normal = [normal_vec.X, normal_vec.Y, normal_vec.Z]
+        target_point = Op['operation'][3]
+
+        extrude_amount = self.find_extrude_amount(sketch_point_list, sketch_face_normal, target_point)
+
+        print("extrude_amount", extrude_amount)
+
+        isSubtract = False
         
         
         # If it is circle
@@ -127,6 +133,7 @@ class parsed_program():
 
         self.Op_idx += 1
         
+
     def parse_fillet(self, Op):
         print("Do fillet!")
         fillet_amount = Op['operation'][2]['amount']
@@ -150,6 +157,25 @@ class parsed_program():
 
     def is_valid_parse(self):
         return self.Op_idx == self.len_program 
+
+
+    def find_extrude_amount(self, sketch_point_list, sketch_face_normal, target_point):
+        sketch_face_normal = np.array(sketch_face_normal)
+        target_point = np.array(target_point)
+        
+        for sketch_point in sketch_point_list:
+            sketch_point = np.array(sketch_point)
+            vec = target_point - sketch_point
+            extrude_amount = np.dot(vec, sketch_face_normal) / np.dot(sketch_face_normal, sketch_face_normal)
+            
+            # Check if reconstruction matches (with tolerance)
+            reconstructed = sketch_point + extrude_amount * sketch_face_normal
+            if np.allclose(reconstructed, target_point, atol=1e-4):
+                return extrude_amount
+        
+        
+        raise ValueError("Build123 : No matching sketch point found that can be extruded to target_point.")
+
 
 
 # Example usage:
