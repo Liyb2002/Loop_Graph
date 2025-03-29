@@ -127,11 +127,11 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/selected_dataset')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
-    epochs = 500
+    epochs = 20
     
     graphs = []
     loop_selection_masks = []
@@ -197,10 +197,8 @@ def train():
     print(f"Total number of preprocessed graphs: {len(graphs)}")
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
-    # train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
-    # train_masks, val_masks = loop_selection_masks[:split_index], loop_selection_masks[split_index:]
-    train_graphs, val_graphs = graphs[:], graphs[:]
-    train_masks, val_masks = loop_selection_masks[:], loop_selection_masks[:]
+    train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
+    train_masks, val_masks = loop_selection_masks[:split_index], loop_selection_masks[split_index:]
 
 
     # Convert train and validation graphs to HeteroData

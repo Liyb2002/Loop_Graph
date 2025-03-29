@@ -109,7 +109,7 @@ def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, padded_size
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/selected_dataset')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0
@@ -198,7 +198,7 @@ def train():
     mask_val_loader = DataLoader(padded_val_masks, batch_size=16, shuffle=False)
 
     # Training and validation loop
-    epochs = 200  # Number of epochs
+    epochs = 20  # Number of epochs
     best_accuracy = 0.0
 
     for epoch in range(epochs):

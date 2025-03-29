@@ -285,9 +285,21 @@ class Particle():
             cur_fidelity_score = -1
 
             self.past_programs.append(self.current_op)
-            self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
-            self.score = self.score * op_prob
+            # self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
+            # self.score = self.score * op_prob
 
+            next_op = self.gt_program[len(self.past_programs) - 1][0]
+
+            if next_op == 'sketch':
+                self.current_op = 1
+            elif next_op == 'extrude':
+                self.current_op = 2
+            elif next_op == 'fillet':
+                self.current_op = 3
+            elif next_op == 'chamfer':
+                self.current_op = 4
+            elif next_op == 'terminate':
+                self.current_op = 0
 
             print("----------------")
             print("self.past_programs", self.past_programs)

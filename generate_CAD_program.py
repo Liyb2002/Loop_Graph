@@ -33,7 +33,7 @@ import copy
 import re
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/selected_dataset', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole', return_data_path=True)
 data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 

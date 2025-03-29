@@ -99,7 +99,7 @@ def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/selected_dataset')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
 
     epochs = 300

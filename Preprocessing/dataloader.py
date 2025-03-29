@@ -6,6 +6,7 @@ from tqdm import tqdm
 import pickle
 import numpy as np
 from torch_geometric.data import Batch as PyGBatch
+import re
 
 import Preprocessing.proc_CAD.helper
 import Preprocessing.gnn_graph
@@ -52,7 +53,11 @@ class Program_Graph_Dataset(Dataset):
         program = program_whole[:int(index)+2]
 
         # 2) Load basic shape data
-        base_shape_file_path = os.path.join(self.data_path, data_dir, 'shape_info', f'shape_info_{len(program_whole) - 2}.pkl')
+        shape_info_dir = os.path.join(self.data_path, data_dir, 'shape_info')
+        shape_files = [f for f in os.listdir(shape_info_dir) if re.match(r'shape_info_(\d+)\.pkl', f)]
+        shape_numbers = [int(re.search(r'shape_info_(\d+)\.pkl', f).group(1)) for f in shape_files]
+
+        base_shape_file_path = os.path.join(self.data_path, data_dir, 'shape_info', f'shape_info_{max(shape_numbers)}.pkl')
         with open(base_shape_file_path, 'rb') as f:
             base_shape_data = pickle.load(f)
 
