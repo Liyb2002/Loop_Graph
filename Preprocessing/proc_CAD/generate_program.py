@@ -176,10 +176,6 @@ class Brep:
                 print(f"Extrusion amount: {amount}, Normal: {normal}")
 
 
-            if random.random() < 0.5 and len(self.op) > 2:
-                amount = -amount
-
-
         num_vertices = len(new_vertices)
         for i in range(num_vertices):
             edge_id = f"edge_{self.idx}_{i}"
@@ -213,7 +209,7 @@ class Brep:
             self.Faces.append(side_face)
 
         self.idx += 1
-        self.op.append(['extrude', sketch_face.id, amount])
+        self.op.append(['extrude', sketch_face.id, amount, extrude_target_point.tolist()])
 
 
     def random_fillet(self, target_edge_tensor = None, amount = 0):        

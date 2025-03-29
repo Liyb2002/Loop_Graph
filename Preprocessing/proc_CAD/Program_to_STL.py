@@ -68,6 +68,7 @@ class parsed_program():
         self.prev_sketch = Preprocessing.proc_CAD.build123.protocol.build_sketch(self.Op_idx, self.canvas, new_point_list, self.output, self.data_directory)
         self.Op_idx += 1
 
+
     def parse_circle(self, Op):
         radius = Op['faces'][0]['radius']
         center = Op['faces'][0]['center']
@@ -81,6 +82,9 @@ class parsed_program():
         self.circle_center = center
         
     def parse_extrude(self, Op, sketch_Op):
+
+
+        print("self.prev_sketch.normal_at()", self.prev_sketch.faces()[0].normal_at())
 
         sketch_point_list = [vert['coordinates'] for vert in sketch_Op['vertices']]
         sketch_face_normal = sketch_Op['faces'][0]['normal']

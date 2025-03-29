@@ -288,8 +288,8 @@ class Particle():
             # self.current_op, op_prob = program_prediction(gnn_graph, self.past_programs)
             # self.score = self.score * op_prob
 
+            # Start hack -------------------------------- #
             next_op = self.gt_program[len(self.past_programs) - 1][0]
-
             if next_op == 'sketch':
                 self.current_op = 1
             elif next_op == 'extrude':
@@ -300,6 +300,7 @@ class Particle():
                 self.current_op = 4
             elif next_op == 'terminate':
                 self.current_op = 0
+            # End hack -------------------------------- #
 
             print("----------------")
             print("self.past_programs", self.past_programs)
