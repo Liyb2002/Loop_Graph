@@ -1219,7 +1219,7 @@ def pad_brep_features(final_brep_edges):
 
 
 #----------------------------------------------------------------------------------#
-def points_match(point1, point2, tolerance=0.0005):
+def points_match(point1, point2, tolerance=0.00005):
     return all(abs(a - b) < tolerance for a, b in zip(point1, point2))
 
 
@@ -1239,6 +1239,9 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
 
     num_strokes = stroke_node_features.shape[0]
     stroke_used_matrix = np.zeros((num_strokes, 1), dtype=np.float32)
+
+    print('--------------------')
+    print("num final_brep_edges", len(final_brep_edges))
     
     # Step 1: Find matching between stroke_node_features and final_brep_edges
     for stroke_idx, stroke in enumerate(stroke_node_features):

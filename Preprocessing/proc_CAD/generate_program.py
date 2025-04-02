@@ -6,6 +6,8 @@ import Preprocessing.proc_CAD.helper
 import random
 import Preprocessing.proc_CAD.random_gen
 
+import torch
+
 import os
 import math
 from Preprocessing.proc_CAD.basic_class import Face, Edge, Vertex
@@ -209,7 +211,9 @@ class Brep:
             self.Faces.append(side_face)
 
         self.idx += 1
-        self.op.append(['extrude', sketch_face.id, amount, extrude_target_point.tolist()])
+        if isinstance(extrude_target_point, torch.Tensor): 
+            extrude_target_point = extrude_target_point.tolist()
+        self.op.append(['extrude', sketch_face.id, amount, extrude_target_point])
 
 
     def random_fillet(self, target_edge_tensor = None, amount = 0):        

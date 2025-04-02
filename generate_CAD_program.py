@@ -65,7 +65,7 @@ def compute_start_idx():
 
 # --------------------- Main Code --------------------- #
 data_produced = compute_start_idx()
-data_limit = 1
+data_limit = 20
 if os.path.exists(os.path.join(output_dir, f'data_{data_produced}')):
     shutil.rmtree(os.path.join(output_dir, f'data_{data_produced}'))
 os.makedirs(os.path.join(output_dir, f'data_{data_produced}'), exist_ok=True)
@@ -81,7 +81,6 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     if program[-1][0] != 'terminate' or len(program)< 6:
         continue
     
-    # try:
     cur_output_dir = os.path.join(output_dir, f'data_{data_produced}')
     if os.path.exists(cur_output_dir):
         shutil.rmtree(cur_output_dir)
@@ -99,7 +98,7 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
     base_particle = particle.Particle(gt_brep_file_path, data_produced, stroke_node_features.squeeze(0).cpu().numpy())
     base_particle.set_gt_program(program)
     particle_list = []
-    for particle_id in range (1):
+    for particle_id in range (50):
         new_particle = copy.deepcopy(base_particle)
         new_particle.set_particle_id(particle_id, cur_output_dir)
         particle_list.append(new_particle)

@@ -118,7 +118,6 @@ def build_subtract(count, canvas, target_face, extrude_amount, output, data_dir)
 
     with canvas:
         extrude( target_face, amount= extrude_amount, mode=Mode.SUBTRACT)
-        extrude( target_face, amount= -extrude_amount, mode=Mode.SUBTRACT)
 
     if output:
         _ = canvas.part.export_stl(stl_dir)

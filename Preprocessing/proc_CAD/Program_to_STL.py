@@ -6,6 +6,7 @@ import numpy as np
 import Preprocessing.proc_CAD.build123.protocol
 import Preprocessing.proc_CAD.helper
 
+import random
 
 class parsed_program():
     def __init__(self, file_path, data_directory = None, output = True):
@@ -69,6 +70,8 @@ class parsed_program():
         self.prev_sketch = Preprocessing.proc_CAD.build123.protocol.build_sketch(self.Op_idx, self.canvas, new_point_list, self.output, self.data_directory)
         self.Op_idx += 1
 
+        
+
 
 
     def parse_circle(self, Op):
@@ -91,45 +94,22 @@ class parsed_program():
         sketch_face_normal = [normal_vec.X, normal_vec.Y, normal_vec.Z]
         target_point = Op['operation'][3]
 
-        extrude_amount = self.find_extrude_amount(sketch_point_list, sketch_face_normal, target_point)
 
-        print("extrude_amount", extrude_amount)
-
-        isSubtract = False
-        
-        
-        # If it is circle
-        if len(sketch_point_list) ==0:
-            expected_axis, expected_value = Preprocessing.proc_CAD.helper.expected_lvl(self.circle_center, sketch_face_normal, extrude_amount)
-            if not isSubtract: 
-                canvas_1 = Preprocessing.proc_CAD.build123.protocol.test_extrude(self.prev_sketch, extrude_amount)
-                canvas_2 = Preprocessing.proc_CAD.build123.protocol.test_extrude(self.prev_sketch, -extrude_amount)
-
-                if (canvas_1 is not None) and Preprocessing.proc_CAD.helper.canvas_has_lvl(canvas_1, expected_axis, expected_value):
-                    self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
-                if (canvas_2 is not None) and Preprocessing.proc_CAD.helper.canvas_has_lvl(canvas_2, expected_axis, expected_value):
-                    self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, -extrude_amount, self.output, self.data_directory)
-
-            else:
-                self.canvas = Preprocessing.proc_CAD.build123.protocol.build_subtract(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
-
-
-
-        # Not circle
+        if len(sketch_point_list) ==0 :
+            extrude_amount = self.find_extrude_amount([self.circle_center], sketch_face_normal, target_point)
         else:
-            expected_point = Op['vertices'][0]['coordinates']        
+            extrude_amount = self.find_extrude_amount(sketch_point_list, sketch_face_normal, target_point)
 
-            if not isSubtract: 
-                canvas_1 = Preprocessing.proc_CAD.build123.protocol.test_extrude(self.prev_sketch, extrude_amount)
-                canvas_2 = Preprocessing.proc_CAD.build123.protocol.test_extrude(self.prev_sketch, -extrude_amount)
 
-                if (canvas_1 is not None) and Preprocessing.proc_CAD.helper.canvas_has_point(canvas_1, expected_point):
-                    self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
-                if (canvas_2 is not None) and Preprocessing.proc_CAD.helper.canvas_has_point(canvas_2, expected_point):
-                    self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, -extrude_amount, self.output, self.data_directory)
-
+        
+        if self.canvas is None:
+            self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
+        else:
+            if random.random() < 0.5:
+                self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
             else:
                 self.canvas = Preprocessing.proc_CAD.build123.protocol.build_subtract(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
+
 
         self.Op_idx += 1
         
