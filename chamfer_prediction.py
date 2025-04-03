@@ -121,7 +121,7 @@ def compute_accuracy_eval_whole(valid_output, valid_batch_masks, hetero_batch):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0
@@ -161,7 +161,7 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")

@@ -790,13 +790,15 @@ def vis_feature_lines(feature_lines):
 
 
 
-def vis_feature_lines_selected(feature_lines, new_stroke_to_edge_matrix):
+
+def vis_feature_lines_selected(feature_lines, stroke_node_features, new_stroke_to_edge_matrix):
     """
     Visualize 3D strokes, with a subset of chosen strokes highlighted in red.
 
     Parameters:
     - feature_lines (list): List of stroke dictionaries containing geometry (list of 3D points).
-    - new_stroke_to_edge_matrix (np.ndarray or list): An array of shape (num_lines, 1)
+    - stroke_node_features: (unused in this function, can be removed if not needed).
+    - new_stroke_to_edge_matrix (np.ndarray or list): An array of shape (num_lines,)
       with value == 1 if a stroke is chosen and should be highlighted.
     """
     # Initialize the 3D plot
@@ -809,18 +811,15 @@ def vis_feature_lines_selected(feature_lines, new_stroke_to_edge_matrix):
     ax.set_zticks([])
     ax.set_frame_on(False)
     ax.grid(False)
-    ax.set_xticklabels([])
-    ax.set_yticklabels([])
-    ax.set_zticklabels([])
-    ax.set_axis_off()  # Hides the axis completely
+    ax.set_axis_off()
 
     # Initialize bounding box variables
     x_min, x_max = float('inf'), float('-inf')
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
-    # First pass: plot all strokes in black (and compute bounding box)
-    for idx, stroke in enumerate(feature_lines):
+    # First pass: plot all strokes in black and compute bounding box
+    for stroke in feature_lines:
         geometry = stroke["geometry"]
 
         if len(geometry) < 2:
@@ -835,7 +834,7 @@ def vis_feature_lines_selected(feature_lines, new_stroke_to_edge_matrix):
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
 
-            # Plot the stroke (black lines)
+            # Plot the stroke in black
             ax.plot([start[0], end[0]], 
                     [start[1], end[1]], 
                     [start[2], end[2]], 
@@ -852,25 +851,33 @@ def vis_feature_lines_selected(feature_lines, new_stroke_to_edge_matrix):
     ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
     ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
 
-    # Second pass: highlight chosen strokes in red (linewidth=1)
-    for idx, stroke in enumerate(feature_lines):
-        # Check if stroke is chosen
-        if new_stroke_to_edge_matrix[idx] == 1:
-            geometry = stroke["geometry"]
-            if len(geometry) < 2:
-                continue
+    # Second pass: highlight chosen strokes in red
+    for idx, selected in enumerate(new_stroke_to_edge_matrix):
+        if selected == 1:
+            if idx < len(feature_lines):
+                geometry = feature_lines[idx]["geometry"]
+                if len(geometry) < 2:
+                    continue
+                for j in range(1, len(geometry)):
+                    start = geometry[j - 1]
+                    end = geometry[j]
+                    ax.plot([start[0], end[0]],
+                            [start[1], end[1]],
+                            [start[2], end[2]],
+                            color='red',
+                            linewidth=1.0)
+            else:
+                stroke = stroke_node_features[idx]
+                start = stroke[0:3]
+                end = stroke[3:6]
+                ax.plot([start[0], end[0]],
+                        [start[1], end[1]],
+                        [start[2], end[2]],
+                        color='red',
+                        linewidth=1.0)
 
-            for j in range(1, len(geometry)):
-                start = geometry[j - 1]
-                end = geometry[j]
-                ax.plot([start[0], end[0]], 
-                        [start[1], end[1]], 
-                        [start[2], end[2]], 
-                        color='red', 
-                        linewidth=1)
-
-    # Show the plot
     plt.show()
+
 
 
 def vis_feature_lines_loop_ver(feature_lines, stroke_to_loop, stroke_cloud_loops):
@@ -1633,8 +1640,8 @@ def split_and_merge_brep(edge_features_list):
     unique_points = set()
     for i, stroke in enumerate(edge_features_list):
         if stroke[-1] == 1:
-            point_1 = tuple(np.round(stroke[:3], 4))
-            point_2 = tuple(np.round(stroke[3:6], 4))
+            point_1 = tuple(np.round(stroke[:3], 5))
+            point_2 = tuple(np.round(stroke[3:6], 5))
             unique_points.add(point_1)
             unique_points.add(point_2)
 

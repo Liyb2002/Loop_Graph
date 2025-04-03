@@ -138,6 +138,9 @@ def train():
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
+        if data is None:
+            continue
+
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
@@ -186,9 +189,8 @@ def train():
         loop_selection_mask = loop_selection_mask.to(device)
 
         # print('loop_selection_mask', loop_selection_mask)
-        print('chosen_strokes', chosen_strokes)
         # Encoders.helper.vis_brep(output_brep_edges)
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
         # Encoders.helper. vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), stroke_cloud_loops)
 
         # Prepare the pair

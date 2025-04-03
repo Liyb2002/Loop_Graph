@@ -59,7 +59,7 @@ def get_feature_strokes(gnn_graph):
 
 
 
-def is_perpendicular(line1, line2, tol=1e-6):
+def is_perpendicular(line1, line2, tol=5e-6):
     """Check if two lines (each defined by two 3D points) are perpendicular."""
     vec1 = np.array(line1[1]) - np.array(line1[0])
     vec2 = np.array(line2[1]) - np.array(line2[0])
@@ -67,51 +67,116 @@ def is_perpendicular(line1, line2, tol=1e-6):
     return abs(dot_product) < tol
 
 def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features):
-    """    
+    """
     Parameters:
-    stroke_selection_mask (np.ndarray): A binary mask of shape (num_strokes, 1) for extrude strokes.
-    sketch_selection_mask (np.ndarray): A binary mask of shape (num_strokes, 1) for sketch strokes.
-    stroke_node_features (np.ndarray): A numpy array of shape (num_strokes, 6), where each row contains two 3D points.
-    
+    stroke_selection_mask (np.ndarray): Binary mask of shape (num_strokes, 1) for extrude strokes.
+    sketch_selection_mask (np.ndarray): Binary mask of shape (num_strokes, 1) for sketch strokes.
+    stroke_node_features (np.ndarray): Array of shape (num_strokes, 6), each row = [x1, y1, z1, x2, y2, z2].
+
     Returns:
-    extrude_strokes (np.ndarray): A binary mask of shape (num_strokes, 1), indicating which extrude strokes are chosen.
+    extrude_strokes (np.ndarray): Binary mask of shape (num_strokes, 1), indicating chosen extrude strokes.
     """
     num_strokes = stroke_node_features.shape[0]
     extrude_strokes = np.zeros((num_strokes, 1), dtype=int)
 
-    # Get all sketch strokes as pairs of 3D points
-    sketch_lines = []
+    # determine if the sketch is circle
+    from_circle = False
     for i in range(num_strokes):
         if sketch_selection_mask[i] == 1:
-            point_1 = stroke_node_features[i][:3]
-            point_2 = stroke_node_features[i][3:6]
-            sketch_lines.append((point_1, point_2))
+            if stroke_node_features[i][-1] == 2:
+                from_circle = True
+                break
+    
+    if from_circle: 
+        return choose_extrude_strokes_from_circle(stroke_selection_mask, sketch_selection_mask, stroke_node_features)
 
-    # Evaluate each stroke marked as extrude
+
+    # Collect sketch strokes as 3D point pairs
+    sketch_lines = []
+    sketch_points = set()
+    for i in range(num_strokes):
+        if sketch_selection_mask[i] == 1:
+            p1 = tuple(stroke_node_features[i][:3])
+            p2 = tuple(stroke_node_features[i][3:6])
+            sketch_lines.append((p1, p2))
+            sketch_points.add(p1)
+            sketch_points.add(p2)
+
+    # First pass: check strokes already marked as extrude
     for i in range(num_strokes):
         if stroke_selection_mask[i] == 1:
-            point_1 = stroke_node_features[i][:3]
-            point_2 = stroke_node_features[i][3:6]
-            candidate_line = (point_1, point_2)
+            p1 = tuple(stroke_node_features[i][:3])
+            p2 = tuple(stroke_node_features[i][3:6])
+            candidate_line = (p1, p2)
 
             if all(is_perpendicular(candidate_line, sketch_line) for sketch_line in sketch_lines):
+                extrude_strokes[i] = 1
+
+    # Fallback: no extrude stroke selected
+    if not np.any(extrude_strokes):
+        for i in range(num_strokes):
+            p1 = tuple(stroke_node_features[i][:3])
+            p2 = tuple(stroke_node_features[i][3:6])
+            candidate_line = (p1, p2)
+
+
+            if all(is_perpendicular(candidate_line, sketch_line) for sketch_line in sketch_lines):
+                # Check if either endpoint is in any sketch line
                 extrude_strokes[i] = 1
 
     return extrude_strokes
 
 
 
-def choose_extrude_strokes_from_circle(kth_operation, stroke_node_features):
-    last_feature = stroke_node_features[:, -1]
-    
-    # Stroke selection criteria: kth_operation is considered here as "stroke_selection_mask"
-    # Create mask: True if kth_operation == 1 and last_feature == 0
-    stroke_selection_mask = (kth_operation.view(-1) == 1) & (last_feature == 1)
-    
-    # Reshape the mask to match the output shape (num_strokes, 1)
-    chosen_strokes = stroke_selection_mask.int().view(-1, 1)
-    
-    return chosen_strokes
+# Circle Feature: 10 values + type 2
+# 0-2: center, 3-5:normal, 6:alpha_value, 7:radius, 8-9: 0
+
+def dist(p1, p2):
+    return np.linalg.norm(np.array(p1) - np.array(p2))
+
+def choose_extrude_strokes_from_circle(stroke_selection_mask, sketch_selection_mask, stroke_node_features):
+    num_strokes = stroke_node_features.shape[0]
+    extrude_strokes = np.zeros((num_strokes, 1), dtype=int)
+
+    sketch_center = None
+    sketch_radius = 0
+    cylinder_height = 0
+    EPSILON = 5e-5
+
+    # Find one circle in the selected sketch
+    for i in range(num_strokes):
+        if sketch_selection_mask[i] == 1 and stroke_node_features[i][-1] == 2:
+            sketch_center = stroke_node_features[i][0:3]
+            sketch_radius = stroke_node_features[i][7]
+            break
+
+    if sketch_center is None:
+        return extrude_strokes  # No valid circle found
+
+    # Find matching circle with same radius but different center
+    for i in range(num_strokes):
+        if stroke_node_features[i][-1] == 2:
+            center = stroke_node_features[i][0:3]
+            radius = stroke_node_features[i][7]
+            if np.linalg.norm(np.array(center) - np.array(sketch_center)) > 100 * EPSILON and abs(radius - sketch_radius) < EPSILON:
+                cylinder_height = dist(center, sketch_center)
+                break
+
+    # Find lines that connect the two circles (extrude strokes)
+    for i in range(num_strokes):
+        if stroke_node_features[i][-1] == 1:
+            point_1 = stroke_node_features[i][0:3]
+            point_2 = stroke_node_features[i][3:6]
+            length = dist(point_1, point_2)
+
+
+            if abs(length - cylinder_height) < EPSILON:
+                d1 = dist(point_1, sketch_center)
+                d2 = dist(point_2, sketch_center)
+                if abs(d1 - sketch_radius) < EPSILON or abs(d2 - sketch_radius) < EPSILON:
+                    extrude_strokes[i] = 1
+
+    return extrude_strokes
 
 
 

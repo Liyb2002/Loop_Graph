@@ -17,6 +17,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
 
 graph_encoder = Encoders.gnn.gnn.SemanticModule()
 graph_decoder = Encoders.gnn.gnn.Extrude_Decoder()
@@ -109,7 +110,7 @@ def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, padded_size
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0
@@ -130,14 +131,14 @@ def train():
         sketch_operation_mask = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-2)
         sketch_stroke_idx = (sketch_operation_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
 
-        if len(sketch_stroke_idx) <= 2 :
-            extrude_selection_mask = kth_operation
-        else:
-            extrude_selection_mask = Encoders.helper.choose_extrude_strokes(kth_operation, sketch_operation_mask, stroke_node_features)
-            extrude_selection_mask = torch.tensor(extrude_selection_mask, dtype=torch.float)
+        
+        sketch_strks = np.where((sketch_operation_mask == 1).any(axis=1))[0]
+        
+        extrude_selection_mask = Encoders.helper.choose_extrude_strokes(kth_operation, sketch_operation_mask, stroke_node_features)
+        extrude_selection_mask = torch.tensor(extrude_selection_mask, dtype=torch.float)
 
         extrude_stroke_idx = (extrude_selection_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
-
+        
         # Find the sketch_loops
         loop_chosen_mask = []
         for loop in stroke_cloud_loops:
@@ -170,8 +171,8 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
 
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx)
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -323,10 +324,7 @@ def eval():
         sketch_operation_mask = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-2)
         sketch_stroke_idx = (sketch_operation_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
 
-        if len(sketch_stroke_idx) < 4:
-            extrude_selection_mask = Encoders.helper.choose_extrude_strokes_from_circle(kth_operation, stroke_node_features)
-        else:
-            extrude_selection_mask = Encoders.helper.choose_extrude_strokes(kth_operation, sketch_operation_mask, stroke_node_features)
+        extrude_selection_mask = Encoders.helper.choose_extrude_strokes(kth_operation, sketch_operation_mask, stroke_node_features)
 
 
         # Find the sketch_loops

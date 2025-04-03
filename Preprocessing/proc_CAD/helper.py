@@ -1236,12 +1236,14 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
     """
     
     # Initialize the output matrix to zeros
+    # print("-------------")
+    # for brep_edge in final_brep_edges:
+    #     brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))
+    #     print("brep_points", brep_points)
+
 
     num_strokes = stroke_node_features.shape[0]
     stroke_used_matrix = np.zeros((num_strokes, 1), dtype=np.float32)
-
-    print('--------------------')
-    print("num final_brep_edges", len(final_brep_edges))
     
     # Step 1: Find matching between stroke_node_features and final_brep_edges
     for stroke_idx, stroke in enumerate(stroke_node_features):
@@ -1271,6 +1273,38 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
     return stroke_used_matrix
 
 
+
+
+def ensure_brep_edges(stroke_node_features, edge_features_list):
+    for brep_edge in edge_features_list:
+        if brep_edge[-1] == 1 or brep_edge[-1] == 4:
+            brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))
+            no_match = True  # Initialize as True
+
+            for stroke_idx, stroke in enumerate(stroke_node_features):
+                if stroke[-1] == 1 or stroke[-1] == 3:
+                    stroke_points = set(map(tuple, [stroke[:3], stroke[3:6]]))
+
+                    stroke_match = all(
+                        any(points_match(stroke_point, brep_point) for brep_point in brep_points)
+                        for stroke_point in stroke_points
+                    )
+
+                    brep_match = all(
+                        any(points_match(brep_point, stroke_point) for stroke_point in stroke_points)
+                        for brep_point in brep_points
+                    )
+
+                    if stroke_match or brep_match:
+                        no_match = False
+                        break  # Exit once a match is found
+
+            if no_match:
+                # Add the brep_edge to stroke_node_features
+                new_stroke = np.array(list(brep_edge[:6]) + [0, 0, 0, 0, 1], dtype=np.float32)
+                stroke_node_features = np.vstack([stroke_node_features, new_stroke])
+
+    return stroke_node_features
 
 
 def match(center1, center2, tol=1e-3):

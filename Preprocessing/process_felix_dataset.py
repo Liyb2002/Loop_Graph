@@ -64,6 +64,8 @@ class cad2sketch_dataset_loader(Dataset):
         Processes an individual subfolder by reading JSON files and extracting relevant data.
         """
 
+        print("subfolder_path", subfolder_path)
+        
         final_edges_file_path = os.path.join(subfolder_path, 'final_edges.json')
         all_edges_file_path = os.path.join(subfolder_path, 'unique_edges.json')
         strokes_dict_path = os.path.join(subfolder_path, 'strokes_dict.json')
@@ -85,7 +87,7 @@ class cad2sketch_dataset_loader(Dataset):
         # Do some vis
         # Load and visualize only feature lines version
         final_edges_data = self.read_json(final_edges_file_path)
-        # feature_lines = Preprocessing.cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
+        feature_lines = Preprocessing.cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(feature_lines)
 
 
@@ -99,11 +101,32 @@ class cad2sketch_dataset_loader(Dataset):
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(construction_lines)
 
 
+
+        # get necessary files
+        brep_folder_path = os.path.join(subfolder_path, 'canvas')
+        if os.path.exists(brep_folder_path) and os.path.isdir(brep_folder_path):
+            step_files = [f for f in os.listdir(brep_folder_path) if f.endswith('.step')]
+            step_files.sort(key=lambda x: int(re.search(r'step_(\d+)\.step', x).group(1)) if re.search(r'step_(\d+)\.step', x) else float('inf'))
+
+
+        matrix_path = os.path.join(subfolder_path, 'canvas', 'matrix.json')
+        with open(matrix_path, 'r') as f:
+            rotation_matrix = json.load(f)
+
+
         # ------------------------------------------------------------ #
-        # Now start information processing
+        # 1) stroke cloud  information processing
         stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
         stroke_node_features, added_feature_lines= Preprocessing.cad2sketch_stroke_features.split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix)
         # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_highlights(stroke_node_features, added_feature_lines)
+
+
+        # we need to make sure all brep_edges has a corresponding stroke 
+        for idx, step_file in enumerate(step_files):
+            edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
+            edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
+            edge_features_list, _ = Preprocessing.cad2sketch_stroke_features.split_and_merge_brep(edge_features_list)
+            stroke_node_features = Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, edge_features_list)
 
         stroke_operations_order_matrix = None
 
@@ -126,22 +149,12 @@ class cad2sketch_dataset_loader(Dataset):
         loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(stroke_cloud_loops, stroke_node_features)
 
 
-        # get the brep generation process
-        brep_folder_path = os.path.join(subfolder_path, 'canvas')
-        if os.path.exists(brep_folder_path) and os.path.isdir(brep_folder_path):
-            step_files = [f for f in os.listdir(brep_folder_path) if f.endswith('.step')]
-            step_files.sort(key=lambda x: int(re.search(r'step_(\d+)\.step', x).group(1)) if re.search(r'step_(\d+)\.step', x) else float('inf'))
-
 
         # now, process the brep files
     
         final_brep_edges = []
         final_cylinder_features = []
         new_features = []
-
-        matrix_path = os.path.join(subfolder_path, 'canvas', 'matrix.json')
-        with open(matrix_path, 'r') as f:
-            rotation_matrix = json.load(f)
 
 
         stroke_operations_order_matrix = np.zeros((stroke_node_features.shape[0], len(step_files)))
@@ -152,7 +165,7 @@ class cad2sketch_dataset_loader(Dataset):
         for idx, step_file in enumerate(step_files):
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
             edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
-            edge_features_list, _ = Preprocessing.cad2sketch_stroke_features.split_and_merge_brep(edge_features_list)
+            # edge_features_list, _ = Preprocessing.cad2sketch_stroke_features.split_and_merge_brep(edge_features_list)
             # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(edge_features_list))
 
             if len(final_brep_edges) == 0:
@@ -192,10 +205,10 @@ class cad2sketch_dataset_loader(Dataset):
             new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, new_features_cylinder)
             new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.union_matrices(new_stroke_to_edge_straight, new_stroke_to_edge_circle)
             
-            chosen_strokes = np.where((new_stroke_to_edge_matrix == 1).any(axis=1))[0]
+            # chosen_strokes = np.where((new_stroke_to_edge_matrix == 1).any(axis=1))[0]
 
             stroke_operations_order_matrix[:, idx] = np.array(new_stroke_to_edge_matrix).flatten()
-            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, new_stroke_to_edge_matrix)
+            Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_node_features, new_stroke_to_edge_matrix)
 
             # 7) Write the data to file
             output_file_path = os.path.join(data_directory, f'shape_info_{file_count}.pkl')

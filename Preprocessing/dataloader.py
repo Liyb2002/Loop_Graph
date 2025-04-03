@@ -54,9 +54,15 @@ class Program_Graph_Dataset(Dataset):
 
         # 2) Load basic shape data
         shape_info_dir = os.path.join(self.data_path, data_dir, 'shape_info')
+        if not os.path.exists(shape_info_dir):
+            return None
+        
         shape_files = [f for f in os.listdir(shape_info_dir) if re.match(r'shape_info_(\d+)\.pkl', f)]
         shape_numbers = [int(re.search(r'shape_info_(\d+)\.pkl', f).group(1)) for f in shape_files]
 
+        if len(shape_numbers) == 0:
+            return None
+        
         base_shape_file_path = os.path.join(self.data_path, data_dir, 'shape_info', f'shape_info_{max(shape_numbers)}.pkl')
         with open(base_shape_file_path, 'rb') as f:
             base_shape_data = pickle.load(f)
