@@ -131,7 +131,7 @@ def train():
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
-    epochs = 20
+    epochs = 50
     
     graphs = []
     loop_selection_masks = []
@@ -146,9 +146,15 @@ def train():
 
         if program[-1] != 'sketch':
             continue
+
+        if loop_neighboring_vertical.shape[0] > 400:
+            continue
     
 
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
+        if kth_operation is None:
+            continue
+
         chosen_strokes = (kth_operation == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
         loop_chosen_mask = []
         for loop in stroke_cloud_loops:
@@ -187,9 +193,12 @@ def train():
 
         gnn_graph.to_device_withPadding(device)
         loop_selection_mask = loop_selection_mask.to(device)
+        num_selected = (loop_selection_mask == 1).sum().item()
 
-        # print('loop_selection_mask', loop_selection_mask)
+        if num_selected != 1:
+            continue
         # Encoders.helper.vis_brep(output_brep_edges)
+        # print("num_selected", num_selected)
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
         # Encoders.helper. vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), stroke_cloud_loops)
 

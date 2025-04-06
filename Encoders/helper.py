@@ -8,11 +8,13 @@ from numpy.linalg import norm
 from scipy.interpolate import CubicSpline
 
 
-def get_kth_operation(op_to_index_matrix, k):    
+def get_kth_operation(op_to_index_matrix, k):
     squeezed_matrix = op_to_index_matrix.squeeze(0)
-    kth_operation = squeezed_matrix[:, k].unsqueeze(1)
-
-    return kth_operation
+    try:
+        kth_operation = squeezed_matrix[:, k].unsqueeze(1)
+        return kth_operation
+    except IndexError:
+        return None
 
 
 

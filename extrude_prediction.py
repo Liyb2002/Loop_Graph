@@ -319,7 +319,14 @@ def eval():
         if program[-1] != 'extrude':
             continue
         
+        if loop_neighboring_vertical.shape[0] > 400:
+            continue
+
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
+
+
+        if kth_operation is None:
+            continue
 
         sketch_operation_mask = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-2)
         sketch_stroke_idx = (sketch_operation_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
@@ -339,11 +346,6 @@ def eval():
 
         if not (extrude_selection_mask == 1).any() and not (sketch_loop_selection_mask == 1).any():
             continue
-
-        if len(graphs) > 100:
-            break
-
-
 
 
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(

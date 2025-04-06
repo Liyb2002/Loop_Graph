@@ -869,6 +869,8 @@ def loop_neighboring_complex(loops, stroke_node_features, loop_neighboring_all):
             edges.append(edge)
         
         # Find two edges that share a common point
+        vec1 = None
+        vec2 = None
         shared_point_found = False
         for i in range(len(edges)):
             for j in range(i + 1, len(edges)):
@@ -893,6 +895,8 @@ def loop_neighboring_complex(loops, stroke_node_features, loop_neighboring_all):
                 break
         
         # Compute the cross product to get the normal
+        if vec1 is None or vec2 is None:
+            return np.array([0,0,0])
         normal = np.cross(vec1, vec2)
         
         if np.isnan(normal).any() or np.all(normal == 0):
@@ -961,6 +965,10 @@ def stroke_relations(stroke_node_features, connected_stroke_nodes):
     strokes_perpendicular = np.zeros((num_strokes, num_strokes), dtype=int)
     strokes_non_perpendicular = np.zeros((num_strokes, num_strokes), dtype=int)
     
+
+    # consider the circle case:
+    strokes_perpendicular = stroke_relations_circle(stroke_node_features, strokes_perpendicular)
+
     # Function to calculate the direction vector of a stroke
     def get_direction_vector(stroke_features):
         point1 = stroke_features[:3]  # First 3D point
@@ -971,7 +979,7 @@ def stroke_relations(stroke_node_features, connected_stroke_nodes):
     for i in range(num_strokes):
         for j in range(num_strokes):
             if connected_stroke_nodes[i, j] == 1:
-                # Get the direction vectors for strokes i and j
+
                 vector_i = get_direction_vector(stroke_node_features[i])
                 vector_j = get_direction_vector(stroke_node_features[j])
                 
@@ -992,20 +1000,52 @@ def stroke_relations(stroke_node_features, connected_stroke_nodes):
                 strokes_non_perpendicular[i, j] = 0
     
 
-    # All relations related to a circle is perpendicular
-    for i in range(num_strokes):
-        # Is circle
-        if stroke_node_features[i, -1] == 2:
-
-            for j in range(num_strokes):
-                if connected_stroke_nodes[i, j] == 1:
-                    strokes_perpendicular[i, j] = 1
-                    strokes_perpendicular[j, i] = 1
             
-
-
     return strokes_perpendicular, strokes_non_perpendicular
     
+
+
+def stroke_relations_circle(stroke_node_features, strokes_perpendicular):
+    
+    num_strokes = stroke_node_features.shape[0]
+    EPSILON = 5e-5
+
+    for i in range(num_strokes):
+        # we find a circle
+    
+        sketch_center = None
+        sketch_radius = 0
+        cylinder_height = 0
+
+        if stroke_node_features[i][-1] == 2:
+            sketch_center = stroke_node_features[i][0:3]
+            sketch_radius = stroke_node_features[i][7]
+
+            # Find matching circle with same radius but different center
+            for i_2 in range(num_strokes):
+                if stroke_node_features[i_2][-1] == 2:
+                    center = stroke_node_features[i_2][0:3]
+                    radius = stroke_node_features[i_2][7]
+                    if np.linalg.norm(np.array(center) - np.array(sketch_center)) > 100 * EPSILON and abs(radius - sketch_radius) < EPSILON:
+                        cylinder_height = dist(center, sketch_center)
+                        break
+            
+            for j in range(num_strokes):
+                if stroke_node_features[j][-1] == 1:
+                    point_1 = stroke_node_features[j][0:3]
+                    point_2 = stroke_node_features[j][3:6]
+                    length = dist(point_1, point_2)
+
+                    if abs(length - cylinder_height) < EPSILON:
+                        d1 = dist(point_1, sketch_center)
+                        d2 = dist(point_2, sketch_center)
+                        if abs(d1 - sketch_radius) < EPSILON or abs(d2 - sketch_radius) < EPSILON:
+                            strokes_perpendicular[i][j] = 1
+                            strokes_perpendicular[j][i] = 1
+        
+    return strokes_perpendicular
+
+
 
 
 def loop_contained(loops, stroke_node_features):
@@ -1035,7 +1075,7 @@ def loop_contained(loops, stroke_node_features):
         
 
         # If circle
-        if len(loop) < 3:
+        if len(loop) < 3 and len(loop) > 0:
             circle_id = list(loop)[0]
             center_x, center_y, center_z, normal_x, normal_y, normal_z, alpha_value, radius, _, _, _ = stroke_coords = stroke_node_features[circle_id]
             min_x = max_x = center_x

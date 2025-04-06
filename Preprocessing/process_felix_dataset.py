@@ -46,13 +46,18 @@ class cad2sketch_dataset_loader(Dataset):
             return
 
         folders = [folder for folder in os.listdir(self.data_path) if os.path.isdir(os.path.join(self.data_path, folder))]
+        folders_sorted = sorted(folders, key=lambda x: int(os.path.basename(x)))
 
         if not folders:
             print("No folders found in the dataset directory.")
             return
 
-        # folder = 1600
-        for folder in folders:
+        target_index = 1600
+        for folder in folders_sorted:
+            folder_index = int(os.path.basename(folder))
+            if folder_index <= target_index:
+                continue
+
             self.process_subfolder(os.path.join(self.data_path, folder))
 
     # IDEA:
@@ -69,6 +74,7 @@ class cad2sketch_dataset_loader(Dataset):
         final_edges_file_path = os.path.join(subfolder_path, 'final_edges.json')
         all_edges_file_path = os.path.join(subfolder_path, 'unique_edges.json')
         strokes_dict_path = os.path.join(subfolder_path, 'strokes_dict.json')
+        program_path = os.path.join(subfolder_path, 'program.json')
 
         # Check if required JSON files exist, printing which one is missing
         missing_files = []
@@ -79,6 +85,8 @@ class cad2sketch_dataset_loader(Dataset):
             missing_files.append("unique_edges.json")
         if not os.path.exists(strokes_dict_path):
             missing_files.append("strokes_dict.json")
+        if not os.path.exists(program_path):
+            missing_files.append("program_path.json")
 
         if missing_files:
             print(f"Skipping {subfolder_path}: Missing files: {', '.join(missing_files)}")
@@ -100,6 +108,9 @@ class cad2sketch_dataset_loader(Dataset):
         # construction_lines = Preprocessing.cad2sketch_stroke_features.extract_only_construction_lines(final_edges_data)
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(construction_lines)
 
+
+        # Load program
+        program = self.read_json(program_path)
 
 
         # get necessary files
@@ -140,6 +151,21 @@ class cad2sketch_dataset_loader(Dataset):
         stroke_cloud_loops = Preprocessing.proc_CAD.helper.reorder_loops(stroke_cloud_loops)
         stroke_cloud_loops = [list(loop) for loop in stroke_cloud_loops]
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_cloud_loops)
+
+        # ensure sketch loops exist:
+        for idx, step_file in enumerate(step_files):
+            if program[idx]['operation'][0] == 'sketch':
+                
+                edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
+                edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
+                edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
+
+                loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, edge_features_list)
+                selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
+
+                if selected_indices not in stroke_cloud_loops:
+                    stroke_cloud_loops.append(selected_indices)
+
 
 
         # 3) Compute Loop Neighboring Information
@@ -208,7 +234,7 @@ class cad2sketch_dataset_loader(Dataset):
             # chosen_strokes = np.where((new_stroke_to_edge_matrix == 1).any(axis=1))[0]
 
             stroke_operations_order_matrix[:, idx] = np.array(new_stroke_to_edge_matrix).flatten()
-            Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_node_features, new_stroke_to_edge_matrix)
+            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_node_features, new_stroke_to_edge_matrix)
 
             # 7) Write the data to file
             output_file_path = os.path.join(data_directory, f'shape_info_{file_count}.pkl')

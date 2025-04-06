@@ -1632,6 +1632,78 @@ def split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix):
     return updated_strokes, np.array(add_feature_lines)
 
 
+import numpy as np
+
+def are_colinear(p1, p2, p3):
+    # Check if three points are colinear using cross product
+    v1 = np.array(p2) - np.array(p1)
+    v2 = np.array(p3) - np.array(p1)
+    cross = np.cross(v1, v2)
+    return np.allclose(cross, [0, 0, 0], atol=1e-5)
+
+def merge_edges(edge1, edge2):
+    points = [tuple(np.round(edge1[:3], 5)), tuple(np.round(edge1[3:6], 5)),
+              tuple(np.round(edge2[:3], 5)), tuple(np.round(edge2[3:6], 5))]
+
+    # Remove the shared point
+    unique_points = []
+    for pt in points:
+        if points.count(pt) == 1:
+            unique_points.append(pt)
+    
+    # Add one shared point to get 3 points for colinearity check
+    for pt in points:
+        if points.count(pt) > 1:
+            shared_point = pt
+            break
+
+    # Sort for consistency (optional)
+    return list(unique_points[0]) + list(unique_points[1]) + [0,0,0,1]
+
+def only_merge_brep(edge_features_list):
+    new_features_list = []
+    used_indices = set()
+    
+    for i, edge1 in enumerate(edge_features_list):
+        if i in used_indices:
+            continue
+        if edge1[-1] != 1:
+            new_features_list.append(edge1)
+            continue
+
+        merged = False
+        for j, edge2 in enumerate(edge_features_list):
+            if i == j or j in used_indices or edge2[-1] != 1:
+                continue
+
+            p11 = tuple(np.round(edge1[:3], 5))
+            p12 = tuple(np.round(edge1[3:6], 5))
+            p21 = tuple(np.round(edge2[:3], 5))
+            p22 = tuple(np.round(edge2[3:6], 5))
+
+            # Check for a common point
+            common_points = set([p11, p12]) & set([p21, p22])
+            if not common_points:
+                continue
+
+            # Check for colinearity
+            unique_points = list(set([p11, p12, p21, p22]))
+            if len(unique_points) < 3:
+                continue  # All points same or only 2 unique
+            if are_colinear(unique_points[0], unique_points[1], unique_points[2]):
+                merged_edge = merge_edges(edge1, edge2)
+                new_features_list.append(merged_edge)
+                used_indices.update([i, j])
+                merged = True
+                break
+
+        if not merged:
+            new_features_list.append(edge1)
+
+    return new_features_list
+
+
+
 
 def split_and_merge_brep(edge_features_list):
     add_feature_lines = []
@@ -1703,6 +1775,8 @@ def split_and_merge_brep(edge_features_list):
                 add_feature_lines.append(new_line)
     
     return edge_features_list + add_feature_lines, add_feature_lines
+
+
 
 # ------------------------------------------------------------------------------------# 
 def extract_input_json(final_edges_data, strokes_dict_data, subfolder_path):
