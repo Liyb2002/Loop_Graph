@@ -64,12 +64,13 @@ def compute_accuracy(valid_output, valid_batch_masks):
 
 
 
-def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
+def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch, data_indices):
     batch_size = valid_output.shape[0] // 400
     correct = 0
     total = 0
 
     for i in range(batch_size):
+        data_idx = data_indices[i]
         output_slice = valid_output[i * 400:(i + 1) * 400]
         mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
         stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 400:(i + 1) * 400]
@@ -88,8 +89,8 @@ def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch):
             predicted_stroke_idx = (output_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
             gt_stroke_idx = (mask_slice > 0.5).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
 
-            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx)
-            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx)
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), predicted_stroke_idx, data_idx)
+            Encoders.helper.vis_selected_strokes(stroke_node_features_slice.cpu().numpy(), gt_stroke_idx, data_idx)
 
 
     return total, correct
@@ -282,21 +283,32 @@ def eval():
     batch_size = 16
 
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/generate_CAD')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
     print(f"Total number of shape data: {len(dataset)}")
 
     graphs = []
     stroke_selection_masks = []
+    data_indices = []
 
     # Preprocess and build the graphs (same as in training)
     for data in tqdm(dataset, desc=f"Building Graphs"):
+        if data is None:
+            continue
+
         # Extract the necessary elements from the dataset
-        program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        data_idx, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
         if program[-1] != 'fillet'or len(program) > stroke_operations_order_matrix.shape[1]:
             continue
         
+        if loop_neighboring_vertical.shape[0] > 400:
+            continue
+
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
+    
+        if kth_operation is None:
+            continue
+
         raw_fillet_stroke_idx = (kth_operation == 1).nonzero(as_tuple=True)[0] 
         fillet_stroke_idx, stroke_selection_matrix= Encoders.helper.choose_fillet_strokes(raw_fillet_stroke_idx, stroke_node_features)
 
@@ -314,13 +326,17 @@ def eval():
 
         # gnn_graph.graph_info()
 
+        data_indices.append(data_idx)
         gnn_graph.to_device_withPadding(device)
         stroke_selection_matrix = stroke_selection_matrix.to(device)
 
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
+        if len(graphs) > 100:
+            break
+
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
 
         
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -332,6 +348,7 @@ def eval():
     # Create DataLoader for evaluation
     graph_eval_loader = DataLoader(hetero_graphs, batch_size=batch_size, shuffle=False)
     mask_eval_loader = DataLoader(padded_masks, batch_size=batch_size, shuffle=False)
+    data_indices_loader = DataLoader(data_indices, batch_size=batch_size, shuffle=False)
 
     eval_loss = 0.0
     total = 0
@@ -342,7 +359,7 @@ def eval():
     with torch.no_grad():
         total_iterations_eval = min(len(graph_eval_loader), len(mask_eval_loader))
 
-        for hetero_batch, batch_masks in tqdm(zip(graph_eval_loader, mask_eval_loader), desc="Evaluation", dynamic_ncols=True, total=total_iterations_eval):
+        for hetero_batch, batch_masks, data_indices in tqdm(zip(graph_eval_loader, mask_eval_loader, data_indices_loader), desc="Evaluation", dynamic_ncols=True, total=total_iterations_eval):
             # Forward pass through the graph encoder
             x_dict = graph_encoder(hetero_batch.x_dict, hetero_batch.edge_index_dict)
 
@@ -358,7 +375,7 @@ def eval():
             valid_batch_masks = batch_masks * valid_mask
 
 
-            tempt_total, tempt_correct = compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch)           
+            tempt_total, tempt_correct = compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch, data_indices)           
             total += tempt_total
             correct += tempt_correct
 
@@ -375,4 +392,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

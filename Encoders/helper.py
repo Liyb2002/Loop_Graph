@@ -7,7 +7,8 @@ from math import inf
 from numpy.linalg import norm
 from scipy.interpolate import CubicSpline
 
-
+import os
+import pathlib
 def get_kth_operation(op_to_index_matrix, k):
     squeezed_matrix = op_to_index_matrix.squeeze(0)
     try:
@@ -873,7 +874,7 @@ def vis_brep_with_indices(brep, indices):
 
 
 
-def vis_selected_strokes(stroke_node_features, selected_stroke_idx, alpha_value=0.7):
+def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, alpha_value=0.7):
     """
     Visualizes selected strokes in 3D space with a hand-drawn effect.
 
@@ -885,135 +886,88 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, alpha_value=
     """
     
     # Initialize the 3D plot
+    final_edges_file_path = os.path.join(
+    os.getcwd(), 'dataset', 'cad2sketch_annotated', data_idx, 'final_edges.json')
+    final_edges_data = read_json(final_edges_file_path)
+    all_lines = extract_all_lines(final_edges_data)
 
-    stroke_node_features = stroke_node_features[:, :-1]  
+
+
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
+    
+    # Remove axis labels, ticks, and background
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.set_frame_on(False)
     ax.grid(False)
-    ax.axis('off')  # Turn off axis background and borders
+    ax.set_axis_off()
 
-    # Initialize min and max limits
+    # Initialize bounding box variables
     x_min, x_max = float('inf'), float('-inf')
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
-    perturb_factor = 0.000002  # Adjusted perturbation factor for hand-drawn effect
+    # First pass: plot all strokes in black and compute bounding box
+    for stroke in all_lines:
+        geometry = stroke["geometry"]
 
-    # Plot all strokes in blue with perturbations
-    for idx, stroke in enumerate(stroke_node_features):
-        start, end = stroke[:3], stroke[3:6]
-        
-        # Ignore invalid strokes marked with specific values
-        if stroke[-2] == -1 and stroke[-3] == -1 and stroke[-4] == -1:
+        if len(geometry) < 2:
             continue
-        
-        color = 'black'
 
-        # Update min and max limits based on strokes (ignoring circles)
-        if stroke[-1] == 1:
-            # straight line
+        for j in range(1, len(geometry)):
+            start = geometry[j - 1]
+            end = geometry[j]
+
+            # Update bounding box
             x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
-        
-        if stroke[-1] == 2:
-            # Circle face
-            x_values, y_values, z_values = plot_circle(stroke)
-            ax.plot(x_values, y_values, z_values, color=color, alpha=alpha_value)
-            continue
 
-        if stroke[-1] ==3:
-            # Arc
-            x_values, y_values, z_values = plot_arc(stroke)
-            ax.plot(x_values, y_values, z_values, color=color, alpha=alpha_value)
-            continue
-
-        else:
-            # Hand-drawn effect for regular stroke line
-            x_values = np.array([start[0], end[0]])
-            y_values = np.array([start[1], end[1]])
-            z_values = np.array([start[2], end[2]])
-            
-            # Add perturbations for hand-drawn effect
-            perturbations = np.random.normal(0, perturb_factor, (10, 3))
-            t = np.linspace(0, 1, 10)
-            x_interpolated = np.linspace(x_values[0], x_values[1], 10) + perturbations[:, 0]
-            y_interpolated = np.linspace(y_values[0], y_values[1], 10) + perturbations[:, 1]
-            z_interpolated = np.linspace(z_values[0], z_values[1], 10) + perturbations[:, 2]
-
-            # Smooth curve with cubic splines
-            cs_x = CubicSpline(t, x_interpolated)
-            cs_y = CubicSpline(t, y_interpolated)
-            cs_z = CubicSpline(t, z_interpolated)
-            smooth_t = np.linspace(0, 1, 100)
-            smooth_x = cs_x(smooth_t)
-            smooth_y = cs_y(smooth_t)
-            smooth_z = cs_z(smooth_t)
-
-            # Plot perturbed line
-            ax.plot(smooth_x, smooth_y, smooth_z, color=color, alpha=alpha_value, linewidth=0.5)
-
-    # Plot selected strokes in red to overlay the blue ones
-    for idx in selected_stroke_idx:
-        stroke = stroke_node_features[idx]
-        start, end = stroke[:3], stroke[3:6]
-        
-        # Ignore invalid strokes marked with specific values
-        if stroke[-2] == -1 and stroke[-3] == -1 and stroke[-4] == -1:
-            continue
-
-        color = 'red'
-        
-        if stroke[-1] == 2:
-            # Circle face
-            x_values, y_values, z_values = plot_circle(stroke)
-            ax.plot(x_values, y_values, z_values, color=color, alpha=alpha_value)
-            continue
-
-        if stroke[-1] ==3:
-            # Arc
-            x_values, y_values, z_values = plot_arc(stroke)
-            ax.plot(x_values, y_values, z_values, color=color, alpha=alpha_value)
-            continue
-
-        else:
-            # Hand-drawn effect for selected stroke
-            x_values = np.array([start[0], end[0]])
-            y_values = np.array([start[1], end[1]])
-            z_values = np.array([start[2], end[2]])
-            
-            perturbations = np.random.normal(0, perturb_factor, (10, 3))
-            t = np.linspace(0, 1, 10)
-            x_interpolated = np.linspace(x_values[0], x_values[1], 10) + perturbations[:, 0]
-            y_interpolated = np.linspace(y_values[0], y_values[1], 10) + perturbations[:, 1]
-            z_interpolated = np.linspace(z_values[0], z_values[1], 10) + perturbations[:, 2]
-
-            cs_x = CubicSpline(t, x_interpolated)
-            cs_y = CubicSpline(t, y_interpolated)
-            cs_z = CubicSpline(t, z_interpolated)
-            smooth_t = np.linspace(0, 1, 100)
-            smooth_x = cs_x(smooth_t)
-            smooth_y = cs_y(smooth_t)
-            smooth_z = cs_z(smooth_t)
-
-            ax.plot(smooth_x, smooth_y, smooth_z, color=color, alpha=alpha_value, linewidth=1)
+            # Plot the stroke in black
+            ax.plot([start[0], end[0]], 
+                    [start[1], end[1]], 
+                    [start[2], end[2]], 
+                    color='black', 
+                    linewidth=0.5)
 
     # Compute the center and rescale
     x_center = (x_min + x_max) / 2
     y_center = (y_min + y_max) / 2
     z_center = (z_min + z_max) / 2
     max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
     ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
     ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
     ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
 
-    # Remove axis ticks and labels
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_zticks([])
+    # Second pass: highlight chosen strokes in red
+    for idx in selected_stroke_idx:
+        if idx < len(all_lines):
+            geometry = all_lines[idx]["geometry"]
+            if len(geometry) < 2:
+                continue
+            for j in range(1, len(geometry)):
+                start = geometry[j - 1]
+                end = geometry[j]
+                ax.plot([start[0], end[0]],
+                        [start[1], end[1]],
+                        [start[2], end[2]],
+                        color='red',
+                        linewidth=1.0)
+        else:
+            stroke = stroke_node_features[idx]
+            start = stroke[0:3]
+            end = stroke[3:6]
+            ax.plot([start[0], end[0]],
+                    [start[1], end[1]],
+                    [start[2], end[2]],
+                    color='red',
+                    linewidth=1.0)
 
-    # Show plot
     plt.show()
+
 
 
 #------------------------------------------------------------------------------------------------------#
@@ -1091,3 +1045,31 @@ def plot_arc(stroke):
 
     # Return x, y, z coordinates of the line points
     return line_points[:, 0], line_points[:, 1], line_points[:, 2]
+
+
+
+
+
+#---------------------- Copied Files -----------------------------#   
+import json
+def read_json( file_path):
+    """
+    Reads a JSON file and returns its contents.
+    """
+    try:
+        with open(file_path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error reading JSON file {file_path}: {e}")
+        return None
+
+
+
+def extract_all_lines(final_edges_data):
+    feature_lines = []
+
+    for key, stroke in final_edges_data.items():
+        
+        feature_lines.append(stroke)
+
+    return feature_lines
