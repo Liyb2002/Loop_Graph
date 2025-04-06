@@ -102,24 +102,33 @@ def train():
     dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
     print(f"Total number of shape data: {len(dataset)}")
 
-    epochs = 300
+    epochs = 50
 
     graphs = []
     stroke_selection_masks = []
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
+    
+        if data is None:
+            continue
+
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
         if program[-1] != 'fillet'or len(program) > stroke_operations_order_matrix.shape[1]:
             continue
         
+        if loop_neighboring_vertical.shape[0] > 400:
+            continue
+
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
+
+        if kth_operation is None:
+            continue
+
         raw_fillet_stroke_idx = (kth_operation == 1).nonzero(as_tuple=True)[0] 
         fillet_stroke_idx, stroke_selection_matrix= Encoders.helper.choose_fillet_strokes(raw_fillet_stroke_idx, stroke_node_features)
-
-
 
 
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
@@ -139,7 +148,7 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")

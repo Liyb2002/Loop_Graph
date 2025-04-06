@@ -51,19 +51,22 @@ def save_models():
 def compute_accuracy(valid_output, valid_batch_masks):
     batch_size = valid_output.shape[0] // 400
     correct = 0
+    total_count = 3 * batch_size
 
     for i in range(batch_size):
-        output_slice = valid_output[i * 400:(i + 1) * 400]
-        mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
+        output_slice = valid_output[i * 400:(i + 1) * 400].squeeze()  # shape: [400]
+        mask_slice = valid_batch_masks[i * 400:(i + 1) * 400].squeeze()  # shape: [400]
 
-        condition_1 = (mask_slice == 1) & (output_slice > 0.5)
-        condition_2 = (mask_slice == 0) & (output_slice < 0.5)
+        top3_indices = torch.topk(output_slice, 3).indices
 
+        for idx in top3_indices:
+            pred = output_slice[idx]
+            label = mask_slice[idx]
 
-        if torch.all(condition_1 | condition_2):
-            correct += 1
+            if (pred > 0.5 and label == 1) or (pred < 0.5 and label == 0):
+                correct += 1
 
-    return correct
+    return correct, total_count
 
 
 
@@ -120,13 +123,22 @@ def train():
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
+        if data is None:
+            continue
+
         # Extract the necessary elements from the dataset
         program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
         if program[-1] != 'extrude'or len(program) > stroke_operations_order_matrix.shape[1]:
             continue
         
+        if loop_neighboring_vertical.shape[0] > 400:
+            continue
+
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
+
+        if kth_operation is None:
+            continue
 
         sketch_operation_mask = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-2)
         sketch_stroke_idx = (sketch_operation_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
@@ -171,8 +183,8 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
 
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx)
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -199,7 +211,7 @@ def train():
     mask_val_loader = DataLoader(padded_val_masks, batch_size=16, shuffle=False)
 
     # Training and validation loop
-    epochs = 20  # Number of epochs
+    epochs = 50  # Number of epochs
     best_accuracy = 0.0
 
     for epoch in range(epochs):
@@ -241,8 +253,9 @@ def train():
             train_loss += loss.item()
 
             # Accuracy computation using the preferred method (only on valid values)
-            correct += compute_accuracy(valid_output, valid_batch_masks)
-            train_total += valid_batch_masks.shape[0] / 400
+            batch_correct, batch_total= compute_accuracy(valid_output, valid_batch_masks)
+            correct += batch_correct
+            train_total += batch_total
 
         train_accuracy = correct / train_total
         print(f"Epoch {epoch+1}/{epochs}, Training Loss: {train_loss / total_iterations:.5f}, Training Accuracy: {train_accuracy:.4f}")
@@ -280,9 +293,10 @@ def train():
                 val_loss += loss.item()
 
                 # Accuracy computation using the preferred method (only on valid values)
-                correct += compute_accuracy(valid_output, valid_batch_masks)
-                total += valid_batch_masks.shape[0] / 400
-
+        
+                batch_correct, batch_total= compute_accuracy(valid_output, valid_batch_masks)
+                correct += batch_correct
+                total += batch_total
         val_accuracy = correct / total
         print(f"Validation Loss: {val_loss / total_iterations_val:.5f}, Validation Accuracy: {val_accuracy:.4f}")
 
