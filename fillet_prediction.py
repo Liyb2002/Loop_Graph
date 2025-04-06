@@ -333,7 +333,7 @@ def eval():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
-        if len(graphs) > 100:
+        if len(graphs) > 2000:
             break
 
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)

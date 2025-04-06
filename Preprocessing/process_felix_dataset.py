@@ -52,13 +52,15 @@ class cad2sketch_dataset_loader(Dataset):
             print("No folders found in the dataset directory.")
             return
 
-        target_index = 1600
+        total_folders = 0
+        target_index = 0
         for folder in folders_sorted:
             folder_index = int(os.path.basename(folder))
             if folder_index <= target_index:
                 continue
-
-            self.process_subfolder(os.path.join(self.data_path, folder))
+            
+            total_folders += 1
+            # self.process_subfolder(os.path.join(self.data_path, folder))
 
     # IDEA:
     # We are in /selected_dataset/1600

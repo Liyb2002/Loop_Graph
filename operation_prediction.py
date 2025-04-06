@@ -149,11 +149,11 @@ def trim_confusion_matrix(conf_matrix):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/selected_dataset')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
-    epochs = 200
+    epochs = 50
     
     graphs = []
     existing_programs = []
@@ -161,16 +161,15 @@ def train():
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
-        # Extract the necessary elements from the dataset
-        program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
         
-        # if program[-1] == 'terminate':
-        #     continue
+        if data is None:
+            continue
 
-        print("existing_programs", program[:-1])
-        print("next token", program[-1])
-        print("------------------")
-
+        # Extract the necessary elements from the dataset
+        data_idx, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        
+        if loop_neighboring_vertical.shape[0] > 400:
+            continue
 
         # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
