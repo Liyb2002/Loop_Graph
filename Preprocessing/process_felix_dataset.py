@@ -60,7 +60,11 @@ class cad2sketch_dataset_loader(Dataset):
                 continue
             
             total_folders += 1
-            # self.process_subfolder(os.path.join(self.data_path, folder))
+            success_process = self.process_subfolder(os.path.join(self.data_path, folder))
+
+            if not success_process:
+                shutil.rmtree(os.path.join(self.data_path, folder))
+
 
     # IDEA:
     # We are in /selected_dataset/1600
@@ -160,11 +164,14 @@ class cad2sketch_dataset_loader(Dataset):
                 
                 edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
                 edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
-                edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
+                new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
 
-                loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, edge_features_list)
+                loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_edge_features_list)
                 selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
 
+                if len(selected_indices) == 1 and stroke_node_features[selected_indices[0]][-1] == 1:
+                    return False
+                
                 if selected_indices not in stroke_cloud_loops:
                     stroke_cloud_loops.append(selected_indices)
 
@@ -260,7 +267,7 @@ class cad2sketch_dataset_loader(Dataset):
             
             file_count += 1
   
-        return None
+        return True
 
 
     def __getitem__(self, index):

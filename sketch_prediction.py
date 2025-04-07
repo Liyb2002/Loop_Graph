@@ -67,7 +67,7 @@ def compute_accuracy(valid_output, valid_batch_masks):
     return correct
 
 
-def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
+def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch, data_indices):
     # Infer batch size and sequence length from the shapes
     batch_size = valid_output.shape[0] // 400
 
@@ -77,6 +77,7 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
 
     for i in range(batch_size):
         # Slice for each example in the batch
+        data_idx = data_indices[i]
 
         output_slice = valid_output[i * 400:(i + 1) * 400]
         mask_slice = valid_batch_masks[i * 400:(i + 1) * 400]
@@ -113,11 +114,10 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch):
 
         # Check if the prediction is correct and increment the correct counter for the category
         if max_output_index.item() in gt_indices:
-            correct_count[category_idx] += 1
+            correct_count[category_idx] += 1         
         else:
-            pass
-            # Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_output_index.item()])
-            # Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, gt_indices)
+            Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_output_index.item()], data_idx)
+            Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, gt_indices, data_idx)
 
     return category_count, correct_count
 
@@ -142,7 +142,7 @@ def train():
             continue
 
         # Extract the necessary elements from the dataset
-        program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        data_idx, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
         if program[-1] != 'sketch':
             continue
@@ -164,9 +164,11 @@ def train():
             else:
                 loop_chosen_mask.append(0)  # Loop is not chosen
         
-        
+        if len(chosen_strokes) == 1 and stroke_node_features[chosen_strokes[0]][-1] == 1:
+            continue
+
         loop_chosen_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).flatten()
-        
+
         # Find the indices where the value is 1
         ones_indices = (loop_chosen_mask == 1).nonzero(as_tuple=True)[0]
         
@@ -199,7 +201,7 @@ def train():
             continue
         # Encoders.helper.vis_brep(output_brep_edges)
         # print("num_selected", num_selected)
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes, data_idx)
         # Encoders.helper. vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), stroke_cloud_loops)
 
         # Prepare the pair
@@ -307,26 +309,35 @@ def train():
 
 
 def eval():
-    # load_models()
+    load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/eval')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
     print(f"Total number of shape data: {len(dataset)}")
 
 
     eval_graphs = []
     eval_loop_selection_masks = []
     eval_all_loop_selection_masks = []
+    data_indices = []
 
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
-        program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        if data is None:
+            continue
+
+        data_idx, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
         if program[-1] != 'sketch':
             continue
 
+        if loop_neighboring_vertical.shape[0] > 400:
+            continue
+
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
-        all_sketch_strokes = Encoders.helper.get_all_operation_strokes(stroke_operations_order_matrix, program_whole, 'sketch')
+
+        if kth_operation is None:
+            continue
 
         # Gets the strokes for the current sketch Operation
         chosen_strokes = (kth_operation == 1).nonzero(as_tuple=True)[0]  # Indices of chosen stroke
@@ -337,20 +348,26 @@ def eval():
             else:
                 loop_chosen_mask.append(0)  # Loop is not chosen
         
-        loop_selection_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
-        if not (loop_selection_mask == 1).any():
+
+        if len(chosen_strokes) == 1 and stroke_node_features[chosen_strokes[0]][-1] == 1:
             continue
 
+        loop_chosen_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).flatten()
+
+        # Find the indices where the value is 1
+        ones_indices = (loop_chosen_mask == 1).nonzero(as_tuple=True)[0]
         
-        # Gets the strokes for all sketch Operation
-        all_chosen_strokes = (all_sketch_strokes == 1).nonzero(as_tuple=True)[0]  # Indices of chosen stroke
-        all_loop_chosen_mask = []
-        for loop in stroke_cloud_loops:
-            if all(stroke in all_chosen_strokes for stroke in loop):
-                all_loop_chosen_mask.append(1)  # Loop is chosen
-            else:
-                all_loop_chosen_mask.append(0)  # Loop is not chosen
-        all_loop_selection_mask = torch.tensor(all_loop_chosen_mask, dtype=torch.float).reshape(-1, 1)
+        if len(ones_indices) > 1:
+            # Set all to 0
+            loop_chosen_mask[ones_indices] = 0
+            # Set only the first occurrence to 1
+            loop_chosen_mask[ones_indices[0]] = 1
+        
+        if len(ones_indices) < 1:
+            continue
+
+        # Reshape to (-1, 1) as in the original
+        loop_selection_mask = loop_chosen_mask.reshape(-1, 1)
 
         
         # Build the graph
@@ -365,19 +382,21 @@ def eval():
             stroke_to_edge
         )
 
-        # Encoders.helper.vis_brep(final_brep_edges)
-        all_selected_loops_idx = [idx for idx, value in enumerate(all_loop_chosen_mask) if value != 0]
 
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes )
+        # print("chosen_strokes", chosen_strokes)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes , data_idx)
 
         # Prepare the pair
         gnn_graph.to_device_withPadding(device)
         loop_selection_mask = loop_selection_mask.to(device)
+        data_indices.append(data_idx)
         
         eval_graphs.append(gnn_graph)
         eval_loop_selection_masks.append(loop_selection_mask)
-        eval_all_loop_selection_masks.append(all_loop_selection_mask)
 
+
+        if len(eval_graphs) > 1000:
+            break
 
     print(f"Total number of preprocessed graphs: {len(eval_graphs)}")
 
@@ -385,12 +404,11 @@ def eval():
     # Convert train and validation graphs to HeteroData
     hetero_eval_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in eval_graphs]
     padded_eval_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in eval_loop_selection_masks]
-    padded_eval_all_masks = [Preprocessing.dataloader.pad_masks(mask) for mask in eval_all_loop_selection_masks]
 
     # Create DataLoaders for training and validation graphs/masks
     graph_eval_loader = DataLoader(hetero_eval_graphs, batch_size=16, shuffle=False)
     mask_eval_loader = DataLoader(padded_eval_masks, batch_size=16, shuffle=False)
-    mask_eval_all_loader = DataLoader(padded_eval_all_masks, batch_size=16, shuffle=False)
+    data_indices_loader = DataLoader(data_indices, batch_size=16, shuffle=False)
 
 
 
@@ -403,9 +421,9 @@ def eval():
     total_correct_count = [0, 0, 0, 0] 
 
     with torch.no_grad():
-        total_iterations_eval = min(len(graph_eval_loader), len(mask_eval_all_loader))
+        total_iterations_eval = min(len(graph_eval_loader), len(mask_eval_loader))
 
-        for hetero_batch, batch_masks, in tqdm(zip(graph_eval_loader, mask_eval_all_loader), 
+        for hetero_batch, batch_masks, data_indices in tqdm(zip(graph_eval_loader, mask_eval_loader, data_indices_loader), 
                                                 desc="Evaluation", 
                                                 dynamic_ncols=True, 
                                                 total=total_iterations_eval):
@@ -420,7 +438,7 @@ def eval():
             valid_batch_masks = batch_masks * valid_mask
 
 
-            category_count, correct_count = compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch)           
+            category_count, correct_count = compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch, data_indices)           
 
             for i in range(4):
                 total_category_count[i] += category_count[i]
@@ -458,4 +476,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

@@ -969,6 +969,101 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
     plt.show()
 
 
+def vis_selected_loops(stroke_node_features, edge_features_slice, selected_loop_idx, data_idx):
+    """
+    Visualizes selected strokes in 3D space with a hand-drawn effect.
+
+    Parameters:
+    - stroke_node_features: A numpy array or list containing the features of each stroke.
+      Each stroke should contain its start and end coordinates, and potentially a flag indicating if it's a circle.
+    - edge_features_slice: A 2D array where each row contains [stroke_index, loop_index].
+    - selected_loop_idx: A list (length 1) or array of the loop index to highlight.
+    - data_idx: String or identifier for loading the corresponding file.
+    """
+
+    # Load final edges
+    final_edges_file_path = os.path.join(
+        os.getcwd(), 'dataset', 'cad2sketch_annotated', data_idx, 'final_edges.json')
+    final_edges_data = read_json(final_edges_file_path)
+    all_lines = extract_all_lines(final_edges_data)
+
+    # Set up the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.set_frame_on(False)
+    ax.grid(False)
+    ax.set_axis_off()
+
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    for stroke in all_lines:
+        geometry = stroke["geometry"]
+        if len(geometry) < 2:
+            continue
+        for j in range(1, len(geometry)):
+            start, end = geometry[j - 1], geometry[j]
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+            ax.plot([start[0], end[0]], 
+                    [start[1], end[1]], 
+                    [start[2], end[2]], 
+                    color='black', 
+                    linewidth=0.5)
+
+    # Normalize view
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    target_loop = selected_loop_idx[0]
+
+    # Step 1: Extract loop indices (second row)
+    loop_indices = edge_features_slice[1]  # shape: (n,)
+
+    # Step 2: Create mask where loop index == target
+    mask = loop_indices == target_loop  # shape: (n,), bool tensor
+
+    # Step 3: Apply mask to stroke indices (first row)
+    stroke_indices = edge_features_slice[0]  # shape: (n,)
+    loop_strokes = stroke_indices[mask].tolist()  # final result as list
+
+    for idx in loop_strokes:
+        if idx < len(all_lines):
+            geometry = all_lines[idx]["geometry"]
+            if len(geometry) < 2:
+                continue
+            for j in range(1, len(geometry)):
+                start = geometry[j - 1]
+                end = geometry[j]
+                ax.plot([start[0], end[0]],
+                        [start[1], end[1]],
+                        [start[2], end[2]],
+                        color='red',
+                        linewidth=1.0)
+        else:
+            stroke = stroke_node_features[idx]
+            start = stroke[0:3]
+            end = stroke[3:6]
+            ax.plot([start[0], end[0]],
+                    [start[1], end[1]],
+                    [start[2], end[2]],
+                    color='red',
+                    linewidth=1.0)
+
+    plt.show()
+
+
 
 #------------------------------------------------------------------------------------------------------#
 
