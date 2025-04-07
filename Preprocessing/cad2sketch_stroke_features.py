@@ -33,6 +33,22 @@ def build_final_edges_json(final_edges_json):
         geometry = stroke["geometry"]
 
         node_feature = build_node_features(geometry)
+
+
+        # remove redundant circle line
+        if node_feature[-1] == 2:
+            center = node_feature[:3]
+            too_close = False
+            for existing_feature in node_features_list:
+                existing_center = existing_feature[:3]
+                dist = np.linalg.norm(np.array(center) - np.array(existing_center))
+                if dist < 5e-5:
+                    too_close = True
+                    break
+            if too_close:
+                continue
+
+
         node_features_list.append(node_feature)
 
         stroke_type = stroke['type']
@@ -40,6 +56,7 @@ def build_final_edges_json(final_edges_json):
             is_feature_line_matrix[i] = 1
         else:
             is_feature_line_matrix[i] = 0
+
 
     node_features_matrix = np.array(node_features_list)
 
