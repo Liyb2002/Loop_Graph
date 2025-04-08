@@ -107,7 +107,7 @@ class Brep:
         self.op.append(['sketch'])
 
 
-    def extrude_op(self, extrude_target_point = None):
+    def extrude_op(self, extrude_amount = None, extrude_direction = None):
         
 
         sketch_face = self.Faces[-1]
@@ -118,7 +118,7 @@ class Brep:
 
 
         # For dataset generation process
-        if extrude_target_point is None:
+        if extrude_amount is None:
             amount = Preprocessing.proc_CAD.random_gen.generate_random_extrude()
             safe_amount = -self.safe_extrude_check()
             if amount <0:
@@ -136,46 +136,14 @@ class Brep:
                 new_vertices.append(new_vertex)
 
         else:
-            extrude_direction = None
-            amount = None
-
-            for sketch_face_vert in sketch_face.vertices:
-                vert_pos = sketch_face_vert.position
-                # Check if vert_pos differs from extrude_target_point by only one axis
-                diff_axis_values = [extrude_target_point[j] - vert_pos[j] for j in range(3)]
-                diff_non_zero = [abs(val) > 1e-2 for val in diff_axis_values]
-                
-                if sum(diff_non_zero) == 1:  # Only one axis has a significant difference
-                    extrude_direction = [1 if val > 0 else -1 if val < 0 else 0 for val in diff_axis_values]
-                    amount = max(abs(val) for val in diff_axis_values).item()
-                    break
-            
             for i, sketch_face_vert in enumerate(sketch_face.vertices):
                 vert_pos = sketch_face_vert.position
                 # Map vert_pos to the same plane as extrude_target_point
-                new_pos = [vert_pos[j] + extrude_direction[j] * amount for j in range(3)]
+                new_pos = [vert_pos[j] + extrude_direction[j] * extrude_amount for j in range(3)]
                 vertex_id = f"vertex_{self.idx}_{i}"
                 new_vertex = Vertex(vertex_id, new_pos)
                 self.Vertices.append(new_vertex)
                 new_vertices.append(new_vertex)
-
-
-            if sketch_face.is_circle:
-                center = sketch_face.center  # Circle's center
-
-                # Compute the difference between the center and the extrude target point
-                diff_axis_values = [extrude_target_point[j] - center[j] for j in range(3)]
-                diff_non_zero = [abs(val) > 1e-2 for val in diff_axis_values]
-
-                if sum(diff_non_zero) == 1:  # Only one axis has a significant difference
-                    # Determine the extrusion direction and amount
-                    normal = [1 if val > 0 else -1 if val < 0 else 0 for val in diff_axis_values]  # Extrusion direction (normal)
-                    amount = max(abs(val) for val in diff_axis_values)  # Extrusion amount
-                else:
-                    raise ValueError("Extrusion target point does not differ from center by exactly one axis.")
-
-                # The computed 'amount' and 'normal' can now be used for further operations
-                print(f"Extrusion amount: {amount}, Normal: {normal}")
 
 
         num_vertices = len(new_vertices)
@@ -211,9 +179,8 @@ class Brep:
             self.Faces.append(side_face)
 
         self.idx += 1
-        if isinstance(extrude_target_point, torch.Tensor): 
-            extrude_target_point = extrude_target_point.tolist()
-        self.op.append(['extrude', sketch_face.id, amount, extrude_target_point])
+
+        self.op.append(['extrude', sketch_face.id, extrude_amount, extrude_direction.tolist()])
 
 
     def random_fillet(self, target_edge_tensor = None, amount = 0):        

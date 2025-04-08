@@ -237,8 +237,8 @@ class Particle():
         # Build Extrude
         if self.current_op == 2:
             print("Build extrude")
-            extrude_target_point, prob = do_extrude(gnn_graph, self.sketch_selection_mask, self.sketch_points, self.brep_edges, self.data_idx)
-            self.cur__brep_class.extrude_op(extrude_target_point)
+            extrude_amount, extrude_direction, prob = do_extrude(gnn_graph, self.sketch_selection_mask, self.sketch_points, self.brep_edges, self.data_idx)
+            self.cur__brep_class.extrude_op(extrude_amount.item(), extrude_direction.detach().cpu().numpy())
             self.score = self.score * prob
 
 
@@ -475,9 +475,8 @@ def predict_extrude(gnn_graph, sketch_selection_mask, data_idx):
 
 def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges, data_idx):
     extrude_selection_mask = predict_extrude(gnn_graph, sketch_selection_mask, data_idx)
-    extrude_target_point, selected_prob= whole_process_helper.helper.get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges)
-
-    return extrude_target_point, selected_prob
+    extrude_amount, extrude_direction, selected_prob= whole_process_helper.helper.get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges)
+    return extrude_amount, extrude_direction, selected_prob
 
 
 

@@ -92,13 +92,9 @@ class parsed_program():
         sketch_point_list = [vert['coordinates'] for vert in sketch_Op['vertices']]
         normal_vec = self.prev_sketch.faces()[0].normal_at()
         sketch_face_normal = [normal_vec.X, normal_vec.Y, normal_vec.Z]
-        target_point = Op['operation'][3]
+        extrude_amount = Op['operation'][2]
+        extrude_direction = Op['operation'][3]
 
-
-        if len(sketch_point_list) ==0 :
-            extrude_amount = self.find_extrude_amount([self.circle_center], sketch_face_normal, target_point)
-        else:
-            extrude_amount = self.find_extrude_amount(sketch_point_list, sketch_face_normal, target_point)
 
 
         
