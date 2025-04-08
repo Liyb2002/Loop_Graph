@@ -84,8 +84,7 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch, dat
         
         stroke_node_features_slice = hetero_batch.x_dict['stroke'][i * 400:(i + 1) * 400]
         edge_features = hetero_batch.edge_index_dict['stroke', 'represents', 'loop']
-        edge_features_slice = Encoders.helper.find_edge_features_slice(edge_features, i)
-
+        edge_features_slice = edge_features[i * 400:(i + 1) * 400]
 
         # Find k: the number of rows where all elements are not -1
         k = 0
@@ -327,7 +326,6 @@ def eval():
             continue
 
         data_idx, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
-
         if program[-1] != 'sketch':
             continue
 
@@ -384,7 +382,7 @@ def eval():
 
 
         # print("chosen_strokes", chosen_strokes)
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes , data_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes , data_idx)
 
         # Prepare the pair
         gnn_graph.to_device_withPadding(device)

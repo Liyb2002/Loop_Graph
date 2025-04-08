@@ -63,6 +63,7 @@ class cad2sketch_dataset_loader(Dataset):
             success_process = self.process_subfolder(os.path.join(self.data_path, folder))
 
             if not success_process:
+                print("remove folder:", folder)
                 shutil.rmtree(os.path.join(self.data_path, folder))
 
 
