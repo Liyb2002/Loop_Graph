@@ -191,8 +191,7 @@ class Particle():
             stroke_to_edge
         )
 
-
-        Encoders.helper.vis_brep(self.brep_edges)
+        # Encoders.helper.vis_brep(self.brep_edges)
         # Encoders.helper.vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), self.stroke_cloud_loops)
         
         if self.past_programs[-1] != 2:
@@ -423,7 +422,7 @@ def predict_sketch(gnn_graph, data_idx):
     selected_loop_idx, idx_prob = whole_process_helper.helper.find_valid_sketch(gnn_graph, sketch_selection_mask)
     sketch_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
 
-    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx, data_idx)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx, data_idx)
 
     return selected_loop_idx, sketch_selection_mask, idx_prob
 
