@@ -153,6 +153,8 @@ class cad2sketch_dataset_loader(Dataset):
         strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, connected_stroke_nodes)
 
 
+        stroke_operations_order_matrix = np.zeros((stroke_node_features.shape[0], len(step_files)))
+
         # 2) Get the loops
         stroke_cloud_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
         stroke_cloud_loops = Preprocessing.proc_CAD.helper.reorder_loops(stroke_cloud_loops)
@@ -177,6 +179,14 @@ class cad2sketch_dataset_loader(Dataset):
                     stroke_cloud_loops.append(selected_indices)
 
 
+                stroke_operations_order_matrix[:, idx] = np.array(loop_strokes).flatten()
+
+                # print("selected_indices", selected_indices)
+                # for idx in selected_indices:
+                #     print("stroke", stroke_node_features[idx])
+
+                # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(edge_features_list))
+                # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, [selected_indices])
 
         # 3) Compute Loop Neighboring Information
         loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(stroke_cloud_loops)
@@ -192,8 +202,6 @@ class cad2sketch_dataset_loader(Dataset):
         final_cylinder_features = []
         new_features = []
 
-
-        stroke_operations_order_matrix = np.zeros((stroke_node_features.shape[0], len(step_files)))
         data_directory = os.path.join(subfolder_path, 'shape_info')
         os.makedirs(data_directory, exist_ok=True)
 
@@ -237,13 +245,14 @@ class cad2sketch_dataset_loader(Dataset):
             # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_ver(all_lines, stroke_to_loop, stroke_cloud_loops)
 
             # 6) We need to build the stroke_operations_order_matrix
-            new_stroke_to_edge_straight = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_features)
-            new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, new_features_cylinder)
-            new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.union_matrices(new_stroke_to_edge_straight, new_stroke_to_edge_circle)
+            if program[idx]['operation'][0] != 'sketch':
+                new_stroke_to_edge_straight = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_features)
+                new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, new_features_cylinder)
+                new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.union_matrices(new_stroke_to_edge_straight, new_stroke_to_edge_circle)
             
-            # chosen_strokes = np.where((new_stroke_to_edge_matrix == 1).any(axis=1))[0]
+                # chosen_strokes = np.where((new_stroke_to_edge_matrix == 1).any(axis=1))[0]
 
-            stroke_operations_order_matrix[:, idx] = np.array(new_stroke_to_edge_matrix).flatten()
+                stroke_operations_order_matrix[:, idx] = np.array(new_stroke_to_edge_matrix).flatten()
             # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_node_features, new_stroke_to_edge_matrix)
 
             # 7) Write the data to file

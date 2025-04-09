@@ -349,7 +349,7 @@ def eval():
 
         if len(chosen_strokes) == 1 and stroke_node_features[chosen_strokes[0]][-1] == 1:
             continue
-
+        
         loop_chosen_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).flatten()
 
         # Find the indices where the value is 1

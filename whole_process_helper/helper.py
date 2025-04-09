@@ -134,35 +134,60 @@ def reorder_strokes_to_neighbors(strokes):
     ordered_points (torch.Tensor): A tensor of ordered points forming a continuous loop.
     """
     # Start with the first stroke (A, B)
-    first_stroke = strokes[0]
+    def stroke_to_key(stroke, precision=1e6):
+        p1 = tuple(torch.round(stroke[0] * precision).int().tolist())
+        p2 = tuple(torch.round(stroke[1] * precision).int().tolist())
+        return tuple(sorted([p1, p2]))  # sort to ignore direction
+
+    # Deduplicate strokes
+    seen_keys = set()
+    unique_strokes = []
+    for stroke in strokes:
+        key = stroke_to_key(stroke)
+        if key not in seen_keys:
+            unique_strokes.append(stroke)
+            seen_keys.add(key)
+
+    # Proceed with your original code
+    first_stroke = unique_strokes[0]
     ordered_points = [first_stroke[0], first_stroke[1]]
-    
-    remaining_strokes = strokes[1:]
+    remaining_strokes = unique_strokes[1:]
+
 
     # Continue until we find the stroke that brings us back to the first point
     while remaining_strokes:
-        last_point = ordered_points[-1]  # The last point in the ordered list
+        last_point = ordered_points[-1]
+        found_connection = False
 
         for i, stroke in enumerate(remaining_strokes):
             pointA, pointB = stroke
-            
-            # Check if last_point is either pointA or pointB of the current stroke
-            if last_point.equal(pointA):  # If last_point matches pointA
-                ordered_points.append(pointB)  # Add pointB to the list
-                remaining_strokes.pop(i)  # Remove this stroke from the list
+
+            if last_point.equal(pointA):
+                ordered_points.append(pointB)
+                remaining_strokes.pop(i)
+                found_connection = True
                 break
-            elif last_point.equal(pointB):  # If last_point matches pointB
-                ordered_points.append(pointA)  # Add pointA to the list
-                remaining_strokes.pop(i)  # Remove this stroke from the list
+            elif last_point.equal(pointB):
+                ordered_points.append(pointA)
+                remaining_strokes.pop(i)
+                found_connection = True
                 break
 
-        # Stop if we encounter the first point again
+        # If no connected stroke was found, break the loop
+        if not found_connection:
+            print("Warning: Some strokes are disconnected and will be ignored.")
+            break
+
+        # Stop if we've come full circle
         if ordered_points[-1].equal(ordered_points[0]):
             break
-    
-    ordered_points.pop()
 
-    return torch.stack(ordered_points)  # Convert the list of points back to a tensor
+    # Remove the duplicate last point if closed
+    if ordered_points[-1].equal(ordered_points[0]):
+        ordered_points.pop()
+
+    return torch.stack(ordered_points)
+
 
 
 def extract_unique_points(max_prob_loop_idx, gnn_graph):
@@ -177,14 +202,15 @@ def extract_unique_points(max_prob_loop_idx, gnn_graph):
     ordered_points (torch.Tensor): A tensor of ordered points forming a continuous loop.
     """
 
-
     # 2. Find the stroke nodes connected to this loop node via 'representedBy' edges
     loop_stroke_edges = gnn_graph['loop', 'represented_by', 'stroke'].edge_index
     connected_stroke_indices = loop_stroke_edges[1][loop_stroke_edges[0] == max_prob_loop_idx]
-
+    
     if connected_stroke_indices.shape[0] == 1:
         circle_stroke = gnn_graph['stroke'].x[connected_stroke_indices[0]]
         return circle_stroke.unsqueeze(0)
+
+
 
     # 3. Extract strokes (pairs of points) from the connected stroke nodes
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points

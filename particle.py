@@ -157,8 +157,6 @@ class Particle():
 
         new_strokes_mark_off = np.sum(stroke_to_brep == 1)
 
-        print("self.used_strokes", self.used_strokes)
-        print("new_strokes_mark_off", new_strokes_mark_off)
         if self.used_strokes == -1 and self.used_strokes == -1:
             self.used_strokes = new_strokes_mark_off
             return True
@@ -194,7 +192,7 @@ class Particle():
         )
 
 
-        # Encoders.helper.vis_brep(self.brep_edges)
+        Encoders.helper.vis_brep(self.brep_edges)
         # Encoders.helper.vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), self.stroke_cloud_loops)
         
         if self.past_programs[-1] != 2:
@@ -214,6 +212,7 @@ class Particle():
 
 
         if self.current_op == 1:
+            print("Build sketch")
             self.sketch_selection_mask, self.sketch_points, normal, selected_loop_idx, prob = do_sketch(gnn_graph, self.data_idx)
             self.selected_loop_indices.append(selected_loop_idx)
             self.score = self.score * prob
@@ -390,12 +389,6 @@ class Particle():
             stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
             stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
 
-            if not self.mark_off_new_strokes(stroke_to_loop):
-                self.remove_particle()
-                print("No new feature added")
-                self.valid_particle = False
-                return
-
             self.valid_particle = False
             self.success_terminate = True
 
@@ -430,7 +423,7 @@ def predict_sketch(gnn_graph, data_idx):
     selected_loop_idx, idx_prob = whole_process_helper.helper.find_valid_sketch(gnn_graph, sketch_selection_mask)
     sketch_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
 
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx, data_idx)
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx, data_idx)
 
     return selected_loop_idx, sketch_selection_mask, idx_prob
 
