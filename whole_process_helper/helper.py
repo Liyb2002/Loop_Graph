@@ -217,26 +217,26 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
     brep_edges (torch.Tensor): A tensor of shape (num_strokes, 6) representing the brep edges (not used in this logic).
 
     Returns:
-    torch.Tensor: The target point for extrusion.
+    tuple: (extrude_amount (float), extrude_direction (Tensor), selected_prob (float))
     """
-
 
     if sketch_points.shape[0] == 1:
         return get_extrude_amount_circle(gnn_graph, sketch_points, extrude_selection_mask)
-    
-    # 1. Find the strokes with the highest probabilities in extrude_selection_mask
-    topk_vals, topk_idxs = torch.topk(extrude_selection_mask.view(-1), 10)  # Get more top candidates to ensure uniqueness
+
+    topk_vals, topk_idxs = torch.topk(extrude_selection_mask.view(-1), 10)
 
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 11), first 6 values are the 3D points
 
-    # Initialize variables to store the top 2 unique strokes
-    possible_extrude_strokes = []
-
     # Set tolerance for floating point comparison
     tol = 1e-5
+    possible_extrude_strokes = []
 
     def is_in_sketch(point):
         return torch.any(torch.all(torch.isclose(sketch_points, point.unsqueeze(0), atol=tol), dim=1))
+
+    # Collect valid strokes and their associated probabilities
+    candidate_indices = []
+    candidate_probs = []
 
     for idx in topk_idxs:
         stroke_feature = stroke_features[idx]
@@ -247,22 +247,27 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
         in2 = is_in_sketch(point2)
 
         if (in1 and not in2) or (in2 and not in1):
-            # Make sure point1 is the one in sketch_points
             if not in1:
                 point1, point2 = point2, point1
             possible_extrude_strokes.append((point1, point2))
+            candidate_indices.append(idx)
+            candidate_probs.append(extrude_selection_mask[idx].item())
 
     if not possible_extrude_strokes:
         raise ValueError("No valid extrude strokes found.")
 
-    # Randomly sample one
-    point1, point2 = random.choice(possible_extrude_strokes)
+    # Normalize probabilities using softmax for biased random selection
+    selected_probs = torch.tensor(candidate_probs)
+    temperature = 0.5  # Lower = more confident choices
+    relative_probs = torch.softmax(selected_probs / temperature, dim=0)
+
+    sampled_idx = torch.multinomial(relative_probs, 1).item()
+    point1, point2 = possible_extrude_strokes[sampled_idx]
+    selected_prob = relative_probs[sampled_idx].item()
 
     direction_vec = point2 - point1
     extrude_amount = torch.norm(direction_vec)
     extrude_direction = F.normalize(direction_vec, dim=0)
-
-    selected_prob = 1.0 / len(possible_extrude_strokes)
 
     return extrude_amount, extrude_direction, selected_prob
 

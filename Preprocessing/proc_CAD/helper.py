@@ -23,6 +23,7 @@ def compute_normal(face_vertices, other_point):
     p2 = np.array(face_vertices[1].position)
     p3 = np.array(face_vertices[2].position)
 
+    print("p1", p1, "p2", p2, "p3", p3)
     # Create vectors from the first three points
     v1 = p2 - p1
     v2 = p3 - p1

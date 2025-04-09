@@ -114,9 +114,9 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch, dat
         # Check if the prediction is correct and increment the correct counter for the category
         if max_output_index.item() in gt_indices:
             correct_count[category_idx] += 1         
-        else:
-            Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_output_index.item()], data_idx)
-            Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, gt_indices, data_idx)
+        # else:
+        #     Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, [max_output_index.item()], data_idx)
+        #     Encoders.helper.vis_selected_loops(stroke_node_features_slice.cpu().numpy(), edge_features_slice, gt_indices, data_idx)
 
     return category_count, correct_count
 
@@ -382,7 +382,7 @@ def eval():
 
 
         # print("chosen_strokes", chosen_strokes)
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes , data_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes , data_idx)
 
         # Prepare the pair
         gnn_graph.to_device_withPadding(device)
@@ -466,7 +466,7 @@ def eval():
 
     # Calculate and print overall average accuracy
     overall_accuracy = total_correct / total_samples 
-    print(f"Overall Average Accuracy: {overall_accuracy:.4f}%")
+    print(f"Overall Average Accuracy: {overall_accuracy:.4f}")
 
 
 

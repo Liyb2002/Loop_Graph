@@ -116,7 +116,7 @@ class Brep:
         new_faces = []
         sketch_face_opposite_normal = [-x for x in sketch_face.normal]
 
-
+        print('extrude_amount', extrude_amount)
         # For dataset generation process
         if extrude_amount is None:
             amount = Preprocessing.proc_CAD.random_gen.generate_random_extrude()
@@ -174,7 +174,8 @@ class Brep:
                 sketch_face.vertices[i], new_vertices[i],
                 new_vertices[(i + 1) % num_vertices], sketch_face.vertices[(i + 1) % num_vertices]
             ]
-            normal = Preprocessing.proc_CAD.helper.compute_normal(side_face_vertices, new_vertices[(i + 2) % num_vertices])
+            normal = [0,0,0]
+            # normal = Preprocessing.proc_CAD.helper.compute_normal(side_face_vertices, new_vertices[(i + 2) % num_vertices])
             side_face = Face(side_face_id, side_face_vertices, normal)
             self.Faces.append(side_face)
 

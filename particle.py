@@ -5,6 +5,7 @@ import Preprocessing.gnn_graph
 import Preprocessing.proc_CAD.Program_to_STL
 import Preprocessing.proc_CAD.brep_read
 import Preprocessing.proc_CAD.helper
+import Preprocessing.cad2sketch_stroke_features
 
 import whole_process_helper.helper
 
@@ -54,17 +55,6 @@ class Particle():
         self.cur__brep_class = Preprocessing.proc_CAD.generate_program.Brep()
 
 
-        loops_fset = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
-        self.stroke_cloud_loops = [list(fset) for fset in loops_fset]
-        
-        self.connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(stroke_node_features)
-        self.strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, self.connected_stroke_nodes)
-
-        self.loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(self.stroke_cloud_loops)
-        self.loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(self.stroke_cloud_loops, self.stroke_node_features, self.loop_neighboring_all)
-        self.loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(self.loop_neighboring_all, self.loop_neighboring_vertical)
-        self.loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(self.stroke_cloud_loops, stroke_node_features)
-
         self.current_op = 1
         self.past_programs = [9]
 
@@ -82,6 +72,14 @@ class Particle():
         # Feature_strokes
         self.predicted_feature_strokes = None
 
+
+    def init_stroke_info(self, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained): 
+        self.stroke_cloud_loops = stroke_cloud_loops
+        
+        self.strokes_perpendicular = strokes_perpendicular
+        self.loop_neighboring_vertical = loop_neighboring_vertical
+        self.loop_neighboring_horizontal = loop_neighboring_horizontal
+        self.loop_neighboring_contained = loop_neighboring_contained
 
 
     def set_particle_id(self, particle_id, cur_output_dir_outerFolder):
@@ -101,9 +99,7 @@ class Particle():
         new_particle.brep_loops = self.brep_loops[:]
         new_particle.cur__brep_class = copy.deepcopy(self.cur__brep_class)
         new_particle.stroke_cloud_loops = copy.deepcopy(self.stroke_cloud_loops)
-        new_particle.connected_stroke_nodes = copy.deepcopy(self.connected_stroke_nodes)
         new_particle.strokes_perpendicular = copy.deepcopy(self.strokes_perpendicular)
-        new_particle.loop_neighboring_all = copy.deepcopy(self.loop_neighboring_all)
         new_particle.loop_neighboring_vertical = copy.deepcopy(self.loop_neighboring_vertical)
         new_particle.loop_neighboring_horizontal = copy.deepcopy(self.loop_neighboring_horizontal)
         new_particle.loop_neighboring_contained = copy.deepcopy(self.loop_neighboring_contained)
@@ -178,17 +174,11 @@ class Particle():
 
         # try:
 
-        stroke_to_loop_lines = Preprocessing.proc_CAD.helper.stroke_to_brep(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
-        stroke_to_loop_circle = Preprocessing.proc_CAD.helper.stroke_to_brep_circle(self.stroke_cloud_loops, self.brep_loops, self.stroke_node_features, self.brep_edges)
-        stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
 
         stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(self.stroke_node_features, self.brep_edges)
         stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(self.stroke_node_features, self.brep_edges)
         stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
-
-
-        stroke_to_loop = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_loop_lines, stroke_to_loop_circle)
-        stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
+        stroke_to_loop = Preprocessing.cad2sketch_stroke_features.from_stroke_to_edge(stroke_to_edge, self.stroke_cloud_loops)
 
 
         # 2) Build graph
@@ -290,7 +280,7 @@ class Particle():
         # self.score = self.score * op_prob
 
         # Start hack -------------------------------- #
-        next_op = self.gt_program[len(self.past_programs) - 1][0]
+        next_op = self.gt_program[len(self.past_programs) - 1]
         if next_op == 'sketch':
             self.current_op = 1
         elif next_op == 'extrude':

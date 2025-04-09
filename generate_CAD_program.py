@@ -34,7 +34,6 @@ import re
 
 # --------------------- Dataset --------------------- #
 dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated', return_data_path=True)
-data_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 
 # --------------------- Directory --------------------- #
@@ -72,13 +71,15 @@ os.makedirs(os.path.join(output_dir, f'data_{data_produced}'), exist_ok=True)
 
 print("data_produced", data_produced)
 
-for data in tqdm(data_loader, desc="Generating CAD Programs"):
-    program, stroke_node_features, data_path= data
+for data in tqdm(dataset, desc="Generating CAD Programs"):
+
+
+    data_idx, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge, data_path = data
 
     if data_produced >= data_limit:
         break
-
-    if program[-1][0] != 'terminate' or len(program)< 6:
+    
+    if program[-1] != 'terminate' or len(program)< 6:
         continue
     
     cur_output_dir = os.path.join(output_dir, f'data_{data_produced}')
@@ -86,16 +87,15 @@ for data in tqdm(data_loader, desc="Generating CAD Programs"):
         shutil.rmtree(cur_output_dir)
     os.makedirs(cur_output_dir, exist_ok=True)
     
-
-    gt_brep_dir = os.path.join(data_path[0], 'canvas')
+    gt_brep_dir = os.path.join(data_path, 'canvas')
     brep_files = [file_name for file_name in os.listdir(gt_brep_dir)
                 if file_name.endswith('.step')]
     brep_files.sort(key=lambda x: int(x.split('_')[1].split('.')[0]))
     gt_brep_file_path = os.path.join(gt_brep_dir, brep_files[-1])
 
 
-
-    base_particle = particle.Particle(gt_brep_file_path, data_produced, stroke_node_features.squeeze(0).cpu().numpy())
+    base_particle = particle.Particle(gt_brep_file_path, data_produced, stroke_node_features)
+    base_particle.init_stroke_info(stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained)
     base_particle.set_gt_program(program)
     particle_list = []
     for particle_id in range (1):
