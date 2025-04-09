@@ -91,11 +91,13 @@ class parsed_program():
 
         sketch_point_list = [vert['coordinates'] for vert in sketch_Op['vertices']]
         normal_vec = self.prev_sketch.faces()[0].normal_at()
-        sketch_face_normal = [normal_vec.X, normal_vec.Y, normal_vec.Z]
+        sketch_face_normal = np.array([normal_vec.X, normal_vec.Y, normal_vec.Z])
         extrude_amount = Op['operation'][2]
-        extrude_direction = Op['operation'][3]
+        extrude_direction = np.array(Op['operation'][3])
 
 
+        if np.allclose(-sketch_face_normal, extrude_direction, atol=1e-5):
+            extrude_amount = -extrude_amount
 
         
         if self.canvas is None:
