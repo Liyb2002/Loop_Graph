@@ -790,10 +790,8 @@ def find_top_different_particles(finished_particles, cur_output_dir, num_output_
 
 
     # Sort unique particles by fidelity_score in descending order
-    unique_particles.sort(key=lambda p: p.fidelity_score, reverse=True)
+    unique_particles.sort(key=lambda p: p.true_value, reverse=True)
 
-    print("len finished_particles", len(finished_particles))
-    print("unique_particles", len(unique_particles))
     
     # Process the top 3 (or fewer) unique particles
     top_particles = unique_particles[:num_output_particles]

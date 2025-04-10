@@ -84,7 +84,7 @@ def chamfer_distance(points1, points2):
         print(f"Error computing Chamfer distance: {e}")
         return float('inf')
 
-def compute_fidelity_score(gt_brep_path, output_brep_path, tolerance=0.01, sample_density=20):
+def compute_fidelity_score(gt_brep_path, output_brep_path, tolerance=0.0001, sample_density=20):
     """
     Computes the fidelity score based on Chamfer distances between two BREP files.
     
@@ -98,7 +98,9 @@ def compute_fidelity_score(gt_brep_path, output_brep_path, tolerance=0.01, sampl
         float: Fidelity score based on the Chamfer distances.
     """
     try:
-
+        
+        print("gt_brep_path", gt_brep_path)
+        print("output_brep_path", output_brep_path)
         # Read shapes from STEP files
         gt_shape = read_step(gt_brep_path)
         output_shape = read_step(output_brep_path)

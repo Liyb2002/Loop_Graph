@@ -198,6 +198,7 @@ class Brep:
             target_edge = self.find_target_edge(target_edge_tensor)
 
 
+
         if amount == 0:
             amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
             safe_amount = self.safe_fillet_check([vert.position for vert in target_edge.vertices])
