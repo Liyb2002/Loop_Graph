@@ -64,7 +64,7 @@ def compute_start_idx():
 
 # --------------------- Main Code --------------------- #
 data_produced = compute_start_idx()
-data_limit = 1
+data_limit = 10
 if os.path.exists(os.path.join(output_dir, f'data_{data_produced}')):
     shutil.rmtree(os.path.join(output_dir, f'data_{data_produced}'))
 os.makedirs(os.path.join(output_dir, f'data_{data_produced}'), exist_ok=True)
@@ -82,6 +82,8 @@ for data in tqdm(dataset, desc="Generating CAD Programs"):
     if program[-1] != 'terminate' or len(program)< 6:
         continue
     
+    print("working on:", data_path)
+
     cur_output_dir = os.path.join(output_dir, f'data_{data_produced}')
     if os.path.exists(cur_output_dir):
         shutil.rmtree(cur_output_dir)

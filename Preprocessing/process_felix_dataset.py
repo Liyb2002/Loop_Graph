@@ -146,6 +146,10 @@ class cad2sketch_dataset_loader(Dataset):
             edge_features_list, _ = Preprocessing.cad2sketch_stroke_features.split_and_merge_brep(edge_features_list)
             stroke_node_features = Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, edge_features_list)
 
+            if program[idx]['operation'][0] == 'sketch':
+                new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
+                stroke_node_features = Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, new_edge_features_list)
+
         stroke_operations_order_matrix = None
 
 
@@ -169,24 +173,36 @@ class cad2sketch_dataset_loader(Dataset):
                 edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
                 new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
 
-                loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_edge_features_list)
-                selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
-
-                if len(selected_indices) == 1 and stroke_node_features[selected_indices[0]][-1] == 1:
-                    return False
+                if len(cylinder_features) != 0:
+                    loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, cylinder_features)
+                    stroke_operations_order_matrix[:, idx] = np.array(loop_strokes).flatten()
                 
-                if selected_indices not in stroke_cloud_loops:
-                    stroke_cloud_loops.append(selected_indices)
+                else:
+                    loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_edge_features_list)
+                    selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
 
+                    if len(new_edge_features_list) >= 5: 
+                        print("selected_indices", selected_indices)
+                        print("---------------------")
+                        Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
+                        return False
+                    
+                
+                    if selected_indices not in stroke_cloud_loops:
+                        stroke_cloud_loops.append(selected_indices)
 
-                stroke_operations_order_matrix[:, idx] = np.array(loop_strokes).flatten()
+                    stroke_operations_order_matrix[:, idx] = np.array(loop_strokes).flatten()
 
-                # print("selected_indices", selected_indices)
-                # for idx in selected_indices:
-                #     print("stroke", stroke_node_features[idx])
+                    # print("new_edge_features_list", new_edge_features_list)
+                    # print("selected_indices", selected_indices)
+                    # for idx in selected_indices:
+                    #     print("stroke", stroke_node_features[idx])
 
-                # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(edge_features_list))
-                # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, [selected_indices])
+                    # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
+                    # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
+
+                    # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, [selected_indices])
+
 
         # 3) Compute Loop Neighboring Information
         loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(stroke_cloud_loops)

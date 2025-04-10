@@ -1648,76 +1648,138 @@ def split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix):
 
     return updated_strokes, np.array(add_feature_lines)
 
-
 import numpy as np
 
 def are_colinear(p1, p2, p3):
-    # Check if three points are colinear using cross product
     v1 = np.array(p2) - np.array(p1)
     v2 = np.array(p3) - np.array(p1)
     cross = np.cross(v1, v2)
     return np.allclose(cross, [0, 0, 0], atol=1e-5)
 
-def merge_edges(edge1, edge2):
-    points = [tuple(np.round(edge1[:3], 5)), tuple(np.round(edge1[3:6], 5)),
-              tuple(np.round(edge2[:3], 5)), tuple(np.round(edge2[3:6], 5))]
+def points_are_close(pt1, pt2, tol=1e-5):
+    return np.allclose(pt1, pt2, atol=tol)
 
-    # Remove the shared point
-    unique_points = []
-    for pt in points:
-        if points.count(pt) == 1:
-            unique_points.append(pt)
+def contained(edge1, edge2):
+    p1, p2 = np.array(edge1[:3]), np.array(edge1[3:6])
+    q1, q2 = np.array(edge2[:3]), np.array(edge2[3:6])
     
-    # Add one shared point to get 3 points for colinearity check
-    for pt in points:
-        if points.count(pt) > 1:
-            shared_point = pt
-            break
+    if not are_colinear(p1, p2, q1) or not are_colinear(p1, p2, q2):
+        return False
 
-    # Sort for consistency (optional)
-    return list(unique_points[0]) + list(unique_points[1]) + [0,0,0,1]
+    vec = p2 - p1
+    vec_len = np.linalg.norm(vec)
+    if vec_len < 1e-8:
+        return False
+    direction = vec / vec_len
+
+    def proj_fraction(point): return np.dot(point - p1, direction) / vec_len
+    f1, f2 = proj_fraction(q1), proj_fraction(q2)
+
+    if 0 - 1e-5 <= f1 <= 1 + 1e-5 and 0 - 1e-5 <= f2 <= 1 + 1e-5:
+        return True
+
+    # Check reverse containment
+    vec2 = q2 - q1
+    len2 = np.linalg.norm(vec2)
+    if len2 < 1e-8:
+        return False
+    dir2 = vec2 / len2
+
+    def proj2(p): return np.dot(p - q1, dir2) / len2
+    r1, r2 = proj2(p1), proj2(p2)
+
+    if 0 - 1e-5 <= r1 <= 1 + 1e-5 and 0 - 1e-5 <= r2 <= 1 + 1e-5:
+        return True
+
+    return False
+
+def merge_edges(edge1, edge2):
+    points = [edge1[:3], edge1[3:6], edge2[:3], edge2[3:6]]
+
+    # Count occurrences with fuzzy comparison
+    point_counts = []
+    for i, pt in enumerate(points):
+        count = 0
+        for other in points:
+            if points_are_close(pt, other):
+                count += 1
+        point_counts.append((pt, count))
+
+    # Keep points that appear only once
+    unique_points = [pt for pt, count in point_counts if count == 1]
+
+
+    if len(unique_points) != 2:
+        # fallback: pick two most distant points
+        max_dist = -1
+        pt1, pt2 = points[0], points[1]
+        for i in range(len(points)):
+            for j in range(i + 1, len(points)):
+                dist = np.linalg.norm(np.array(points[i]) - np.array(points[j]))
+                if dist > max_dist:
+                    max_dist = dist
+                    pt1, pt2 = points[i], points[j]
+        unique_points = [pt1, pt2]
+
+    return list(unique_points[0]) + list(unique_points[1]) + [0, 0, 0, 1]
+
 
 def only_merge_brep(edge_features_list):
-    new_features_list = []
-    used_indices = set()
-    
-    for i, edge1 in enumerate(edge_features_list):
-        if i in used_indices:
-            continue
-        if edge1[-1] != 1:
-            new_features_list.append(edge1)
-            continue
+    def _run_single_pass(edges):
+        new_features_list = []
+        used_indices = set()
 
-        merged = False
-        for j, edge2 in enumerate(edge_features_list):
-            if i == j or j in used_indices or edge2[-1] != 1:
+        for i, edge1 in enumerate(edges):
+            if i in used_indices:
+                continue
+            if edge1[-1] != 1:
+                new_features_list.append(edge1)
                 continue
 
-            p11 = tuple(np.round(edge1[:3], 5))
-            p12 = tuple(np.round(edge1[3:6], 5))
-            p21 = tuple(np.round(edge2[:3], 5))
-            p22 = tuple(np.round(edge2[3:6], 5))
+            merged = False
+            for j, edge2 in enumerate(edges):
+                if i == j or j in used_indices or edge2[-1] != 1:
+                    continue
 
-            # Check for a common point
-            common_points = set([p11, p12]) & set([p21, p22])
-            if not common_points:
-                continue
+                p11, p12 = edge1[:3], edge1[3:6]
+                p21, p22 = edge2[:3], edge2[3:6]
 
-            # Check for colinearity
-            unique_points = list(set([p11, p12, p21, p22]))
-            if len(unique_points) < 3:
-                continue  # All points same or only 2 unique
-            if are_colinear(unique_points[0], unique_points[1], unique_points[2]):
-                merged_edge = merge_edges(edge1, edge2)
-                new_features_list.append(merged_edge)
-                used_indices.update([i, j])
-                merged = True
-                break
+                common_found = any(points_are_close(pa, pb) for pa in [p11, p12] for pb in [p21, p22])
+                if not common_found:
+                    continue
 
-        if not merged:
-            new_features_list.append(edge1)
+                all_points = [p11, p12, p21, p22]
+                unique_points = []
+                for pt in all_points:
+                    if not any(points_are_close(pt, up) for up in unique_points):
+                        unique_points.append(pt)
 
-    return new_features_list
+                if len(unique_points) < 3:
+                    continue
+
+                if are_colinear(unique_points[0], unique_points[1], unique_points[2]) and not contained(edge1, edge2):
+                    merged_edge = merge_edges(edge1, edge2)
+                    new_features_list.append(merged_edge)
+                    used_indices.update([i, j])
+                    merged = True
+                    break
+
+            if not merged:
+                new_features_list.append(edge1)
+
+        return new_features_list
+
+    prev_length = -1
+    current_edges = edge_features_list
+
+    while True:
+        merged_edges = _run_single_pass(current_edges)
+        if len(merged_edges) == prev_length:
+            break
+        prev_length = len(merged_edges)
+        current_edges = merged_edges
+
+    return current_edges
 
 
 
