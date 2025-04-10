@@ -329,19 +329,19 @@ def get_extrude_amount_circle(gnn_graph, sketch_points, extrude_selection_mask):
         if any(torch.isclose(center[i], point1[i]) for i in range(3)):
             extrude_point = point2
             other_point = point1
-            extrude_amount = torch.norm(point1 - point2, p=2).item()
+            extrude_amount = torch.norm(point1 - point2, p=2)
             break
         elif any(torch.isclose(center[i], point2[i]) for i in range(3)):
             extrude_point = point1
             other_point = point2
-            extrude_amount = torch.norm(point1 - point2, p=2).item()
+            extrude_amount = torch.norm(point1 - point2, p=2)
             break
     
     else:
         raise ValueError("No suitable stroke found for extrusion.")
 
     # Compute the direction from the other point to the extrude_point
-    direction = (extrude_point - other_point).tolist()
+    direction = extrude_point - other_point
 
     # Compute the target point by extruding from the center
     target_point = [center[i].item() + direction[i] for i in range(3)]
