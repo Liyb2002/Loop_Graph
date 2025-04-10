@@ -326,6 +326,7 @@ def eval():
             continue
 
         data_idx, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        print("data_idx", data_idx)
         if program[-1] != 'sketch':
             continue
 
@@ -367,7 +368,6 @@ def eval():
         # Reshape to (-1, 1) as in the original
         loop_selection_mask = loop_chosen_mask.reshape(-1, 1)
 
-        
         # Build the graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
@@ -382,6 +382,7 @@ def eval():
 
 
         # print("chosen_strokes", chosen_strokes)
+        # print("gnn_graph['stroke'].x.cpu().numpy()", gnn_graph['stroke'].x.cpu().numpy().shape)
         Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes , data_idx)
 
         # Prepare the pair

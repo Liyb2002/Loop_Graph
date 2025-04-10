@@ -35,20 +35,6 @@ def build_final_edges_json(final_edges_json):
         node_feature = build_node_features(geometry)
 
 
-        # remove redundant circle line
-        if node_feature[-1] == 2:
-            center = node_feature[:3]
-            too_close = False
-            for existing_feature in node_features_list:
-                existing_center = existing_feature[:3]
-                dist = np.linalg.norm(np.array(center) - np.array(existing_center))
-                if dist < 5e-5:
-                    too_close = True
-                    break
-            if too_close:
-                continue
-
-
         node_features_list.append(node_feature)
 
         stroke_type = stroke['type']
@@ -994,6 +980,7 @@ def vis_feature_lines_loop_all(feature_lines, stroke_cloud_loops):
     x_min, x_max = float('inf'), float('-inf')
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
+
 
     for stroke in feature_lines:
         geometry = stroke["geometry"]

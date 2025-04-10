@@ -21,6 +21,7 @@ import Preprocessing.proc_CAD.draw_all_lines_baseline
 import Preprocessing.gnn_graph
 import Preprocessing.SBGCN.brep_read
 
+import Encoders.helper
 from tqdm import tqdm
 from pathlib import Path
 
@@ -135,7 +136,8 @@ class cad2sketch_dataset_loader(Dataset):
         # ------------------------------------------------------------ #
         # 1) stroke cloud  information processing
         stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
-        stroke_node_features, added_feature_lines= Preprocessing.cad2sketch_stroke_features.split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix)
+        # stroke_node_features, added_feature_lines= Preprocessing.cad2sketch_stroke_features.split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix)
+
         # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_highlights(stroke_node_features, added_feature_lines)
 
 
@@ -143,12 +145,13 @@ class cad2sketch_dataset_loader(Dataset):
         for idx, step_file in enumerate(step_files):
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
             edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
-            edge_features_list, _ = Preprocessing.cad2sketch_stroke_features.split_and_merge_brep(edge_features_list)
-            stroke_node_features = Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, edge_features_list)
-
+            
             if program[idx]['operation'][0] == 'sketch':
                 new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
-                stroke_node_features = Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, new_edge_features_list)
+            else:
+                new_edge_features_list, _ = Preprocessing.cad2sketch_stroke_features.split_and_merge_brep(edge_features_list)
+
+            stroke_node_features = Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, new_edge_features_list)
 
         stroke_operations_order_matrix = None
 
@@ -175,6 +178,7 @@ class cad2sketch_dataset_loader(Dataset):
 
                 if len(cylinder_features) != 0:
                     loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, cylinder_features)
+                    selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
                     stroke_operations_order_matrix[:, idx] = np.array(loop_strokes).flatten()
                 
                 else:
@@ -182,9 +186,7 @@ class cad2sketch_dataset_loader(Dataset):
                     selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
 
                     if len(new_edge_features_list) >= 5: 
-                        print("selected_indices", selected_indices)
-                        print("---------------------")
-                        Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
+                        # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
                         return False
                     
                 
@@ -193,12 +195,6 @@ class cad2sketch_dataset_loader(Dataset):
 
                     stroke_operations_order_matrix[:, idx] = np.array(loop_strokes).flatten()
 
-                    # print("new_edge_features_list", new_edge_features_list)
-                    # print("selected_indices", selected_indices)
-                    # for idx in selected_indices:
-                    #     print("stroke", stroke_node_features[idx])
-
-                    # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
                     # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
 
                     # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, [selected_indices])

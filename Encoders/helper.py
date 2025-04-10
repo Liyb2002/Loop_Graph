@@ -891,8 +891,6 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
     final_edges_data = read_json(final_edges_file_path)
     all_lines = extract_all_lines(final_edges_data)
 
-
-
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     
