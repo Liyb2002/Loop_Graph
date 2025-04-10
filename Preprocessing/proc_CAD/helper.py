@@ -46,7 +46,7 @@ def compute_normal(face_vertices, other_point):
 #----------------------------------------------------------------------------------#
 
 
-def round_position(position, decimals=3):
+def round_position(position, decimals=10):
     return tuple(round(coord, decimals) for coord in position)
 
 
@@ -1255,11 +1255,11 @@ def pad_brep_features(final_brep_edges):
         padded_edge = edge + [0] * (10 - len(edge))
         padded_edges.append(padded_edge)
 
-    return np.round(np.array(padded_edges), 4)
+    return np.array(padded_edges)
 
 
 #----------------------------------------------------------------------------------#
-def points_match(point1, point2, tolerance=0.00005):
+def points_match(point1, point2, tolerance=1e-4):
     return all(abs(a - b) < tolerance for a, b in zip(point1, point2))
 
 
@@ -1278,8 +1278,14 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
     # Initialize the output matrix to zeros
     # print("-------------")
     # for brep_edge in final_brep_edges:
-    #     brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))
-    #     print("brep_points", brep_points)
+    #     if brep_edge[-1] == 4 :
+    #         brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))
+    #         print("brep_points", brep_points)
+
+    # for stroke in stroke_node_features:
+    #     if stroke[-1] == 3 :
+    #         stroke_points = set(map(tuple, [stroke[:3], stroke[3:6]]))
+    #         print("stroke_points", stroke_points)
 
 
     num_strokes = stroke_node_features.shape[0]
@@ -1287,11 +1293,11 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
     
     # Step 1: Find matching between stroke_node_features and final_brep_edges
     for stroke_idx, stroke in enumerate(stroke_node_features):
-        if stroke[-1] == 1 or stroke[-1] == 3:
+        if stroke[-1] == 1:
             stroke_points = set(map(tuple, [stroke[:3], stroke[3:6]]))  # Get the start and end points of the stroke
             
             for brep_edge in final_brep_edges:
-                if brep_edge[-1] == 1 or brep_edge[-1] == 4:
+                if brep_edge[-1] == 1 :
                     brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))  # Get the start and end points of the BRep edge
 
                     stroke_match = all(
@@ -1308,6 +1314,29 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
                     if stroke_match or brep_match:
                         stroke_used_matrix[stroke_idx] = 1  # Mark this stroke as used
                         break  # No need to check further once a match is found
+        
+        if stroke[-1] == 3:
+            stroke_points = set(map(tuple, [stroke[:3], stroke[3:6]]))  # Get the start and end points of the stroke
+            
+            for brep_edge in final_brep_edges:
+                if brep_edge[-1] == 4:
+
+                    brep_points = set(map(tuple, [brep_edge[:3], brep_edge[3:6]]))  # Get the start and end points of the BRep edge
+                    stroke_match = all(
+                        any(points_match(stroke_point, brep_point, 2e-4) for brep_point in brep_points)
+                        for stroke_point in stroke_points
+                    )
+
+                    brep_match = all(
+                        any(points_match(brep_point, stroke_point, 2e-4) for stroke_point in stroke_points)
+                        for brep_point in brep_points
+                    )
+
+                    # Check if stroke points are part of any brep edge
+                    if stroke_match or brep_match:
+                        stroke_used_matrix[stroke_idx] = 1  # Mark this stroke as used
+                        break  # No need to check further once a match is found
+
 
 
     return stroke_used_matrix
@@ -1476,7 +1505,7 @@ def stroke_to_brep(stroke_cloud_loops, brep_loops, stroke_node_features, final_b
     """
     import numpy as np
 
-    def points_match(point1, point2, tolerance=1e-6):
+    def points_match(point1, point2, tolerance=5e-5):
         """Check if two points are approximately equal within a tolerance."""
         return all(abs(a - b) <= tolerance for a, b in zip(point1, point2))
 

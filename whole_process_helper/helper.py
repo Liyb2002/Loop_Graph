@@ -430,12 +430,12 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
         # print("edge_point1", edge_point1, "edge_point2", edge_point2)
         # print("distance1", distance1)
         # print("distance2", distance2)
-        # print("torch.allclose(distance1, distance2, atol=1e-2)", torch.allclose(distance1, distance2, atol=1e-2))
+        # print("torch.allclose(distance1, distance2, atol=1e-2)", torch.allclose(distance1, distance2, atol=0.0005))
         # print("-----------")
 
 
         # Check if all distances are the same within a small tolerance
-        if torch.allclose(distance1, distance2, atol=1e-2):
+        if torch.allclose(distance1, distance2, atol=0.0005):
             
             if distance1 < min_distance:
                 min_distance = distance1
