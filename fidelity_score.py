@@ -99,8 +99,6 @@ def compute_fidelity_score(gt_brep_path, output_brep_path, tolerance=0.0001, sam
     """
     try:
         
-        print("gt_brep_path", gt_brep_path)
-        print("output_brep_path", output_brep_path)
         # Read shapes from STEP files
         gt_shape = read_step(gt_brep_path)
         output_shape = read_step(output_brep_path)

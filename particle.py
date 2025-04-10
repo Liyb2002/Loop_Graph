@@ -194,7 +194,7 @@ class Particle():
             )
 
             Encoders.helper.vis_brep(self.brep_edges)
-            # Encoders.helper.vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), self.stroke_cloud_loops)
+            Encoders.helper.vis_used_strokes(gnn_graph['stroke'].x.cpu().numpy(), self.data_idx)
             
             if self.past_programs[-1] != 2:
                 self.mark_off_new_strokes(stroke_to_edge)
@@ -392,8 +392,6 @@ class Particle():
                     self.gt_brep_file_path,
                     latest_step_file
                 )
-
-        self.true_value = fidelity_score.compute_fidelity_score(self.gt_brep_file_path, latest_step_file)
 
         if self.past_programs[-1] == 1 or len(self.past_programs) < 4:
             self.remove_particle()
