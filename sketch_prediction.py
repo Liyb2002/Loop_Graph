@@ -126,7 +126,7 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch, dat
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/small')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -310,7 +310,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/small')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -382,7 +382,7 @@ def eval():
 
         # print("chosen_strokes", chosen_strokes)
         # print("gnn_graph['stroke'].x.cpu().numpy()", gnn_graph['stroke'].x.cpu().numpy().shape)
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes , data_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes , data_idx)
 
         # Prepare the pair
         gnn_graph.to_device_withPadding(device)

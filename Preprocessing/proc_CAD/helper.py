@@ -1261,13 +1261,12 @@ def pad_brep_features(final_brep_edges):
 #----------------------------------------------------------------------------------#
 def stroke_to_edge(stroke_node_features, final_brep_edges):
     """
-    Checks whether each stroke is used in the final BREP shape by comparing with brep edges.
-    A stroke matches a brep edge if the sum of distances between its two endpoints and the brep edge's
-    endpoints (in either order) is within a threshold.
+    Matches each BREP edge to the closest stroke of the same type (line or arc) in stroke_node_features.
+    Marks the closest stroke as used (1). Each BREP edge is guaranteed to match exactly one stroke.
 
     Parameters:
-    - stroke_node_features: Tensor or array of shape (num_strokes, 11)
-    - final_brep_edges: Tensor or array of shape (num_brep_edges, 11)
+    - stroke_node_features: np.ndarray of shape (num_strokes, 11)
+    - final_brep_edges: np.ndarray of shape (num_brep_edges, 11)
 
     Returns:
     - stroke_used_matrix: np.ndarray of shape (num_strokes, 1), values in {0, 1}
@@ -1275,43 +1274,39 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
     import numpy as np
 
     stroke_used_matrix = np.zeros((len(stroke_node_features), 1), dtype=np.int32)
-    threshold = 2e-4
 
-    for stroke_idx, stroke in enumerate(stroke_node_features):
-        stroke_type = stroke[-1]
+    for brep_edge in final_brep_edges:
+        brep_type = brep_edge[-1]
+        brep_pt1 = brep_edge[:3]
+        brep_pt2 = brep_edge[3:6]
 
-        if stroke_type == 1:  # Line
+        # Determine stroke type to compare with
+        target_stroke_type = 1 if brep_type == 1 else 3 if brep_type == 4 else None
+        if target_stroke_type is None:
+            continue
+
+        # Search for the closest stroke of matching type
+        min_distance = float('inf')
+        best_stroke_idx = None
+
+        for stroke_idx, stroke in enumerate(stroke_node_features):
+            if stroke[-1] != target_stroke_type:
+                continue
+
             stroke_pt1 = stroke[:3]
             stroke_pt2 = stroke[3:6]
 
-            for brep_edge in final_brep_edges:
-                if brep_edge[-1] == 1:  # Only compare with brep lines
-                    brep_pt1 = brep_edge[:3]
-                    brep_pt2 = brep_edge[3:6]
+            d1 = np.linalg.norm(stroke_pt1 - brep_pt1) + np.linalg.norm(stroke_pt2 - brep_pt2)
+            d2 = np.linalg.norm(stroke_pt1 - brep_pt2) + np.linalg.norm(stroke_pt2 - brep_pt1)
 
-                    # Compare both possible point matchings and take min
-                    d1 = np.linalg.norm(stroke_pt1 - brep_pt1) + np.linalg.norm(stroke_pt2 - brep_pt2)
-                    d2 = np.linalg.norm(stroke_pt1 - brep_pt2) + np.linalg.norm(stroke_pt2 - brep_pt1)
+            best_d = min(d1, d2)
 
-                    if min(d1, d2) < threshold:
-                        stroke_used_matrix[stroke_idx] = 1
-                        break
+            if best_d < min_distance:
+                min_distance = best_d
+                best_stroke_idx = stroke_idx
 
-        elif stroke_type == 3 :  # Arc
-            stroke_pt1 = stroke[:3]
-            stroke_pt2 = stroke[3:6]
-
-            for brep_edge in final_brep_edges:
-                if brep_edge[-1] == 4:  # Only compare with brep arcs
-                    brep_pt1 = brep_edge[:3]
-                    brep_pt2 = brep_edge[3:6]
-
-                    d1 = np.linalg.norm(stroke_pt1 - brep_pt1) + np.linalg.norm(stroke_pt2 - brep_pt2)
-                    d2 = np.linalg.norm(stroke_pt1 - brep_pt2) + np.linalg.norm(stroke_pt2 - brep_pt1)
-
-                    if min(d1, d2) < threshold:
-                        stroke_used_matrix[stroke_idx] = 1
-                        break
+        if best_stroke_idx is not None:
+            stroke_used_matrix[best_stroke_idx] = 1
 
     return stroke_used_matrix
 
@@ -1321,16 +1316,35 @@ def ensure_brep_edges(stroke_node_features, edge_features_list):
     """
     Ensures all brep edges of type 1 or 4 are represented in stroke_node_features.
     If a brep edge is not matched by any existing stroke (based on endpoint distance),
-    it is added to stroke_node_features.
+    it is added to stroke_node_features using the closest stroke points.
 
     Parameters:
     - stroke_node_features: np.ndarray of shape (num_strokes, 11)
-    - edge_features_list: list or np.ndarray of brep edges of shape (num_edges, 11)
+    - edge_features_list: np.ndarray of shape (num_edges, 11)
 
     Returns:
     - stroke_node_features: np.ndarray with unmatched brep edges added
+    - num_add_edges: int, number of added edges
+    - new_edges: np.ndarray of shape (num_added, 11)
     """
-    threshold = 2e-4
+    import numpy as np
+
+    threshold = 5e-4
+    num_add_edges = 0
+    new_edges = []
+
+    # Collect all unique stroke points
+    unique_stroke_points = []
+    for stroke in stroke_node_features:
+        if stroke[-1] == 1 or stroke[-1] == 3:
+            pt1 = tuple(np.round(stroke[:3], 6))
+            pt2 = tuple(np.round(stroke[3:6], 6))
+            if pt1 not in unique_stroke_points:
+                unique_stroke_points.append(pt1)
+            if pt2 not in unique_stroke_points:
+                unique_stroke_points.append(pt2)
+
+    unique_stroke_points = np.array(unique_stroke_points)
 
     for brep_edge in edge_features_list:
         if brep_edge[-1] == 1 or brep_edge[-1] == 4:  # Line or Arc
@@ -1340,7 +1354,7 @@ def ensure_brep_edges(stroke_node_features, edge_features_list):
             no_match = True
 
             for stroke in stroke_node_features:
-                if stroke[-1] == 1 or stroke[-1] == 3:  # Stroke Line or Arc
+                if stroke[-1] == 1 or stroke[-1] == 3:
                     stroke_pt1 = stroke[:3]
                     stroke_pt2 = stroke[3:6]
 
@@ -1352,11 +1366,19 @@ def ensure_brep_edges(stroke_node_features, edge_features_list):
                         break
 
             if no_match:
-                # Add the brep_edge to stroke_node_features
-                new_stroke = np.array(list(brep_edge[:6]) + [0, 0, 0, 0, 1], dtype=np.float32)
-                stroke_node_features = np.vstack([stroke_node_features, new_stroke])
+                # Find closest existing stroke points for both ends of this brep edge
+                dists_to_pt1 = np.linalg.norm(unique_stroke_points - brep_pt1, axis=1)
+                dists_to_pt2 = np.linalg.norm(unique_stroke_points - brep_pt2, axis=1)
 
-    return stroke_node_features
+                closest_pt1 = unique_stroke_points[np.argmin(dists_to_pt1)]
+                closest_pt2 = unique_stroke_points[np.argmin(dists_to_pt2)]
+
+                new_stroke = np.array(list(closest_pt1) + list(closest_pt2) + [0, 0, 0, 0, 1], dtype=np.float32)
+                new_edges.append(new_stroke)
+                stroke_node_features = np.vstack([stroke_node_features, new_stroke])
+                num_add_edges += 1
+
+    return stroke_node_features, num_add_edges, np.array(new_edges)
 
 
 def match(center1, center2, tol=1e-3):

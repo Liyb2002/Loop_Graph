@@ -391,7 +391,7 @@ def find_good_extrude(sketch_points, stroke_features):
                 best_score = score
                 extrude_amount = torch.norm(direction_vec)
                 extrude_direction = direction_norm
-                if random.random < 0.5:
+                if random.random() < 0.5:
                     extrude_direction = -extrude_direction
                 best_result = (extrude_amount, extrude_direction, 1.0)
 

@@ -24,7 +24,7 @@ class parsed_program():
         self.Op_idx = 0
         self.output = output
         
-    def read_json_file(self):
+    def read_json_file(self, tempt_idx = 0):
         with open(self.file_path, 'r') as file:
             data = json.load(file)
             self.len_program = len(data)
@@ -33,7 +33,7 @@ class parsed_program():
                 operation = Op['operation']
                 
                 if operation[0] == 'sketch':
-                    self.parse_sketch(Op)
+                    self.parse_sketch(Op, tempt_idx)
                 
                 if operation[0] == 'extrude':
                     self.parse_extrude(Op, data[i-1])
@@ -51,7 +51,7 @@ class parsed_program():
         return
             
 
-    def parse_sketch(self, Op):
+    def parse_sketch(self, Op, tempt_idx):
         if 'radius' in Op['faces'][0]:
             self.parse_circle(Op)
             return 
@@ -66,7 +66,10 @@ class parsed_program():
         
         # Add the first point again at the end to close the loop
         new_point_list.append(point_list[0])
-        self.prev_sketch = Preprocessing.proc_CAD.build123.protocol.build_sketch(self.Op_idx, self.canvas, new_point_list, self.output, self.data_directory)
+        if tempt_idx == 0:
+            self.prev_sketch = Preprocessing.proc_CAD.build123.protocol.build_sketch(self.Op_idx, self.canvas, new_point_list, self.output, self.data_directory)
+        else:
+            Preprocessing.proc_CAD.build123.protocol.build_sketch(self.Op_idx, self.canvas, new_point_list, self.output, self.data_directory, tempt_idx)
         self.Op_idx += 1
 
         

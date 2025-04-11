@@ -360,7 +360,7 @@ class Brep:
         return True
 
 
-    def write_to_json(self, data_directory = None):
+    def write_to_json(self, data_directory = None, tempt = False):
         #clean everything in the folder
         folder = os.path.join(os.path.dirname(__file__), 'canvas')
         if not os.path.exists(folder):
@@ -380,12 +380,18 @@ class Brep:
 
         #start writing program
         filename = os.path.join(folder, 'Program.json')
+        if tempt:
+            filename = os.path.join(folder, 'tempt_Program.json')
+        
         data = []
         for count in range(0, self.idx):
             op = self.op[count][0]
             self.write_Op(self.op[count], count, data)
         
         self.write_terminate(data)  
+
+        if tempt:
+            print("data", data)
 
         with open(filename, 'w') as f:
             json.dump(data, f, indent=4)

@@ -181,54 +181,59 @@ class dataset_generator():
         return True
         
 
+def find_new_features(prev_brep_edges, new_edge_features, tol=1e-4):
+    """
+    Identifies new features by comparing new_edge_features to existing prev_brep_edges.
+    If a new line is fully contained in or extends a previous line, a new trimmed or extended line is added.
+    Distance-based comparison is used instead of rounding or np.allclose.
 
-def find_new_features(prev_brep_edges, new_edge_features):
-    prev_brep_edges = [[round(coord, 4) for coord in line] for line in prev_brep_edges]
-    new_edge_features = [[round(coord, 4) for coord in line] for line in new_edge_features]
+    Parameters:
+    - prev_brep_edges: list of brep edges, each of shape (6,)
+    - new_edge_features: list of new edges, each of shape (6,)
+    - tol: float, distance tolerance
 
+    Returns:
+    - new_features: list of updated/added edges
+    """
     def is_same_direction(line1, line2):
-        """Check if two lines have the same direction."""
-        vector1 = np.array(line1[3:6]) - np.array(line1[:3])
-        vector2 = np.array(line2[3:6]) - np.array(line2[:3])
-        return np.allclose(vector1 / np.linalg.norm(vector1), vector2 / np.linalg.norm(vector2))
+        vec1 = np.array(line1[3:6]) - np.array(line1[:3])
+        vec2 = np.array(line2[3:6]) - np.array(line2[:3])
+        if np.linalg.norm(vec1) < tol or np.linalg.norm(vec2) < tol:
+            return False
+        vec1 = vec1 / np.linalg.norm(vec1)
+        vec2 = vec2 / np.linalg.norm(vec2)
+        return np.linalg.norm(vec1 - vec2) < tol or np.linalg.norm(vec1 + vec2) < tol
 
     def is_point_on_line(point, line):
-        """Check if a point lies on a given line segment."""
-        start, end = np.array(line[:3]), np.array(line[3:6])
-
-        # Check if the point is collinear (still important to check)
-        if not np.allclose(np.cross(end - start, point - start), 0):
+        start = np.array(line[:3])
+        end = np.array(line[3:6])
+        vec = end - start
+        if np.linalg.norm(vec) < tol:
             return False
-        
-        # Check if point lies within the bounds of the line segment
-        min_x, max_x = min(start[0], end[0]), max(start[0], end[0])
-        min_y, max_y = min(start[1], end[1]), max(start[1], end[1])
-        min_z, max_z = min(start[2], end[2]), max(start[2], end[2])
-        
-        return (min_x <= point[0] <= max_x) and (min_y <= point[1] <= max_y) and (min_z <= point[2] <= max_z)
+
+        to_point = point - start
+        proj_len = np.dot(to_point, vec) / np.linalg.norm(vec)
+        proj_point = start + (proj_len / np.linalg.norm(vec)) * vec
+
+        # Check if projection is close to the point and lies between start and end
+        within_bounds = (
+            -tol <= proj_len <= np.linalg.norm(vec) + tol
+        )
+        close_enough = np.linalg.norm(proj_point - point) < tol
+        return close_enough and within_bounds
 
     def is_line_contained(line1, line2):
-        """Check if line1 is contained within line2."""
         return is_point_on_line(np.array(line1[:3]), line2) and is_point_on_line(np.array(line1[3:6]), line2)
 
-
-
-    def find_unique_points(new_edge_line, prev_brep_line):
-        """Find the two unique points between new_edge_line and prev_brep_line."""
-        points = [
-            tuple(new_edge_line[:3]),   # new_edge_line start
-            tuple(new_edge_line[3:6]),   # new_edge_line end
-            tuple(prev_brep_line[:3]),  # prev_brep_line start
-            tuple(prev_brep_line[3:6]),  # prev_brep_line end
-        ]
-
-        # Find unique points
-        unique_points = [point for point in points if points.count(point) == 1]
-
-        # Ensure there are exactly two unique points
-        if len(unique_points) == 2:
-            return unique_points
-        return None
+    def find_unique_points(line1, line2):
+        points = [np.array(line1[:3]), np.array(line1[3:6]),
+                  np.array(line2[:3]), np.array(line2[3:6])]
+        unique = []
+        for i, p in enumerate(points):
+            count = sum(np.linalg.norm(p - q) < tol for j, q in enumerate(points) if i != j)
+            if count == 1:
+                unique.append(p)
+        return unique if len(unique) == 2 else None
 
     new_features = []
 
@@ -238,55 +243,43 @@ def find_new_features(prev_brep_edges, new_edge_features):
             continue
 
         relation_found = False
+        edge_start = np.array(new_edge_line[:3])
+        edge_end = np.array(new_edge_line[3:6])
 
-        edge_start, edge_end = np.array(new_edge_line[:3]), np.array(new_edge_line[3:6])
-        
+        if np.linalg.norm(edge_start - edge_end) < tol:
+            new_features.append(new_edge_line)
+            continue
+
         for prev_brep_line in prev_brep_edges:
             if prev_brep_line[-1] != 0:
                 continue
 
-            brep_start, brep_end = np.array(prev_brep_line[:3]), np.array(prev_brep_line[3:6])
+            brep_start = np.array(prev_brep_line[:3])
+            brep_end = np.array(prev_brep_line[3:6])
 
-            # This is a circle edge
-            if (edge_start == edge_end).all():
-                break
-
-            # Check if the lines are the same, either directly or in reverse order
-            if (np.allclose(edge_start, brep_start) and np.allclose(edge_end, brep_end)) or \
-            (np.allclose(edge_start, brep_end) and np.allclose(edge_end, brep_start)):
-                # Relation 1: The two lines are exactly the same
+            if np.linalg.norm(brep_start - edge_start) < tol and np.linalg.norm(brep_end - edge_end) < tol or \
+               np.linalg.norm(brep_start - edge_end) < tol and np.linalg.norm(brep_end - edge_start) < tol:
+                # Relation 1: exactly the same
                 relation_found = True
                 break
-            
+
             elif is_same_direction(new_edge_line, prev_brep_line) and is_line_contained(new_edge_line, prev_brep_line):
-                # new feature is in prev brep
-                relation_found = True
-                
-                unique_points = find_unique_points(new_edge_line, prev_brep_line)
-                if unique_points:
-                    # Create a new line using the unique points
-                    new_line = list(unique_points[0]) + list(unique_points[1])
+                unique_pts = find_unique_points(new_edge_line, prev_brep_line)
+                if unique_pts:
+                    new_line = list(unique_pts[0]) + list(unique_pts[1])
                     new_features.append(new_line)
-                    relation_found = True
-                    break
+                relation_found = True
                 break
-            
-            elif is_same_direction(new_edge_line, prev_brep_line) and is_line_contained(prev_brep_line, new_edge_line):
-                # prev brep is in new feature
-                relation_found = True
-                
-                unique_points = find_unique_points(new_edge_line, prev_brep_line)
-                if unique_points:
-                    # Create a new line using the unique points
-                    new_line = list(unique_points[0]) + list(unique_points[1])
-                    new_features.append(new_line)
-                    relation_found = True
-                    break
 
+            elif is_same_direction(new_edge_line, prev_brep_line) and is_line_contained(prev_brep_line, new_edge_line):
+                unique_pts = find_unique_points(new_edge_line, prev_brep_line)
+                if unique_pts:
+                    new_line = list(unique_pts[0]) + list(unique_pts[1])
+                    new_features.append(new_line)
+                relation_found = True
                 break
-        
+
         if not relation_found:
-            # Relation 4: None of the relations apply
             new_features.append(new_edge_line)
 
     return new_features

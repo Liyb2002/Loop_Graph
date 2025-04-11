@@ -190,6 +190,7 @@ class Particle():
         stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
         stroke_to_loop = Preprocessing.cad2sketch_stroke_features.from_stroke_to_edge(stroke_to_edge, self.stroke_cloud_loops)
 
+
         # 2) Build graph
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             self.stroke_cloud_loops, 
@@ -223,11 +224,20 @@ class Particle():
             self.sketch_selection_mask, self.sketch_points, normal, selected_loop_idx, prob = do_sketch(gnn_graph, self.data_idx)
             self.selected_loop_indices.append(selected_loop_idx)
             self.score = self.score * prob
+
+            tmpt_brep_class = Preprocessing.proc_CAD.generate_program.Brep()
             if self.sketch_points.shape[0] == 1:
                 # do circle sketch
                 self.cur__brep_class.regular_sketch_circle(self.sketch_points[0, 3:6].tolist(), self.sketch_points[0, 7].item(), self.sketch_points[0, :3].tolist())
+                tmpt_brep_class.regular_sketch_circle(self.sketch_points[0, 3:6].tolist(), self.sketch_points[0, 7].item(), self.sketch_points[0, :3].tolist())
             else: 
                 self.cur__brep_class._sketch_op(self.sketch_points, normal, self.sketch_points)
+                tmpt_brep_class._sketch_op(self.sketch_points, normal, self.sketch_points)
+
+            tmpt_brep_class.write_to_json(self.cur_output_dir, True)
+            tmpt_file_path = os.path.join(self.cur_output_dir, 'tempt_Program.json')
+            tmpt_parsed_program_class = Preprocessing.proc_CAD.Program_to_STL.parsed_program(tmpt_file_path, self.cur_output_dir)
+            tmpt_parsed_program_class.read_json_file(len(self.past_programs))
 
 
         # Build Extrude
@@ -276,7 +286,7 @@ class Particle():
         self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
         # self.brep_loops = Preprocessing.proc_CAD.helper.remove_duplicate_circle_breps(self.brep_loops, self.brep_edges)
 
-        # Encoders.helper.vis_brep(self.brep_edges)
+        Encoders.helper.vis_brep(self.brep_edges)
         # Compute Chamfer Distance
         # cur_fidelity_score = fidelity_score.compute_fidelity_score(self.gt_brep_file_path, os.path.join(brep_path, brep_files[-1]))
         cur_fidelity_score = -1
@@ -440,7 +450,6 @@ def predict_sketch(gnn_graph, data_idx):
 
     selected_loop_idx, idx_prob = whole_process_helper.helper.find_valid_sketch(gnn_graph, sketch_selection_mask)
     sketch_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
-
     # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx, data_idx)
 
     return selected_loop_idx, sketch_selection_mask, idx_prob
