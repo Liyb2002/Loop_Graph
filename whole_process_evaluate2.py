@@ -77,8 +77,10 @@ def run_eval():
     dataset = Evaluation_Dataset('program_output_dataset')
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=lambda x: x[0])
 
-    total_correct = 0
-    total = 0
+    total_particles = 0
+    above_99 = 0
+    above_95 = 0
+    above_90 = 0
 
     for particle in tqdm(data_loader, desc="Evaluating CAD Programs"):
 
@@ -87,6 +89,7 @@ def run_eval():
 
             try:
                 cur_fidelity_score = fidelity_score.compute_fidelity_score(gt_brep_path, output_brep_path)
+                print("cur_fidelity_score", cur_fidelity_score)
             except Exception as e:
                 print(f"Error while computing fidelity score: {e}")
                 cur_fidelity_score = 0
@@ -94,13 +97,22 @@ def run_eval():
             if cur_fidelity_score > best_fidelity_score:
                 best_fidelity_score = cur_fidelity_score
 
-        if best_fidelity_score < 0.95:
-            print("gt_brep_path", gt_brep_path)
-        
+        if best_fidelity_score > 0.99:
+            above_99 += 1
+        if best_fidelity_score > 0.95:
+            above_95 += 1
+        if best_fidelity_score > 0.9:
+            above_90 += 1
+
+        total_particles += 1
         print("Best fidelity score for this particle:", best_fidelity_score)
         print("-----------")
 
-    # print(f"Overall Average Accuracy: {total_correct / total:.4f}, with total_correct : {total_correct} and total: {total}")
+    print("\n========== Evaluation Summary ==========")
+    print(f"Total particles evaluated: {total_particles}")
+    print(f"Above 0.99: {above_99} ({(above_99 / total_particles) * 100:.2f}%)")
+    print(f"Above 0.95: {above_95} ({(above_95 / total_particles) * 100:.2f}%)")
+    print(f"Above 0.90: {above_90} ({(above_90 / total_particles) * 100:.2f}%)")
 
 
 run_eval()

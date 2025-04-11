@@ -194,8 +194,7 @@ class Particle():
                 stroke_to_edge
             )
 
-            Encoders.helper.vis_brep(self.brep_edges)
-            Encoders.helper.vis_used_strokes(gnn_graph['stroke'].x.cpu().numpy(), self.data_idx)
+            # Encoders.helper.vis_used_strokes(gnn_graph['stroke'].x.cpu().numpy(), self.data_idx)
             
             if self.past_programs[-1] != 2:
                 self.mark_off_new_strokes(stroke_to_edge)
@@ -236,9 +235,9 @@ class Particle():
             # Build fillet
             if self.current_op == 3:
                 print("Build Fillet")
-                fillet_edge, fillet_amount, prob = do_fillet(gnn_graph, self.brep_edges, self.data_idx)
-                self.cur__brep_class.random_fillet(fillet_edge, fillet_amount)
-                self.score = self.score * prob
+                output_fillet_edge, selected_prob = do_fillet(gnn_graph, self.brep_edges, self.data_idx)
+                self.cur__brep_class.random_fillet(output_fillet_edge)
+                self.score = self.score * selected_prob
 
 
             if self.current_op ==4:
@@ -271,7 +270,7 @@ class Particle():
             self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
             # self.brep_loops = Preprocessing.proc_CAD.helper.remove_duplicate_circle_breps(self.brep_loops, self.brep_edges)
 
-
+            # Encoders.helper.vis_brep(self.brep_edges)
             # Compute Chamfer Distance
             # cur_fidelity_score = fidelity_score.compute_fidelity_score(self.gt_brep_file_path, os.path.join(brep_path, brep_files[-1]))
             cur_fidelity_score = -1
@@ -501,9 +500,10 @@ def predict_fillet(gnn_graph, data_idx):
 
 def do_fillet(gnn_graph, brep_edges, data_idx):
     fillet_selection_mask = predict_fillet(gnn_graph, data_idx)
-    fillet_edge, fillet_amount, selected_prob= whole_process_helper.helper.get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges)
+    # fillet_edge, fillet_amount, selected_prob= whole_process_helper.helper.get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges)
+    output_fillet_edge, selected_prob = whole_process_helper.helper.get_output_fillet_edge(gnn_graph, fillet_selection_mask)
 
-    return fillet_edge, fillet_amount.item(), selected_prob
+    return output_fillet_edge, selected_prob
 
 
 

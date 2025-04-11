@@ -455,6 +455,23 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
     return None, None, 0
 
 
+
+def get_output_fillet_edge(gnn_graph, fillet_selection_mask):
+    top2_vals, top2_idxs = torch.topk(fillet_selection_mask.view(-1), 1)
+    total_sum = top2_vals.sum()
+    relative_probs = top2_vals / total_sum
+    sampled_idx = torch.multinomial(relative_probs, 1).item()
+
+    selected_idx = top2_idxs[sampled_idx].item()
+    selected_prob = top2_vals[sampled_idx].item()
+
+    stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
+    fillet_stroke = stroke_features[selected_idx]
+
+    return fillet_stroke, selected_prob
+    
+
+
 # --------------------------------------------------------------------------- #
 
 

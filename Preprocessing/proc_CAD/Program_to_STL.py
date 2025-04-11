@@ -112,14 +112,17 @@ class parsed_program():
         
 
     def parse_fillet(self, Op):
-        fillet_amount = Op['operation'][2]['amount']
-        verts = Op['operation'][3]['old_verts_pos']
+        
+        
+        target_output_edge = Op['operation'][1]
+        target_edge, fillet_amount = Preprocessing.proc_CAD.helper.get_fillet_amount(target_output_edge, self.canvas.edges())
 
-        target_edge = Preprocessing.proc_CAD.helper.find_target_verts(verts, self.canvas.edges())
 
         if target_edge != None:
             self.canvas = Preprocessing.proc_CAD.build123.protocol.build_fillet(self.Op_idx, self.canvas, target_edge, fillet_amount, self.output, self.data_directory)
             self.Op_idx += 1
+        else:
+            print("no target fillet edge")
             
     def parse_chamfer(self, Op):
         chamfer_amount = Op['operation'][2]['amount']

@@ -183,89 +183,87 @@ class Brep:
         self.op.append(['extrude', sketch_face.id, extrude_amount, extrude_direction.tolist()])
 
 
-    def random_fillet(self, target_edge_tensor = None, amount = 0):        
+    def random_fillet(self, target_output_edge_tensor = None):        
 
         available_fillet_edges = [edge for edge in self.Edges if edge.fillet_permited]
         if not available_fillet_edges:
             return False
         
-        if target_edge_tensor is None:
+        if target_output_edge_tensor is not None:
+            self.idx += 1
+            self.op.append(['fillet', target_output_edge_tensor.tolist() ])
+
+        else:
             target_edge = None
             while not self.check_fillet_validity(target_edge):
                 target_edge = random.choice(available_fillet_edges)
-        else:
-            # find target_edge based on target_edge_tensor value
-            target_edge = self.find_target_edge(target_edge_tensor)
 
-
-
-        if amount == 0:
             amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
             safe_amount = self.safe_fillet_check([vert.position for vert in target_edge.vertices])
             amount = min(amount * 0.5, safe_amount * 0.5)
 
+            
+            target_edge.disable_fillet()
+
+            verts_pos = []
+            verts_id = []
+            new_vert_pos = []
+            centers = []
+
+            for vert in target_edge.vertices:
+                verts_pos.append(vert.position)
+                verts_id.append(vert.id)
+                neighbor_verts = Preprocessing.proc_CAD.helper.get_neighbor_verts(vert, target_edge, self.Edges)
+                new_vert_pos_half, center = Preprocessing.proc_CAD.helper.compute_fillet_new_vert(vert, neighbor_verts, amount)
+                new_vert_pos.append(new_vert_pos_half)
+                centers.append(center)
+            
+            new_A = new_vert_pos[0][0]
+            new_B = new_vert_pos[0][1]
+            new_C = new_vert_pos[1][0]
+            new_D = new_vert_pos[1][1]
+
+            #create 4 new verts from new_A, new_B and new_C, new_D
+            new_vert_B = Vertex(f"vertex_{self.idx}_0", new_B)
+            new_vert_D = Vertex(f"vertex_{self.idx}_1", new_D)
+            new_vert_A = Vertex(f"vertex_{self.idx}_2", new_A)
+            new_vert_C = Vertex(f"vertex_{self.idx}_3", new_C)
+            self.Vertices.append(new_vert_B)
+            self.Vertices.append(new_vert_D)
+            self.Vertices.append(new_vert_A)
+            self.Vertices.append(new_vert_C)
+
+            arc_0 = [new_A, new_B, centers[0], [new_vert_A.id, new_vert_B.id]]
+            arc_1 = [new_C, new_D, centers[1], [new_vert_C.id, new_vert_D.id]]
+
+
+            #create 2 edge that connect new_B and new_D / new_A and new_C
+            new_edge_id_0 = f"edge_{self.idx}_0"
+            new_edge_0 = Edge(new_edge_id_0, [new_vert_B, new_vert_D])
+            new_edge_id_1 = f"edge_{self.idx}_1"
+            new_edge_1 = Edge(new_edge_id_1, [new_vert_A, new_vert_C])
+            self.Edges.append(new_edge_0)
+            self.Edges.append(new_edge_1)
+
+            # Fillet should produce arc connecting the fillet verts
+            #create 2 edge that connect new_A and new_B / new_C and new_D
+            # new_edge_id_2 = f"edge_{self.idx}_2"
+            # new_edge_2 = Edge(new_edge_id_2, [new_vert_A, new_vert_B])
+            # new_edge_id_3 = f"edge_{self.idx}_3"
+            # new_edge_3 = Edge(new_edge_id_3, [new_vert_C, new_vert_D])
+            # self.Edges.append(new_edge_2)
+            # self.Edges.append(new_edge_3)
+
+            self.idx += 1
+            self.op.append(['fillet', 
+                            target_edge.id, 
+                            {'amount': amount}, 
+                            {'old_verts_pos': verts_pos},
+                            {'verts_id': verts_id},
+                            {'arc_0': arc_0},
+                            {'arc_1': arc_1},
+                            ])
         
-        target_edge.disable_fillet()
-
-        verts_pos = []
-        verts_id = []
-        new_vert_pos = []
-        centers = []
-
-        for vert in target_edge.vertices:
-            verts_pos.append(vert.position)
-            verts_id.append(vert.id)
-            neighbor_verts = Preprocessing.proc_CAD.helper.get_neighbor_verts(vert, target_edge, self.Edges)
-            new_vert_pos_half, center = Preprocessing.proc_CAD.helper.compute_fillet_new_vert(vert, neighbor_verts, amount)
-            new_vert_pos.append(new_vert_pos_half)
-            centers.append(center)
-        
-        new_A = new_vert_pos[0][0]
-        new_B = new_vert_pos[0][1]
-        new_C = new_vert_pos[1][0]
-        new_D = new_vert_pos[1][1]
-
-        #create 4 new verts from new_A, new_B and new_C, new_D
-        new_vert_B = Vertex(f"vertex_{self.idx}_0", new_B)
-        new_vert_D = Vertex(f"vertex_{self.idx}_1", new_D)
-        new_vert_A = Vertex(f"vertex_{self.idx}_2", new_A)
-        new_vert_C = Vertex(f"vertex_{self.idx}_3", new_C)
-        self.Vertices.append(new_vert_B)
-        self.Vertices.append(new_vert_D)
-        self.Vertices.append(new_vert_A)
-        self.Vertices.append(new_vert_C)
-
-        arc_0 = [new_A, new_B, centers[0], [new_vert_A.id, new_vert_B.id]]
-        arc_1 = [new_C, new_D, centers[1], [new_vert_C.id, new_vert_D.id]]
-
-
-        #create 2 edge that connect new_B and new_D / new_A and new_C
-        new_edge_id_0 = f"edge_{self.idx}_0"
-        new_edge_0 = Edge(new_edge_id_0, [new_vert_B, new_vert_D])
-        new_edge_id_1 = f"edge_{self.idx}_1"
-        new_edge_1 = Edge(new_edge_id_1, [new_vert_A, new_vert_C])
-        self.Edges.append(new_edge_0)
-        self.Edges.append(new_edge_1)
-
-        # Fillet should produce arc connecting the fillet verts
-        #create 2 edge that connect new_A and new_B / new_C and new_D
-        # new_edge_id_2 = f"edge_{self.idx}_2"
-        # new_edge_2 = Edge(new_edge_id_2, [new_vert_A, new_vert_B])
-        # new_edge_id_3 = f"edge_{self.idx}_3"
-        # new_edge_3 = Edge(new_edge_id_3, [new_vert_C, new_vert_D])
-        # self.Edges.append(new_edge_2)
-        # self.Edges.append(new_edge_3)
-
-        self.idx += 1
-        self.op.append(['fillet', 
-                        target_edge.id, 
-                        {'amount': amount}, 
-                        {'old_verts_pos': verts_pos},
-                        {'verts_id': verts_id},
-                        {'arc_0': arc_0},
-                        {'arc_1': arc_1},
-                        ])
-    
 
     def random_chamfer(self, target_edge_tensor = None, amount = 0):
         # Chamfer is just non-linear version of fillet
@@ -542,23 +540,27 @@ class Brep:
         return max_dist if max_dist != float('inf') else None  # Return None if no valid distance was found
     
 
+
     def find_target_edge(self, edge_tensor):
         point_1 = edge_tensor[:3].tolist()
         point_2 = edge_tensor[3:6].tolist()
 
-        def is_close(p1, p2, tol=1e-6):
+        def is_close(p1, p2, tol=1e-5):
             return all(abs(a - b) < tol for a, b in zip(p1, p2))
+
+        def distance(a, b):
+            return np.linalg.norm(np.array(a) - np.array(b))
 
         for edge in self.Edges:
             pos_1 = edge.vertices[0].position
             pos_2 = edge.vertices[1].position
 
-            # print("point_1", point_1, "point_2", point_2)
-            # print("pos_1", pos_1, "pos_2", pos_2)
-            # print ("(is_close(point_1, pos_1)", is_close(point_1, pos_1))
-            # print ("(is_close(point_2, pos_2)", is_close(point_2, pos_2))
-            # print("------------")
-            
+            # For each vertex, get the minimum distance to point_1 or point_2
+            d1 = min(distance(pos_1, point_1), distance(pos_1, point_2))
+            d2 = min(distance(pos_2, point_1), distance(pos_2, point_2))
+
+            print(f"Closest distances: {d1:.6f}, {d2:.6f}")
+            print("-------------")
 
             # Check if the points match (considering floating point tolerance)
             if (is_close(point_1, pos_1) and is_close(point_2, pos_2)) or \
@@ -566,4 +568,3 @@ class Brep:
                 return edge
 
         return None
-
