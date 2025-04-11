@@ -33,7 +33,7 @@ import copy
 import re
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/small', return_data_path=True)
 
 
 # --------------------- Directory --------------------- #
@@ -64,7 +64,7 @@ def compute_start_idx():
 
 # --------------------- Main Code --------------------- #
 data_produced = compute_start_idx()
-data_limit = 20
+data_limit = 1
 if os.path.exists(os.path.join(output_dir, f'data_{data_produced}')):
     shutil.rmtree(os.path.join(output_dir, f'data_{data_produced}'))
 os.makedirs(os.path.join(output_dir, f'data_{data_produced}'), exist_ok=True)
@@ -100,7 +100,7 @@ for data in tqdm(dataset, desc="Generating CAD Programs"):
     base_particle.init_stroke_info(stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained)
     base_particle.set_gt_program(program)
     particle_list = []
-    for particle_id in range (50):
+    for particle_id in range (10):
         new_particle = copy.deepcopy(base_particle)
         new_particle.set_particle_id(particle_id, cur_output_dir)
         particle_list.append(new_particle)

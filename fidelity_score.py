@@ -91,17 +91,19 @@ def apply_transform_from_json(shape, matrix_path):
         return shape
 
 
-def compute_fidelity_score(gt_brep_path, output_brep_path, tolerance=0.0001, sample_density=10):
+def compute_fidelity_score(gt_brep_path, output_brep_path, matrix_path, tolerance=0.0001, sample_density=10):
     """
     Computes the fidelity score based on Chamfer distances between two BREP files.
     """
     try:
         # Read shapes
+        if not Path(gt_brep_path).exists():
+            return 0
+        
         gt_shape = read_step(gt_brep_path)
         output_shape = read_step(output_brep_path)
 
         # Apply transformation to GT shape
-        matrix_path = Path(gt_brep_path).parent / "gt_canvas" / "matrix.json"
         gt_shape = apply_transform_from_json(gt_shape, matrix_path)
 
         if gt_shape is None or output_shape is None:

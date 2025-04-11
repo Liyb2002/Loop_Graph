@@ -107,7 +107,6 @@ class parsed_program():
             else:
                 self.canvas = Preprocessing.proc_CAD.build123.protocol.build_subtract(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
 
-
         self.Op_idx += 1
         
 

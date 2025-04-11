@@ -164,7 +164,10 @@ def train():
         
         if data is None:
             continue
-
+        
+        if program[-1] == 0:
+            print("program", program)
+            
         # Extract the necessary elements from the dataset
         data_idx, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
         

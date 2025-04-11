@@ -123,67 +123,65 @@ def face_aggregate_addStroke(stroke_matrix):
 
 # --------------------------------------------------------------------------- #
 
+import torch
+
 def reorder_strokes_to_neighbors(strokes):
     """
     Reorder strokes so that they form a continuous loop of connected points.
-    
+
     Parameters:
     strokes (list): A list of strokes, where each stroke is a tuple (A, B) representing two points.
-    
+
     Returns:
     ordered_points (torch.Tensor): A tensor of ordered points forming a continuous loop.
     """
-    # Start with the first stroke (A, B)
-    def stroke_to_key(stroke, precision=1e6):
-        p1 = tuple(torch.round(stroke[0] * precision).int().tolist())
-        p2 = tuple(torch.round(stroke[1] * precision).int().tolist())
-        return tuple(sorted([p1, p2]))  # sort to ignore direction
+    def points_are_close(p1, p2, tol=5e-4):
+        return torch.norm(p1 - p2) < tol
 
-    # Deduplicate strokes
-    seen_keys = set()
+    # Deduplicate strokes based on proximity
     unique_strokes = []
     for stroke in strokes:
-        key = stroke_to_key(stroke)
-        if key not in seen_keys:
-            unique_strokes.append(stroke)
-            seen_keys.add(key)
+        A, B = stroke
+        is_duplicate = False
+        for uA, uB in unique_strokes:
+            if (points_are_close(A, uA) and points_are_close(B, uB)) or \
+               (points_are_close(A, uB) and points_are_close(B, uA)):
+                is_duplicate = True
+                break
+        if not is_duplicate:
+            unique_strokes.append((A, B))
 
-    # Proceed with your original code
+    if not unique_strokes:
+        return torch.empty((0, 2))  # or raise an error depending on context
+
+    # Start with the first stroke
     first_stroke = unique_strokes[0]
     ordered_points = [first_stroke[0], first_stroke[1]]
     remaining_strokes = unique_strokes[1:]
 
-
-    # Continue until we find the stroke that brings us back to the first point
     while remaining_strokes:
         last_point = ordered_points[-1]
         found_connection = False
-
-        for i, stroke in enumerate(remaining_strokes):
-            pointA, pointB = stroke
-
-            if last_point.equal(pointA):
-                ordered_points.append(pointB)
+        for i, (A, B) in enumerate(remaining_strokes):
+            if points_are_close(last_point, A):
+                ordered_points.append(B)
                 remaining_strokes.pop(i)
                 found_connection = True
                 break
-            elif last_point.equal(pointB):
-                ordered_points.append(pointA)
+            elif points_are_close(last_point, B):
+                ordered_points.append(A)
                 remaining_strokes.pop(i)
                 found_connection = True
                 break
 
-        # If no connected stroke was found, break the loop
         if not found_connection:
             print("Warning: Some strokes are disconnected and will be ignored.")
             break
 
-        # Stop if we've come full circle
-        if ordered_points[-1].equal(ordered_points[0]):
+        if points_are_close(ordered_points[-1], ordered_points[0]):
             break
 
-    # Remove the duplicate last point if closed
-    if ordered_points[-1].equal(ordered_points[0]):
+    if points_are_close(ordered_points[-1], ordered_points[0]):
         ordered_points.pop()
 
     return torch.stack(ordered_points)
@@ -295,7 +293,112 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
     extrude_amount = torch.norm(direction_vec)
     extrude_direction = F.normalize(direction_vec, dim=0)
 
+    if not ensure_valid_extrude(extrude_direction, sketch_points):
+        return find_good_extrude(sketch_points, stroke_features)
+
     return extrude_amount, extrude_direction, selected_prob
+
+
+
+def ensure_valid_extrude(extrude_direction, sketch_points):
+    """
+    Ensure the extrude direction is perpendicular to all lines formed by pairs of sketch points.
+
+    Parameters:
+    extrude_direction (torch.Tensor): A tensor of shape (3,) representing the extrusion direction.
+    sketch_points (torch.Tensor): A tensor of shape (num_points, 3) representing coplanar points.
+
+    Returns:
+    bool: True if the extrude_direction is perpendicular to all sketch lines within tolerance.
+    """
+
+    tol = 5e-5
+    num_points = sketch_points.shape[0]
+
+    for i in range(num_points):
+        for j in range(i + 1, num_points):
+            vec = sketch_points[j] - sketch_points[i]
+            vec_norm = F.normalize(vec, dim=0)
+            dot = torch.dot(vec_norm, extrude_direction)
+            if not torch.isclose(dot.abs(), torch.tensor(0.0, dtype=dot.dtype, device=dot.device), atol=tol):
+                return False
+
+    return True
+    
+
+
+def find_good_extrude(sketch_points, stroke_features):
+    """
+    Finds the best available stroke for extrusion:
+    - One endpoint must be in sketch_points.
+    - Chooses the stroke whose direction (from the sketch point to the other point)
+      is as perpendicular as possible (on average) to all sketch lines.
+    
+    Parameters:
+    sketch_points (torch.Tensor): A tensor of shape (num_points, 3).
+    stroke_features (torch.Tensor): A tensor of shape (num_strokes, 11). The first 6 entries in each row
+                                    represent two 3D points (endpoints of the stroke). The last two entries
+                                    are flags used for selection.
+    
+    Returns:
+    tuple: (extrude_amount (float), extrude_direction (Tensor), confidence (float))
+    """
+    tol = 1e-5
+    num_points = sketch_points.shape[0]
+
+    def is_in_sketch(point):
+        # Check if any of the sketch_points is close enough to the given point
+        return torch.any(torch.all(torch.isclose(sketch_points, point.unsqueeze(0), atol=tol), dim=1))
+
+    def average_abs_dot_with_sketch_lines(direction):
+        total_dot = 0.0
+        count = 0
+        # For every unique pair of sketch points, compute the dot product with the direction vector.
+        for i in range(num_points):
+            for j in range(i + 1, num_points):
+                vec = sketch_points[j] - sketch_points[i]
+                if torch.norm(vec) < tol:
+                    continue  # Skip nearly degenerate lines
+                sketch_dir = F.normalize(vec, dim=0)
+                total_dot += torch.abs(torch.dot(direction, sketch_dir))
+                count += 1
+        return total_dot / count if count > 0 else float('inf')
+
+    best_score = float('inf')
+    best_result = None
+
+    for stroke_feature in stroke_features:
+        if stroke_feature[-1] == 0 and stroke_feature[-2] == 1:
+            p1 = stroke_feature[:3]
+            p2 = stroke_feature[3:6]
+
+            # Determine which point is in the sketch
+            if is_in_sketch(p1):
+                base_point = p1
+                extrude_point = p2
+            elif is_in_sketch(p2):
+                base_point = p2
+                extrude_point = p1
+            else:
+                continue  # Skip this stroke if none of the endpoints is in sketch_points
+
+            direction_vec = extrude_point - base_point
+
+            direction_norm = F.normalize(direction_vec, dim=0)
+            score = average_abs_dot_with_sketch_lines(direction_norm)
+
+            if score < best_score:
+                best_score = score
+                extrude_amount = torch.norm(direction_vec)
+                extrude_direction = direction_norm
+                if random.random < 0.5:
+                    extrude_direction = -extrude_direction
+                best_result = (extrude_amount, extrude_direction, 1.0)
+
+    if best_result is None:
+        raise ValueError("No stroke with an endpoint in sketch_points found.")
+    
+    return best_result
 
 
 
@@ -813,6 +916,7 @@ def find_top_different_particles(finished_particles, cur_output_dir, num_output_
     # Process the top 3 (or fewer) unique particles
     top_particles = unique_particles[:num_output_particles]
     for particle in top_particles:
+        print("top value: ", particle.true_value)
         old_dir = os.path.join(cur_output_dir, f'particle_{particle.particle_id}')
         new_dir = os.path.join(cur_output_dir, f'particle_{particle.particle_id}_output')
 

@@ -5,6 +5,7 @@ import pickle
 from tqdm import tqdm
 import torch
 import re
+from pathlib import Path
 
 import fidelity_score
 
@@ -88,7 +89,8 @@ def run_eval():
         for gt_brep_path, output_brep_path in particle:
 
             try:
-                cur_fidelity_score = fidelity_score.compute_fidelity_score(gt_brep_path, output_brep_path)
+                matrix_path = Path(gt_brep_path).parent / "gt_canvas" / "matrix.json"
+                cur_fidelity_score = fidelity_score.compute_fidelity_score(gt_brep_path, output_brep_path, matrix_path)
                 print("cur_fidelity_score", cur_fidelity_score)
             except Exception as e:
                 print(f"Error while computing fidelity score: {e}")
