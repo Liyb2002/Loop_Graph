@@ -1827,21 +1827,20 @@ def remove_duplicate_circle_breps(brep_loops, final_brep_edges):
 
 
 
-
 import math
+import random
 
 def get_fillet_amount(target_output_edge, brep_edges):
     point1 = target_output_edge[:3]
     point2 = target_output_edge[3:6]
-
-    fillet_amount = 0
-    fillet_edge = None
 
     def midpoint(p1, p2):
         return [(a + b) / 2 for a, b in zip(p1, p2)]
 
     def distance(p1, p2):
         return math.sqrt(sum((a - b) ** 2 for a, b in zip(p1, p2)))
+
+    candidate_edges = []
 
     for edge in brep_edges:
         verts = edge.vertices()
@@ -1854,7 +1853,11 @@ def get_fillet_amount(target_output_edge, brep_edges):
             distance2 = distance(point2, edge_mid_point)
 
             if abs(distance1 - distance2) < 0.0005:
-                fillet_amount = (math.sqrt(2) / 2) * distance(point1, point2)
-                fillet_edge = edge
+                candidate_edges.append(edge)
 
-    return fillet_edge, fillet_amount
+    if candidate_edges:
+        fillet_edge = random.choice(candidate_edges)
+        fillet_amount = (math.sqrt(2) / 2) * distance(point1, point2)
+        return fillet_edge, fillet_amount
+
+    return None, 0

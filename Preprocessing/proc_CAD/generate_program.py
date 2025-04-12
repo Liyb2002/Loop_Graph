@@ -390,9 +390,6 @@ class Brep:
         
         self.write_terminate(data)  
 
-        if tempt:
-            print("data", data)
-
         with open(filename, 'w') as f:
             json.dump(data, f, indent=4)
         

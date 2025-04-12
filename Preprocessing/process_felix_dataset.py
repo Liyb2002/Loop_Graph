@@ -188,8 +188,11 @@ class cad2sketch_dataset_loader(Dataset):
                 else:
                     loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_edge_features_list)
                     selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
-                    if len(new_edge_features_list) >= 5: 
-                        # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
+                    
+                    if len(new_edge_features_list) >= 5 or not Preprocessing.cad2sketch_stroke_features.ensure_loop(stroke_node_features, selected_indices): 
+                        print("failed ensure loop")
+                        Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
+                        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, [selected_indices])
                         return False
                     
                 
@@ -198,7 +201,7 @@ class cad2sketch_dataset_loader(Dataset):
                     stroke_operations_order_matrix[:, idx] = np.array(loop_strokes).flatten()
 
                     # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
-                    # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, [selected_indices])
+                    # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_node_features, [selected_indices])
 
 
         # 3) Compute Loop Neighboring Information

@@ -967,7 +967,7 @@ def vis_feature_lines_loop_ver(feature_lines, stroke_to_loop, stroke_cloud_loops
 
 
 
-def vis_feature_lines_loop_all(feature_lines, stroke_cloud_loops):
+def vis_feature_lines_loop_all(feature_lines, stroke_node_features, stroke_cloud_loops):
     """
     Visualize 3D strokes, highlighting one loop at a time in red.
     A separate plot is generated for each loop.
@@ -976,11 +976,12 @@ def vis_feature_lines_loop_all(feature_lines, stroke_cloud_loops):
     - feature_lines (list): List of stroke dictionaries containing geometry (list of 3D points).
     - stroke_cloud_loops (list of lists): Each sublist contains stroke indices forming a loop.
     """
+    import matplotlib.pyplot as plt
+
     # Precompute bounding box across all strokes
     x_min, x_max = float('inf'), float('-inf')
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
-
 
     for stroke in feature_lines:
         geometry = stroke["geometry"]
@@ -1029,7 +1030,17 @@ def vis_feature_lines_loop_all(feature_lines, stroke_cloud_loops):
         # Highlight current loop in red
         for stroke_idx in stroke_indices:
             if stroke_idx >= len(feature_lines):
+                # Fallback to stroke_node_features
+                stroke = stroke_node_features[stroke_idx]
+                point_1 = stroke[:3]
+                point_2 = stroke[3:6]
+                ax.plot([point_1[0], point_2[0]],
+                        [point_1[1], point_2[1]],
+                        [point_1[2], point_2[2]],
+                        color='red',
+                        linewidth=1.0)
                 continue
+
             geometry = feature_lines[stroke_idx]["geometry"]
             if len(geometry) < 2:
                 continue
@@ -1843,6 +1854,46 @@ def split_and_merge_brep(edge_features_list):
     return edge_features_list + add_feature_lines, add_feature_lines
 
 
+
+def ensure_loop(stroke_node_features, selected_indices, tol=1e-4):
+    """
+    Checks whether the selected strokes form a valid loop:
+    All endpoints (3D points) must appear exactly twice (within distance tolerance).
+
+    Parameters:
+    - stroke_node_features: np.ndarray of shape (num_strokes, ≥6)
+    - selected_indices: list of indices (ints)
+    - tol: distance tolerance for point matching
+
+    Returns:
+    - True if all points appear exactly twice, False otherwise
+    """
+    points = []
+
+    # Collect all points (start and end) from selected strokes
+    for idx in selected_indices:
+        stroke = stroke_node_features[idx]
+        points.append(stroke[0:3])
+        points.append(stroke[3:6])
+
+    # Count occurrences using distance-based matching
+    matched_flags = [False] * len(points)
+    counts = [0] * len(points)
+
+    for i, p1 in enumerate(points):
+        if matched_flags[i]:
+            continue
+        for j, p2 in enumerate(points):
+            if np.linalg.norm(np.array(p1) - np.array(p2)) < tol:
+                counts[i] += 1
+                matched_flags[j] = True  # mark as used in match
+
+    # Each point must appear exactly twice
+    for c in counts:
+        if c==2 or c==0:
+            return True
+
+    return False
 
 # ------------------------------------------------------------------------------------# 
 def extract_input_json(final_edges_data, strokes_dict_data, subfolder_path):
