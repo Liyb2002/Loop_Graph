@@ -69,6 +69,7 @@ def is_perpendicular(line1, line2, tol=5e-6):
     dot_product = np.dot(vec1, vec2)
     return abs(dot_product) < tol
 
+
 def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features):
     """
     Parameters:

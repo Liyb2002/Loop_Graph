@@ -1895,6 +1895,67 @@ def ensure_loop(stroke_node_features, selected_indices, tol=1e-4):
 
     return False
 
+
+
+def ensure_loop_plane(stroke_node_features, selected_indices, point_tol=1e-4, plane_tol=1e-5):
+    """
+    Checks whether all the 3D points from selected strokes lie on the same plane.
+
+    Parameters:
+    - stroke_node_features: np.ndarray of shape (num_strokes, ≥6)
+    - selected_indices: list of indices referring to strokes in stroke_node_features
+    - point_tol: tolerance to decide if points are considered unique
+    - plane_tol: tolerance to check if a point lies on the plane
+
+    Returns:
+    - True if all points lie on the same plane, False otherwise
+    """
+
+    # Collect unique 3D points from selected strokes
+    points = []
+    for idx in selected_indices:
+        stroke = stroke_node_features[idx]
+        pt1 = stroke[:3]
+        pt2 = stroke[3:6]
+
+        def add_if_unique(p):
+            for existing in points:
+                if np.linalg.norm(np.array(p) - np.array(existing)) < point_tol:
+                    return
+            points.append(p)
+
+        add_if_unique(pt1)
+        add_if_unique(pt2)
+
+    if len(points) <= 3:
+        return True  # Any 3 or fewer points are always planar
+
+    # Try to find 3 non-colinear points to define a valid plane
+    p0 = np.array(points[0])
+    normal = None
+    for i in range(1, len(points)):
+        for j in range(i + 1, len(points)):
+            v1 = np.array(points[i]) - p0
+            v2 = np.array(points[j]) - p0
+            n = np.cross(v1, v2)
+            if np.linalg.norm(n) > plane_tol:
+                normal = n / np.linalg.norm(n)
+                break
+        if normal is not None:
+            break
+
+    if normal is None:
+        return False  # All points are colinear
+
+    # Check that all points lie on the plane
+    for p in points:
+        if abs(np.dot(np.array(p) - p0, normal)) > plane_tol:
+            return False
+
+    return True
+
+
+
 # ------------------------------------------------------------------------------------# 
 def extract_input_json(final_edges_data, strokes_dict_data, subfolder_path):
     """

@@ -234,12 +234,6 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
     Calculate the extrude target point from the stroke with the highest probability in the extrude_selection_mask.
     The extrusion target is determined by identifying the point of the stroke that is not in the sketch points (coplanar points).
 
-    Parameters:
-    gnn_graph (HeteroData): The graph containing stroke nodes and their features.
-    extrude_selection_mask (torch.Tensor): A tensor of shape (num_strokes, 1) representing probabilities for selecting strokes.
-    sketch_points (torch.Tensor): A tensor of shape (num_points, 3), representing the coplanar points.
-    brep_edges (torch.Tensor): A tensor of shape (num_strokes, 6) representing the brep edges (not used in this logic).
-
     Returns:
     tuple: (extrude_amount (float), extrude_direction (Tensor), selected_prob (float))
     """
@@ -251,16 +245,13 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
 
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 11), first 6 values are the 3D points
 
-    # Set tolerance for floating point comparison
     tol = 1e-5
     possible_extrude_strokes = []
+    candidate_indices = []
+    candidate_probs = []
 
     def is_in_sketch(point):
         return torch.any(torch.all(torch.isclose(sketch_points, point.unsqueeze(0), atol=tol), dim=1))
-
-    # Collect valid strokes and their associated probabilities
-    candidate_indices = []
-    candidate_probs = []
 
     for idx in topk_idxs:
         stroke_feature = stroke_features[idx]
@@ -273,16 +264,20 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
         if (in1 and not in2) or (in2 and not in1):
             if not in1:
                 point1, point2 = point2, point1
-            possible_extrude_strokes.append((point1, point2))
-            candidate_indices.append(idx)
-            candidate_probs.append(extrude_selection_mask[idx].item())
+
+            direction_vec = point2 - point1
+            extrude_direction = F.normalize(direction_vec, dim=0)
+
+            if ensure_valid_extrude(extrude_direction, sketch_points):
+                possible_extrude_strokes.append((point1, point2))
+                candidate_indices.append(idx)
+                candidate_probs.append(extrude_selection_mask[idx].item())
 
     if not possible_extrude_strokes:
-        raise ValueError("No valid extrude strokes found.")
+        return find_good_extrude(sketch_points, stroke_features)
 
-    # Normalize probabilities using softmax for biased random selection
     selected_probs = torch.tensor(candidate_probs)
-    temperature = 0.5  # Lower = more confident choices
+    temperature = 0.5
     relative_probs = torch.softmax(selected_probs / temperature, dim=0)
 
     sampled_idx = torch.multinomial(relative_probs, 1).item()
@@ -292,9 +287,6 @@ def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_ed
     direction_vec = point2 - point1
     extrude_amount = torch.norm(direction_vec)
     extrude_direction = F.normalize(direction_vec, dim=0)
-
-    if not ensure_valid_extrude(extrude_direction, sketch_points):
-        return find_good_extrude(sketch_points, stroke_features)
 
     return extrude_amount, extrude_direction, selected_prob
 

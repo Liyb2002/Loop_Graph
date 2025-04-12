@@ -171,7 +171,6 @@ class cad2sketch_dataset_loader(Dataset):
         stroke_cloud_loops = Preprocessing.proc_CAD.helper.reorder_loops(stroke_cloud_loops)
         stroke_cloud_loops = [list(loop) for loop in stroke_cloud_loops]
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_cloud_loops)
-
         # ensure sketch loops exist:
         for idx, step_file in enumerate(step_files):
             if program[idx]['operation'][0] == 'sketch':
@@ -189,9 +188,9 @@ class cad2sketch_dataset_loader(Dataset):
                     loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_edge_features_list)
                     selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
                     
-                    if len(new_edge_features_list) >= 5 or not Preprocessing.cad2sketch_stroke_features.ensure_loop(stroke_node_features, selected_indices): 
+                    if len(new_edge_features_list) >= 5 or not Preprocessing.cad2sketch_stroke_features.ensure_loop(stroke_node_features, selected_indices) and Preprocessing.cad2sketch_stroke_features.ensure_loop_plane(stroke_node_features, selected_indices): 
                         print("failed ensure loop")
-                        Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
+                        # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
                         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, [selected_indices])
                         return False
                     

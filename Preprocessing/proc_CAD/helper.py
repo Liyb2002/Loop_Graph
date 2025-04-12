@@ -577,6 +577,24 @@ def chosen_face_id(boundary_points, edge_features):
     print("edge_features", len(edge_features))
     print("boundary_points", len(boundary_points))
 
+
+def is_planar(points, tol=1e-5):
+    if len(points) < 3:
+        return True  # 2 points are trivially planar
+
+    p0, p1, p2 = points[:3]
+    v1 = np.array(p1) - np.array(p0)
+    v2 = np.array(p2) - np.array(p0)
+    normal = np.cross(v1, v2)
+    if np.linalg.norm(normal) < tol:
+        return False  # points are colinear
+
+    normal = normal / np.linalg.norm(normal)
+    for p in points[3:]:
+        if abs(np.dot(np.array(p) - np.array(p0), normal)) > tol:
+            return False
+    return True
+
     
 
 #----------------------------------------------------------------------------------#
@@ -657,7 +675,7 @@ def face_aggregate_networkx(stroke_matrix):
             stroke = stroke_matrix[edge_id]
             points.add(tuple(stroke[:3]))
             points.add(tuple(stroke[3:]))
-        if len(points) == len(group):
+        if len(points) == len(group) and is_planar(list(points)):
             final_groups.append(group)
 
 

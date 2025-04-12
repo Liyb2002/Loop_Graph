@@ -131,12 +131,12 @@ def train():
             continue
 
         # Extract the necessary elements from the dataset
-        program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        data_idx, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
         if program[-1] != 'extrude'or len(program) > stroke_operations_order_matrix.shape[1]:
             continue
         
-        if loop_neighboring_vertical.shape[0] > 400:
+        if stroke_node_features.shape[0] > 400:
             continue
 
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
@@ -448,4 +448,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()
