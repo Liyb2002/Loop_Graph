@@ -94,9 +94,11 @@ def apply_transform_from_json(shape, matrix_path):
         return shape
 
 
+from OCC.Core.BRepBndLib import brepbndlib
+
 def compute_bbox_scale(shape):
     bbox = Bnd_Box()
-    brepbndlib_Add(shape, bbox)
+    brepbndlib.Add(shape, bbox)
     xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
     x_range = xmax - xmin
     y_range = ymax - ymin
@@ -136,17 +138,17 @@ def compute_fidelity_score(gt_brep_path, output_brep_path, matrix_path, toleranc
         gt_to_output = chamfer_distance(gt_points, output_points)
         output_to_gt = chamfer_distance(output_points, gt_points)
 
-        print("gt_to_output", gt_to_output)
-        print("output_to_gt", output_to_gt)
+        # print("gt_to_output", gt_to_output)
+        # print("output_to_gt", output_to_gt)
 
         # Normalize distances using bounding box scale
         bbox_scale = compute_bbox_scale(gt_shape)
         norm_gt_to_output = gt_to_output / bbox_scale
         norm_output_to_gt = output_to_gt / bbox_scale
 
-        print(f"bbox_scale = {bbox_scale}")
-        print(f"normalized gt_to_output = {norm_gt_to_output}")
-        print(f"normalized output_to_gt = {norm_output_to_gt}")
+        # print(f"bbox_scale = {bbox_scale}")
+        # print(f"normalized gt_to_output = {norm_gt_to_output}")
+        # print(f"normalized output_to_gt = {norm_output_to_gt}")
 
         fidelity_score = min(1, 3 / (1 + norm_gt_to_output + norm_output_to_gt))
 
