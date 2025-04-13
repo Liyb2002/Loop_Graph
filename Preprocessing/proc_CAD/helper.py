@@ -1859,6 +1859,8 @@ def get_fillet_amount(target_output_edge, brep_edges):
         return math.sqrt(sum((a - b) ** 2 for a, b in zip(p1, p2)))
 
     candidate_edges = []
+    min_distance = float('inf')
+    tolerance = 1e-6
 
     for edge in brep_edges:
         verts = edge.vertices()
@@ -1870,8 +1872,14 @@ def get_fillet_amount(target_output_edge, brep_edges):
             distance1 = distance(point1, edge_mid_point)
             distance2 = distance(point2, edge_mid_point)
 
-            if abs(distance1 - distance2) < 0.0005:
-                candidate_edges.append(edge)
+            if abs(distance1 - distance2) < 1e-6:
+                if distance1 < min_distance - tolerance:
+                    # New minimum found
+                    min_distance = distance1
+                    candidate_edges = [edge]
+                elif abs(distance1 - min_distance) <= tolerance:
+                    # Equally good candidate
+                    candidate_edges.append(edge)
 
     if candidate_edges:
         fillet_edge = random.choice(candidate_edges)

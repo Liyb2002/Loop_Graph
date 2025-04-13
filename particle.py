@@ -193,14 +193,15 @@ class Particle():
                 stroke_to_edge
             )
 
-            # Encoders.helper.vis_used_strokes(gnn_graph['stroke'].x.cpu().numpy(), self.data_idx)
+            if self.current_op == 3:
+                Encoders.helper.vis_brep(self.brep_edges)
+                Encoders.helper.vis_used_strokes(gnn_graph['stroke'].x.cpu().numpy(), self.data_idx)
             
-            if self.past_programs[-1] == 2:
-                if not self.mark_off_new_strokes(stroke_to_edge, stroke_to_edge_circle):
-                    self.remove_particle()
-                    print("No new feature added")
-                    self.valid_particle = False
-                    return
+            if not self.mark_off_new_strokes(stroke_to_edge, stroke_to_edge_circle):
+                self.remove_particle()
+                print("No new feature added")
+                self.valid_particle = False
+                return
 
 
 
@@ -276,7 +277,8 @@ class Particle():
             self.brep_edges, self.brep_loops = cascade_brep(brep_files, self.data_produced, brep_path)
             # self.brep_loops = Preprocessing.proc_CAD.helper.remove_duplicate_circle_breps(self.brep_loops, self.brep_edges)
 
-            # Encoders.helper.vis_brep(self.brep_edges)
+            # if self.current_op == 3:
+            #     Encoders.helper.vis_brep(self.brep_edges)
             # Compute Chamfer Distance
             # cur_fidelity_score = fidelity_score.compute_fidelity_score(self.gt_brep_file_path, os.path.join(brep_path, brep_files[-1]))
             cur_fidelity_score = -1

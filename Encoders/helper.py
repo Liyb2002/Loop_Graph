@@ -162,8 +162,13 @@ def choose_extrude_strokes_from_circle(stroke_selection_mask, sketch_selection_m
         if stroke_node_features[i][-1] == 2:
             center = stroke_node_features[i][0:3]
             radius = stroke_node_features[i][7]
-            if np.linalg.norm(np.array(center) - np.array(sketch_center)) > 100 * EPSILON and abs(radius - sketch_radius) < EPSILON:
-                cylinder_height = dist(center, sketch_center)
+
+
+            center_dist = dist(center, sketch_center)
+            radius_diff = abs(radius - sketch_radius) 
+
+            if center_dist > 1e-4 and radius_diff < 1e-5:
+                cylinder_height = center_dist
                 break
 
     # Find lines that connect the two circles (extrude strokes)
@@ -174,9 +179,10 @@ def choose_extrude_strokes_from_circle(stroke_selection_mask, sketch_selection_m
             length = dist(point_1, point_2)
 
 
-            if abs(length - cylinder_height) < EPSILON:
+            if abs(length - cylinder_height) < EPSILON and dist(point_1, point_2) > 1e-5:
                 d1 = dist(point_1, sketch_center)
                 d2 = dist(point_2, sketch_center)
+
                 if abs(d1 - sketch_radius) < EPSILON or abs(d2 - sketch_radius) < EPSILON:
                     extrude_strokes[i] = 1
 

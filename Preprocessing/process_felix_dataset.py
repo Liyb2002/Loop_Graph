@@ -31,7 +31,7 @@ class cad2sketch_dataset_loader(Dataset):
         Initializes the dataset generator by setting paths and loading the dataset.
         """
 
-        self.data_path = os.path.join(os.getcwd(), 'dataset', 'cad2sketch_annotated')
+        self.data_path = os.path.join(os.getcwd(), 'dataset', 'small')
 
         self.subfolder_paths = []
 
@@ -150,9 +150,10 @@ class cad2sketch_dataset_loader(Dataset):
                 new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
             else:
                 new_edge_features_list, _ = Preprocessing.cad2sketch_stroke_features.split_and_merge_brep(edge_features_list)
+                # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list  + cylinder_features))
 
             stroke_node_features, num_add_edges, added_feature_lines= Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, new_edge_features_list)
-            
+
             # if num_add_edges !=0:
             #     Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_highlights(stroke_node_features, added_feature_lines)
             #     print("num_add_edges", num_add_edges)
@@ -254,7 +255,7 @@ class cad2sketch_dataset_loader(Dataset):
             stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
             stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle_full(stroke_node_features, output_brep_edges)
             stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
-            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_to_edge)
+            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_node_features, stroke_to_edge)
 
             stroke_to_loop = Preprocessing.cad2sketch_stroke_features.from_stroke_to_edge(stroke_to_edge, stroke_cloud_loops)
             # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_ver(all_lines, stroke_to_loop, stroke_cloud_loops)
@@ -276,7 +277,6 @@ class cad2sketch_dataset_loader(Dataset):
                 # chosen_strokes = np.where((new_stroke_to_edge_matrix == 1).any(axis=1))[0]
 
                 stroke_operations_order_matrix[:, idx] = np.array(new_stroke_to_edge_matrix).flatten()
-            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_node_features, new_stroke_to_edge_matrix)
 
             # 7) Write the data to file
             output_file_path = os.path.join(data_directory, f'shape_info_{file_count}.pkl')

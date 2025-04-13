@@ -143,6 +143,8 @@ def train():
 
         if kth_operation is None:
             continue
+        
+        all_kth_stroke =  (kth_operation == 1).nonzero(as_tuple=True)[0]
 
         sketch_operation_mask = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-2)
         sketch_stroke_idx = (sketch_operation_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
@@ -153,6 +155,9 @@ def train():
 
         extrude_stroke_idx = (extrude_selection_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
         
+        if len(extrude_stroke_idx) == 0:
+            continue
+
         # Find the sketch_loops
         loop_chosen_mask = []
         for loop in stroke_cloud_loops:
@@ -185,8 +190,11 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(extrude_selection_mask)
 
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx)
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx)
+        # print("extrude_stroke_idx", extrude_stroke_idx)
+        # print("gnn_graph['stroke'].x.cpu().numpy()", stroke_node_features.shape)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx, data_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx, data_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), all_kth_stroke, data_idx)
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")

@@ -552,7 +552,7 @@ def get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges):
 
 
 def get_output_fillet_edge(gnn_graph, fillet_selection_mask):
-    top2_vals, top2_idxs = torch.topk(fillet_selection_mask.view(-1), 1)
+    top2_vals, top2_idxs = torch.topk(fillet_selection_mask.view(-1), 2)
     total_sum = top2_vals.sum()
     relative_probs = top2_vals / total_sum
     sampled_idx = torch.multinomial(relative_probs, 1).item()
@@ -877,7 +877,7 @@ def resample_particles(particle_list, finished_particles):
 
 # --------------------------------------------------------------------------- #
 
-def find_top_different_particles(finished_particles, cur_output_dir, num_output_particles = 5):
+def find_top_different_particles(finished_particles, cur_output_dir, num_output_particles = 1):
     """
     Finds the top 3 particles with different brep_edges and renames their directories.
 
