@@ -97,7 +97,6 @@ class parsed_program():
         extrude_amount = Op['operation'][2]
         extrude_direction = np.array(Op['operation'][3])
 
-
         if np.allclose(-sketch_face_normal, extrude_direction, atol=1e-5):
             extrude_amount = -extrude_amount
 

@@ -1399,8 +1399,9 @@ def ensure_brep_edges(stroke_node_features, edge_features_list):
 
 import numpy as np
 
-def match(center1, center2, tol=1e-5):
+def match(center1, center2, tol=0.0015):
     """Utility function to check if two centers are approximately equal."""
+
     return np.linalg.norm(center1 - center2) < tol
 
 def dist(p1, p2):
@@ -1433,7 +1434,7 @@ def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
                     brep_center = np.array(brep_edge[:3])
                     if match(stroke_center, brep_center):
                         stroke_used_matrix[i] = 1
-                        break
+                        
 
     # Second pass: Detect paired circle faces (for cylinders)
     circle_pairs = []
@@ -1449,7 +1450,7 @@ def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
                     center2 = np.array(brep_edge2[:3])
                     radius2 = brep_edge2[6]
 
-                    if abs(radius1 - radius2) < 1e-6 and dist(center1, center2) > 1e-4:
+                    if abs(radius1 - radius2) < 1e-5 and dist(center1, center2) > 1e-4:
                         circle_pairs.append((center1, center2, radius1))
 
     # Third pass: Match straight strokes connecting paired circles
@@ -1460,10 +1461,11 @@ def stroke_to_edge_circle(stroke_node_features, final_brep_edges):
             point2 = np.array(stroke[3:6])
 
             for center1, center2, radius in circle_pairs:
+                # print("abs(dist(point1, center1) - radius)", abs(dist(point1, center1) - radius))
                 if (
-                    abs(dist(point1, center1) - radius) < 1e-5 and abs(dist(point2, center2) - radius) < 1e-5
+                    abs(dist(point1, center1) - radius) < 0.0015 and abs(dist(point2, center2) - radius) < 0.0015
                 ) or (
-                    abs(dist(point2, center1) - radius) < 1e-5 and abs(dist(point1, center2) - radius) < 1e-5
+                    abs(dist(point2, center1) - radius) < 0.0015 and abs(dist(point1, center2) - radius) < 0.0015
                 ):
                     stroke_used_matrix[i] = 1
                     break  # Go to next stroke

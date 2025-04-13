@@ -397,51 +397,127 @@ def find_good_extrude(sketch_points, stroke_features):
 def get_extrude_amount_circle(gnn_graph, sketch_points, extrude_selection_mask):
     """
     Calculates the extrude target point and amount for a circle sketch.
-    
+
     Parameters:
     - gnn_graph (HeteroData): The graph containing stroke features.
     - sketch_points (torch.Tensor): A tensor representing the sketch points (the circle center in this case).
     - extrude_selection_mask (torch.Tensor): A tensor of shape (num_strokes, 1) representing probabilities for selecting strokes.
-    
+
     Returns:
-    - target_point (list): A list of 3 values representing the extrusion target point.
+    - extrude_amount (float): The length of extrusion.
+    - direction (torch.Tensor): A 3D vector representing the extrusion direction.
+    - score (float): Placeholder score, set to 1.0
     """
-    # 1) Get the sketch center point
+    # 1) Get the sketch center point and radius
     center = sketch_points[0][:3]  # Assuming the first row corresponds to the circle and [:3] gives the center
+    radius = sketch_points[0][7]
 
     # 2) Get the predicted strokes
     topk_vals, topk_idxs = torch.topk(extrude_selection_mask.view(-1), 10)  # Get top candidates
 
     stroke_features = gnn_graph['stroke'].x  # Shape: (num_strokes, 7), first 6 values are the 3D points
 
-    # Iterate over topk indices to find the stroke to extrude
     for idx in topk_idxs:
         stroke_feature = stroke_features[idx]
         point1 = stroke_feature[:3]
         point2 = stroke_feature[3:6]
 
-        # Check if point1 or point2 is on the same plane with center
-        if any(torch.isclose(center[i], point1[i]) for i in range(3)):
-            extrude_point = point2
-            other_point = point1
-            extrude_amount = torch.norm(point1 - point2, p=2)
+        dist1 = torch.norm(point1 - center)
+        dist2 = torch.norm(point2 - center)
+
+        # Check if one point is approximately on the circle
+        if abs(dist1 - radius) < 5e-5:
+            face_point = point1
+            extrude_to_point = point2
             break
-        elif any(torch.isclose(center[i], point2[i]) for i in range(3)):
-            extrude_point = point1
-            other_point = point2
-            extrude_amount = torch.norm(point1 - point2, p=2)
+        elif abs(dist2 - radius) < 5e-5:
+            face_point = point2
+            extrude_to_point = point1
             break
-    
     else:
-        raise ValueError("No suitable stroke found for extrusion.")
+        # fallback
+        return get_extrude_amount_circle_fallback(sketch_points, stroke_features)
+    
+    # Compute the direction and amount
+    raw_direction = extrude_to_point - face_point
+    extrude_amount = torch.norm(raw_direction)
 
-    # Compute the direction from the other point to the extrude_point
-    direction = extrude_point - other_point
-
-    # Compute the target point by extruding from the center
-    target_point = [center[i].item() + direction[i] for i in range(3)]
+    direction = raw_direction / extrude_amount.item()
 
     return extrude_amount, direction, 1.0
+
+
+
+
+
+
+def dist(p1, p2):
+    return np.linalg.norm(np.array(p1) - np.array(p2))
+
+def get_extrude_amount_circle_fallback(sketch_points, stroke_node_features):
+    """
+    Fallback method to calculate the extrude amount and direction using sketch circle info
+    and straight strokes connecting paired circles (forming a cylinder).
+    """
+
+    # 1) Get the sketch center point and radius
+    center1 = np.array(sketch_points[0][:3])  # center of the circle
+    radius1 = sketch_points[0][7]
+
+    paired_center = None
+    radius2 = None
+
+    # 2) Find the paired circle
+    for stroke in stroke_node_features:
+        stroke_type = stroke[-1]
+        if stroke_type == 2:  # Circle stroke
+            center2 = np.array(stroke[:3])
+            radius2_candidate = stroke[7]
+
+            if abs(radius1 - radius2_candidate) < 1e-5 and dist(center1, center2) > 1e-4:
+                paired_center = center2
+                radius2 = radius2_candidate
+                break
+
+    if paired_center is None:
+        raise ValueError("No paired circle found.")
+
+    # 3) Find the connecting cylinder line (a straight stroke connecting the two circles)
+    face_point = None
+    extrude_to_point = None
+
+    for stroke in stroke_node_features:
+        stroke_type = stroke[-1]
+        if stroke_type == 1:  # Straight stroke
+            point1 = np.array(stroke[:3])
+            point2 = np.array(stroke[3:6])
+
+            if (
+                abs(dist(point1, center1) - radius1) < 0.0015 and
+                abs(dist(point2, paired_center) - radius2) < 0.0015
+            ):
+                face_point = point1
+                extrude_to_point = point2
+                break
+            elif (
+                abs(dist(point2, center1) - radius1) < 0.0015 and
+                abs(dist(point1, paired_center) - radius2) < 0.0015
+            ):
+                face_point = point2
+                extrude_to_point = point1
+                break
+
+    if face_point is None or extrude_to_point is None:
+        raise ValueError("No suitable connecting stroke found between circles.")
+
+    # 4) Compute direction and extrusion amount
+    raw_direction = torch.tensor(extrude_to_point - face_point, dtype=torch.float32)
+    extrude_amount = torch.norm(raw_direction)
+    direction = raw_direction / extrude_amount
+
+    return extrude_amount.item(), direction, 1.0
+
+
 
 
 

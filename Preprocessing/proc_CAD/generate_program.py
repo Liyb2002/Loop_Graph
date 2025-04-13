@@ -109,7 +109,6 @@ class Brep:
 
     def extrude_op(self, extrude_amount = None, extrude_direction = None):
         
-
         sketch_face = self.Faces[-1]
         new_vertices = []
         new_edges = []
