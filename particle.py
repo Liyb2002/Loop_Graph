@@ -193,11 +193,11 @@ class Particle():
                 stroke_to_edge
             )
 
-            if self.current_op == 3:
+            if len(self.past_programs) == 5:
                 Encoders.helper.vis_brep(self.brep_edges)
                 Encoders.helper.vis_used_strokes(gnn_graph['stroke'].x.cpu().numpy(), self.data_idx)
-            
-            if not self.mark_off_new_strokes(stroke_to_edge, stroke_to_edge_circle):
+
+            if self.mark_off_new_strokes(stroke_to_edge, stroke_to_edge_circle) == False:
                 self.remove_particle()
                 print("No new feature added")
                 self.valid_particle = False
