@@ -57,7 +57,6 @@ def sample_points_from_shape(shape, sample_density, tolerance=1e-5):
         print(f"Error sampling points from shape: {e}")
         return np.array([])
 
-
 def chamfer_distance(points1, points2, bbox_scale):
     if points1.shape[0] == 0 or points2.shape[0] == 0:
         print("Empty point cloud detected!")
@@ -66,10 +65,11 @@ def chamfer_distance(points1, points2, bbox_scale):
         tree = cKDTree(points2)
         dist, _ = tree.query(points1)
 
-        # Cap each distance by bbox_scale
-        dist = np.minimum(dist, bbox_scale)
+        # Cap each distance at bbox_scale
+        # dist = np.minimum(dist, bbox_scale)
 
-        return np.mean(dist)
+        # Sum of clipped distances
+        return np.sum(dist)
     except Exception as e:
         print(f"Error computing Chamfer distance: {e}")
         return float('inf')
@@ -108,7 +108,7 @@ def compute_bbox_scale(shape):
     y_range = ymax - ymin
     z_range = zmax - zmin
     max_range = max(x_range, y_range, z_range)
-    return max_range / 100.0
+    return max_range
 
 
 def compute_fidelity_score(gt_brep_path, output_brep_path, matrix_path, strict = False, sample_density=250, tolerance=1e-5):
