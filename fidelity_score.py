@@ -28,7 +28,7 @@ def read_step(filepath):
         return None
 
 
-def sample_points_from_shape(shape, tolerance=0.0001, sample_density=100):
+def sample_points_from_shape(shape, tolerance=1e-5, sample_density=100):
     if shape is None:
         print("Shape is None, skipping sampling.")
         return np.array([])
@@ -58,13 +58,17 @@ def sample_points_from_shape(shape, tolerance=0.0001, sample_density=100):
         return np.array([])
 
 
-def chamfer_distance(points1, points2):
+def chamfer_distance(points1, points2, bbox_scale):
     if points1.shape[0] == 0 or points2.shape[0] == 0:
         print("Empty point cloud detected!")
         return float('inf')
     try:
         tree = cKDTree(points2)
         dist, _ = tree.query(points1)
+
+        # Cap each distance by bbox_scale
+        dist = np.minimum(dist, bbox_scale)
+
         return np.mean(dist)
     except Exception as e:
         print(f"Error computing Chamfer distance: {e}")
@@ -107,7 +111,7 @@ def compute_bbox_scale(shape):
     return max_range / 100.0
 
 
-def compute_fidelity_score(gt_brep_path, output_brep_path, matrix_path, tolerance=0.0001, sample_density=100):
+def compute_fidelity_score(gt_brep_path, output_brep_path, matrix_path, tolerance=1e-5, sample_density=250):
     """
     Computes the fidelity score based on Chamfer distances between two BREP files.
     """
@@ -134,15 +138,16 @@ def compute_fidelity_score(gt_brep_path, output_brep_path, matrix_path, toleranc
             print("Insufficient points sampled, skipping fidelity computation.")
             return 0
 
+        bbox_scale = compute_bbox_scale(gt_shape)
+
         # Compute directional Chamfer distances
-        gt_to_output = chamfer_distance(gt_points, output_points)
-        output_to_gt = chamfer_distance(output_points, gt_points)
+        gt_to_output = chamfer_distance(gt_points, output_points, bbox_scale)
+        output_to_gt = chamfer_distance(output_points, gt_points, bbox_scale)
 
         # print("gt_to_output", gt_to_output)
         # print("output_to_gt", output_to_gt)
 
         # Normalize distances using bounding box scale
-        bbox_scale = compute_bbox_scale(gt_shape)
         norm_gt_to_output = gt_to_output / bbox_scale
         norm_output_to_gt = output_to_gt / bbox_scale
 
