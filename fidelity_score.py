@@ -28,7 +28,7 @@ def read_step(filepath):
         return None
 
 
-def sample_points_from_shape(shape, tolerance=1e-5, sample_density=100):
+def sample_points_from_shape(shape, sample_density, tolerance=1e-5):
     if shape is None:
         print("Shape is None, skipping sampling.")
         return np.array([])
@@ -111,7 +111,7 @@ def compute_bbox_scale(shape):
     return max_range / 100.0
 
 
-def compute_fidelity_score(gt_brep_path, output_brep_path, matrix_path, tolerance=1e-5, sample_density=250):
+def compute_fidelity_score(gt_brep_path, output_brep_path, matrix_path, strict = False, sample_density=250, tolerance=1e-5):
     """
     Computes the fidelity score based on Chamfer distances between two BREP files.
     """
@@ -156,6 +156,9 @@ def compute_fidelity_score(gt_brep_path, output_brep_path, matrix_path, toleranc
         # print(f"normalized output_to_gt = {norm_output_to_gt}")
 
         fidelity_score = min(1, 3 / (1 + norm_gt_to_output + norm_output_to_gt))
+
+        if strict:
+            fidelity_score = 1 / (1 + gt_to_output * 1000 + output_to_gt * 1000)
 
         return fidelity_score
     except Exception as e:
