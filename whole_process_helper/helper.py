@@ -422,6 +422,9 @@ def get_extrude_amount_circle(gnn_graph, sketch_points, extrude_selection_mask):
         point1 = stroke_feature[:3]
         point2 = stroke_feature[3:6]
 
+        if torch.norm(point1 - point2) < 1e-3:
+            continue
+
         dist1 = torch.norm(point1 - center)
         dist2 = torch.norm(point2 - center)
 
@@ -469,7 +472,7 @@ def get_extrude_amount_circle_fallback(sketch_points, stroke_node_features):
 
     # 2) Find the paired circle
     for stroke in stroke_node_features:
-        stroke_type = stroke[-1]
+        stroke_type = stroke[-2]
         if stroke_type == 2:  # Circle stroke
             center2 = np.array(stroke[:3])
             radius2_candidate = stroke[7]
@@ -487,7 +490,7 @@ def get_extrude_amount_circle_fallback(sketch_points, stroke_node_features):
     extrude_to_point = None
 
     for stroke in stroke_node_features:
-        stroke_type = stroke[-1]
+        stroke_type = stroke[-2]
         if stroke_type == 1:  # Straight stroke
             point1 = np.array(stroke[:3])
             point2 = np.array(stroke[3:6])
@@ -515,7 +518,7 @@ def get_extrude_amount_circle_fallback(sketch_points, stroke_node_features):
     extrude_amount = torch.norm(raw_direction)
     direction = raw_direction / extrude_amount
 
-    return extrude_amount.item(), direction, 1.0
+    return extrude_amount, direction, 1.0
 
 
 
@@ -953,7 +956,7 @@ def resample_particles(particle_list, finished_particles):
 
 # --------------------------------------------------------------------------- #
 
-def find_top_different_particles(finished_particles, cur_output_dir, num_output_particles = 3):
+def find_top_different_particles(finished_particles, cur_output_dir, num_output_particles = 30):
     """
     Finds the top 3 particles with different brep_edges and renames their directories.
 

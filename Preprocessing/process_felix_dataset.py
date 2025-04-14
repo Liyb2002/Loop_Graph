@@ -137,7 +137,7 @@ class cad2sketch_dataset_loader(Dataset):
         # 1) stroke cloud  information processing
         stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
         stroke_node_features, added_feature_lines= Preprocessing.cad2sketch_stroke_features.split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix)
-
+        # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
 
         # we need to make sure all brep_edges has a corresponding stroke 
         for idx, step_file in enumerate(step_files):
@@ -148,7 +148,6 @@ class cad2sketch_dataset_loader(Dataset):
                 new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
             else:
                 new_edge_features_list, _ = Preprocessing.cad2sketch_stroke_features.split_and_merge_brep(edge_features_list)
-                # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list  + cylinder_features))
 
             stroke_node_features, num_add_edges, added_feature_lines= Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, new_edge_features_list)
 
@@ -188,10 +187,10 @@ class cad2sketch_dataset_loader(Dataset):
                     selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
                     # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_node_features, selected_indices)
 
-                    if len(new_edge_features_list) >= 5 or not Preprocessing.cad2sketch_stroke_features.ensure_loop(stroke_node_features, selected_indices) or not Preprocessing.cad2sketch_stroke_features.ensure_loop_plane(stroke_node_features, selected_indices): 
-                        # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
-                        print("ensure loop failed")
-                        return False
+                    # if len(new_edge_features_list) >= 5 or not Preprocessing.cad2sketch_stroke_features.ensure_loop(stroke_node_features, selected_indices) or not Preprocessing.cad2sketch_stroke_features.ensure_loop_plane(stroke_node_features, selected_indices): 
+                    #     Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
+                    #     print("ensure loop failed")
+                    #     return False
                     
                 
                     if selected_indices not in stroke_cloud_loops:
