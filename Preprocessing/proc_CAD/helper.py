@@ -1316,7 +1316,8 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
 
             best_d = min(d1, d2)
 
-            if best_d < min_distance and best_d <1e-4:
+            if best_d < min_distance and best_d <5e-4:
+                
                 min_distance = best_d
                 best_stroke_idx = stroke_idx
 
@@ -1360,7 +1361,7 @@ def ensure_brep_edges(stroke_node_features, edge_features_list):
                 unique_stroke_points.append(pt2)
 
     unique_stroke_points = np.array(unique_stroke_points)
-
+    
     for brep_edge in edge_features_list:
         if brep_edge[-1] == 1 or brep_edge[-1] == 4:  # Line or Arc
             brep_pt1 = brep_edge[:3]
@@ -1368,7 +1369,7 @@ def ensure_brep_edges(stroke_node_features, edge_features_list):
 
             no_match = True
 
-            for stroke in stroke_node_features:
+            for stroke_idx, stroke in enumerate(stroke_node_features):
                 if stroke[-1] == 1 or stroke[-1] == 3:
                     stroke_pt1 = stroke[:3]
                     stroke_pt2 = stroke[3:6]
