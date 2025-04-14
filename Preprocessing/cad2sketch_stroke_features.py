@@ -93,7 +93,7 @@ def build_node_features(geometry):
 
     # Case 1: Check if the geometry has low residual fitting straight line  -> (Straight Line)
     residual = fit_straight_line(geometry)
-    threshold = dist(geometry) * 2
+    threshold = feature_dist(geometry) * 2
 
     if residual < threshold:
         point1 = geometry[0]
@@ -627,13 +627,13 @@ def fit_ellipse_3d(points):
 def is_closed_shape(points):
     points = np.array(points)
     distance = np.linalg.norm(points[0] - points[-1])
-    tolerance = dist(points) * 2
+    tolerance = feature_dist(points) * 2
     
 
     return distance, distance < tolerance
 
 
-def dist(points):
+def feature_dist(points):
     points = np.array(points)
     distances = np.linalg.norm(points[1:] - points[:-1], axis=1)
     average_distance = np.mean(distances)
@@ -1954,6 +1954,33 @@ def ensure_loop_plane(stroke_node_features, selected_indices, point_tol=1e-4, pl
 
     return True
 
+
+
+def dist(p1, p2):
+    return np.linalg.norm(p1 - p2)
+
+def ensure_paired_circle(stroke_node_features):
+    for stroke in stroke_node_features:
+        if stroke[-1] == 2:
+            this_circle_is_paired = False
+
+            center1 = np.array(stroke[:3])
+            radius1 = stroke[7]
+
+            # 2) Find the paired circle
+            for other_stroke in stroke_node_features:
+                if other_stroke[-1] == 2:
+                    center2 = np.array(other_stroke[:3])
+                    radius2_candidate = other_stroke[7]
+
+                    if abs(radius1 - radius2_candidate) < 1e-5 and dist(center1, center2) > 1e-4:
+                        this_circle_is_paired = True
+                        break
+
+            if this_circle_is_paired == False:
+                return False
+
+    return True
 
 
 # ------------------------------------------------------------------------------------# 
