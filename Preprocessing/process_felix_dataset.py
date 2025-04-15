@@ -24,6 +24,7 @@ import Preprocessing.SBGCN.brep_read
 import Encoders.helper
 from tqdm import tqdm
 from pathlib import Path
+from deepdiff import DeepDiff
 
 class cad2sketch_dataset_loader(Dataset):
     def __init__(self):
@@ -32,6 +33,11 @@ class cad2sketch_dataset_loader(Dataset):
         """
 
         self.data_path = os.path.join(os.getcwd(), 'dataset', 'small')
+        mapping_path = os.path.join(os.getcwd(), 'dataset', 'mapping', 'mapping_train.json')
+        with open(mapping_path, 'r') as f:
+            self.mapping_file = json.load(f)
+
+        self.lifted_path = os.path.join(os.getcwd(), 'dataset', 'shm_cad2sketch_dataset_fixed_ellipses_line_type_correct')
 
         self.subfolder_paths = []
 
@@ -77,11 +83,12 @@ class cad2sketch_dataset_loader(Dataset):
         Processes an individual subfolder by reading JSON files and extracting relevant data.
         """
 
-        print("subfolder_path", subfolder_path)
+        data_idx = Path(subfolder_path).name
+        lifted_path = self.mapping_file[data_idx]
+
         
-        final_edges_file_path = os.path.join(subfolder_path, 'final_edges.json')
-        all_edges_file_path = os.path.join(subfolder_path, 'unique_edges.json')
-        strokes_dict_path = os.path.join(subfolder_path, 'strokes_dict.json')
+        final_edges_file_path = os.path.join(lifted_path, 'final_edges.json')
+        cleaned_edges_file_path = os.path.join(subfolder_path, 'final_edges.json')
         program_path = os.path.join(subfolder_path, 'program.json')
 
         # Check if required JSON files exist, printing which one is missing
@@ -89,27 +96,27 @@ class cad2sketch_dataset_loader(Dataset):
         
         if not os.path.exists(final_edges_file_path):
             missing_files.append("final_edges.json")
-        if not os.path.exists(all_edges_file_path):
-            missing_files.append("unique_edges.json")
-        if not os.path.exists(strokes_dict_path):
-            missing_files.append("strokes_dict.json")
         if not os.path.exists(program_path):
             missing_files.append("program_path.json")
 
         if missing_files:
-            print(f"Skipping {subfolder_path}: Missing files: {', '.join(missing_files)}")
+            print(f"Skipping {lifted_path}: Missing files: {', '.join(missing_files)}")
             return None, None, None
 
         # Do some vis
         # Load and visualize only feature lines version
         final_edges_data = self.read_json(final_edges_file_path)
-        feature_lines = Preprocessing.cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
+        cleaned_edges_data = self.read_json(cleaned_edges_file_path)
+
+        # feature_lines = Preprocessing.cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(feature_lines)
 
 
         # Load and visualize only final edges (feature + construction lines)
         all_lines = Preprocessing.cad2sketch_stroke_features.extract_all_lines(final_edges_data)
-        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
+        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
+        # cleaned_lines = Preprocessing.cad2sketch_stroke_features.extract_all_lines(cleaned_edges_data)
+        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(cleaned_lines)
 
 
         # Load and visualize only construction lines (construction lines)
@@ -150,6 +157,7 @@ class cad2sketch_dataset_loader(Dataset):
                 new_edge_features_list, _ = Preprocessing.cad2sketch_stroke_features.split_and_merge_brep(edge_features_list)
 
             stroke_node_features, num_add_edges, added_feature_lines= Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, new_edge_features_list)
+            # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list + cylinder_features))
 
 
         if not Preprocessing.cad2sketch_stroke_features.ensure_paired_circle(stroke_node_features):
