@@ -13,6 +13,8 @@ from itertools import permutations, combinations
 import networkx as nx
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import Preprocessing.proc_CAD.global_thresholding
+
 
 def compute_normal(face_vertices, other_point):
     if len(face_vertices) < 3:
@@ -1220,20 +1222,24 @@ def connected_strokes(stroke_node_features):
     connected = np.zeros((num_strokes, num_strokes), dtype=np.float32)
     
     # Iterate over each pair of strokes
+    # Iterate over each pair of strokes
     for i in range(num_strokes):
-        stroke_i_start = stroke_node_features[i, :3]  # First point of stroke i
-        stroke_i_end = stroke_node_features[i, 3:6]   # Second point of stroke i
-        
-        for j in range(i + 1, num_strokes):
-            stroke_j_start = stroke_node_features[j, :3]  # First point of stroke j
-            stroke_j_end = stroke_node_features[j, 3:6]   # Second point of stroke j
+        stroke_i_start = stroke_node_features[i, :3]
+        stroke_i_end = stroke_node_features[i, 3:6]
 
-            # Check if stroke i and stroke j share a common point (either order)
-            if (np.allclose(stroke_i_start, stroke_j_start) or np.allclose(stroke_i_start, stroke_j_end) or
-                np.allclose(stroke_i_end, stroke_j_start) or np.allclose(stroke_i_end, stroke_j_end)):
+        for j in range(i + 1, num_strokes):
+            stroke_j_start = stroke_node_features[j, :3]
+            stroke_j_end = stroke_node_features[j, 3:6]
+
+            # Use global thresholding based on max stroke length
+            if (Preprocessing.proc_CAD.global_thresholding.point_close(stroke_i_start, stroke_j_start, stroke_node_features[i], stroke_node_features[j]) or
+                Preprocessing.proc_CAD.global_thresholding.point_close(stroke_i_start, stroke_j_end,   stroke_node_features[i], stroke_node_features[j]) or
+                Preprocessing.proc_CAD.global_thresholding.point_close(stroke_i_end,   stroke_j_start, stroke_node_features[i], stroke_node_features[j]) or
+                Preprocessing.proc_CAD.global_thresholding.point_close(stroke_i_end,   stroke_j_end,   stroke_node_features[i], stroke_node_features[j])):
                 
                 connected[i, j] = 1
                 connected[j, i] = 1
+
 
     # Now consider the circles
     for i in range(num_strokes):
@@ -1243,15 +1249,16 @@ def connected_strokes(stroke_node_features):
             center = stroke_node_features[i, :3]
             radius = stroke_node_features[i, 7]
 
-            for j in range(i + 1, num_strokes):
-                stroke_j_start = stroke_node_features[j, :3]  
+            for j in range(num_strokes):
+                if i == j:
+                    continue
+
+                stroke_j_start = stroke_node_features[j, :3]
                 stroke_j_end = stroke_node_features[j, 3:6]
 
-
-                if math.isclose(dist(center, stroke_j_start), abs(radius), rel_tol=1e-5) or \
-                    math.isclose(dist(center, stroke_j_end), abs(radius), rel_tol=1e-5):
+                if Preprocessing.proc_CAD.global_thresholding.circle_radius_close(center, radius, stroke_j_start) or Preprocessing.proc_CAD.global_thresholding.circle_radius_close(center, radius, stroke_j_end):
                     connected[i, j] = 1
-                    connected[j, i] = 1  
+                    connected[j, i] = 1
 
     return connected
  
@@ -1378,7 +1385,7 @@ def ensure_brep_edges(stroke_node_features, edge_features_list):
                     d2 = np.linalg.norm(brep_pt1 - stroke_pt2) + np.linalg.norm(brep_pt2 - stroke_pt1)
                     stroke_length = np.linalg.norm(stroke_pt1 - stroke_pt2)
 
-                    if min(d1, d2) < stroke_length * 0.1:
+                    if min(d1, d2) < stroke_length * 0.2:
                         no_match = False
                         break
 

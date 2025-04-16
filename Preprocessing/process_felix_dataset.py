@@ -124,15 +124,15 @@ class cad2sketch_dataset_loader(Dataset):
         # construction_lines = Preprocessing.cad2sketch_stroke_features.extract_only_construction_lines(final_edges_data)
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(construction_lines)
 
-        # find the scaling matrix:
-
+        # find the scaling matrix and scale the stroke cloud
+        # 1) stroke cloud information processing
         lifted_stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
         lifted_stroke_node_features_bbox, lifted_stroke_node_features_center = Preprocessing.cad2sketch_stroke_features.bbox(lifted_stroke_node_features)
         cleaned_stroke_node_features, _= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(cleaned_edges_data)
         cleaned_stroke_node_features_bbox, cleaned_stroke_node_features_center= Preprocessing.cad2sketch_stroke_features.bbox(cleaned_stroke_node_features)
         scaling_factor = Preprocessing.cad2sketch_stroke_features.get_scaling_factor(lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
         stroke_node_features = Preprocessing.cad2sketch_stroke_features.transform_stroke_node_features(lifted_stroke_node_features, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
-        Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
+        # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
 
         # Load program
         program = self.read_json(program_path)
@@ -151,11 +151,7 @@ class cad2sketch_dataset_loader(Dataset):
 
 
         # ------------------------------------------------------------ #
-        # 1) stroke cloud  information processing
-        stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
-        stroke_node_features, added_feature_lines= Preprocessing.cad2sketch_stroke_features.split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix)
-        stroke_node_features_bbox = Preprocessing.cad2sketch_stroke_features.bbox(stroke_node_features)
-
+        # 1.1) Stroke Cloud: ensure strokes
         # we need to make sure all brep_edges has a corresponding stroke 
         for idx, step_file in enumerate(step_files):
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
@@ -168,7 +164,8 @@ class cad2sketch_dataset_loader(Dataset):
 
             stroke_node_features, num_add_edges, added_feature_lines= Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, new_edge_features_list)
 
-            # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list + cylinder_features))
+            # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
+            Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_brep(stroke_node_features, new_edge_features_list)
 
         # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
 
