@@ -711,7 +711,6 @@ def get_scaling_factor(lifted_stroke_node_features_bbox, cleaned_stroke_node_fea
     uniform_scale = (scale_x + scale_y + scale_z) / 3.0
     return uniform_scale
 
-
 def transform_stroke_node_features(
     lifted_stroke_node_features,
     lifted_bbox,
@@ -749,21 +748,30 @@ def transform_stroke_node_features(
 
     uniform_scale = (scale_x + scale_y + scale_z) / 3.0
 
-    # --- Transform only the first 6 values of each stroke ---
+    # --- Transform strokes ---
     transformed_strokes = []
     for stroke in lifted_stroke_node_features:
-        transformed_coords = []
-        for i in range(0, 6, 3):
-            x = (stroke[i]   - lifted_center['x']) * uniform_scale + cleaned_center['x']
-            y = (stroke[i+1] - lifted_center['y']) * uniform_scale + cleaned_center['y']
-            z = (stroke[i+2] - lifted_center['z']) * uniform_scale + cleaned_center['z']
-            transformed_coords.extend([x, y, z])
-        # Keep the rest of the stroke untouched
-        transformed_stroke = transformed_coords + list(stroke[6:])
+        if stroke[-1] != 2:
+            # Regular stroke with 2 endpoints
+            transformed_coords = []
+            for i in range(0, 6, 3):
+                x = (stroke[i]   - lifted_center['x']) * uniform_scale + cleaned_center['x']
+                y = (stroke[i+1] - lifted_center['y']) * uniform_scale + cleaned_center['y']
+                z = (stroke[i+2] - lifted_center['z']) * uniform_scale + cleaned_center['z']
+                transformed_coords.extend([x, y, z])
+            transformed_stroke = transformed_coords + list(stroke[6:])
+        else:
+            # Circle stroke: scale the center and the radius
+            x = (stroke[0] - lifted_center['x']) * uniform_scale + cleaned_center['x']
+            y = (stroke[1] - lifted_center['y']) * uniform_scale + cleaned_center['y']
+            z = (stroke[2] - lifted_center['z']) * uniform_scale + cleaned_center['z']
+            radius_scaled = stroke[7] * uniform_scale
+
+            transformed_stroke = [x, y, z] + list(stroke[3:7]) + [radius_scaled] + list(stroke[8:]) 
+
         transformed_strokes.append(transformed_stroke)
 
     return transformed_strokes
-
 
 # ------------------------------------------------------------------------------------# 
 
