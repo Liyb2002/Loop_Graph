@@ -657,6 +657,62 @@ def compute_normal(points):
     
     return normal
 
+
+
+def bbox(stroke_node_features):
+    x_coords = []
+    y_coords = []
+    z_coords = []
+
+    for stroke in stroke_node_features:
+        x_coords.extend([stroke[0], stroke[3]])
+        y_coords.extend([stroke[1], stroke[4]])
+        z_coords.extend([stroke[2], stroke[5]])
+
+    x_min, x_max = min(x_coords), max(x_coords)
+    y_min, y_max = min(y_coords), max(y_coords)
+    z_min, z_max = min(z_coords), max(z_coords)
+
+    bbox = {
+        'x_min': x_min, 'x_max': x_max,
+        'y_min': y_min, 'y_max': y_max,
+        'z_min': z_min, 'z_max': z_max
+    }
+
+    center = {
+        'x': (x_min + x_max) / 2,
+        'y': (y_min + y_max) / 2,
+        'z': (z_min + z_max) / 2
+    }
+
+    return bbox, center
+
+
+def get_scaling_factor(lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox):
+    # Size of original (lifted) bbox
+    lifted_x_size = lifted_stroke_node_features_bbox['x_max'] - lifted_stroke_node_features_bbox['x_min']
+    lifted_y_size = lifted_stroke_node_features_bbox['y_max'] - lifted_stroke_node_features_bbox['y_min']
+    lifted_z_size = lifted_stroke_node_features_bbox['z_max'] - lifted_stroke_node_features_bbox['z_min']
+
+    # Size of target (cleaned) bbox
+    cleaned_x_size = cleaned_stroke_node_features_bbox['x_max'] - cleaned_stroke_node_features_bbox['x_min']
+    cleaned_y_size = cleaned_stroke_node_features_bbox['y_max'] - cleaned_stroke_node_features_bbox['y_min']
+    cleaned_z_size = cleaned_stroke_node_features_bbox['z_max'] - cleaned_stroke_node_features_bbox['z_min']
+
+    # Compute scale factors for each dimension
+    scale_x = cleaned_x_size / lifted_x_size if lifted_x_size != 0 else 1.0
+    scale_y = cleaned_y_size / lifted_y_size if lifted_y_size != 0 else 1.0
+    scale_z = cleaned_z_size / lifted_z_size if lifted_z_size != 0 else 1.0
+
+    # Option 1: Uniform scale (average of all axes)
+    uniform_scale = (scale_x + scale_y + scale_z) / 3.0
+
+    print("lifted_stroke_node_features_bbox", lifted_stroke_node_features_bbox)
+    print("cleaned_stroke_node_features_bbox", cleaned_stroke_node_features_bbox)
+    print("scale_x", scale_x, "scale_y", scale_y, "scale_z", scale_z, "uniform_scale", uniform_scale)
+    return uniform_scale
+      
+
 # ------------------------------------------------------------------------------------# 
 
 
