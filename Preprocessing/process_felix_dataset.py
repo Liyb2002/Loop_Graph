@@ -131,7 +131,9 @@ class cad2sketch_dataset_loader(Dataset):
         cleaned_stroke_node_features, _= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(cleaned_edges_data)
         cleaned_stroke_node_features_bbox, cleaned_stroke_node_features_center= Preprocessing.cad2sketch_stroke_features.bbox(cleaned_stroke_node_features)
         scaling_factor = Preprocessing.cad2sketch_stroke_features.get_scaling_factor(lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
-        
+        stroke_node_features = Preprocessing.cad2sketch_stroke_features.transform_stroke_node_features(lifted_stroke_node_features, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
+        Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
+
         # Load program
         program = self.read_json(program_path)
 
@@ -153,7 +155,6 @@ class cad2sketch_dataset_loader(Dataset):
         stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
         stroke_node_features, added_feature_lines= Preprocessing.cad2sketch_stroke_features.split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix)
         stroke_node_features_bbox = Preprocessing.cad2sketch_stroke_features.bbox(stroke_node_features)
-        # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
 
         # we need to make sure all brep_edges has a corresponding stroke 
         for idx, step_file in enumerate(step_files):

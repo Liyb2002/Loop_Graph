@@ -665,6 +665,9 @@ def bbox(stroke_node_features):
     z_coords = []
 
     for stroke in stroke_node_features:
+        if stroke[-1] ==2 :
+            continue
+
         x_coords.extend([stroke[0], stroke[3]])
         y_coords.extend([stroke[1], stroke[4]])
         z_coords.extend([stroke[2], stroke[5]])
@@ -706,12 +709,61 @@ def get_scaling_factor(lifted_stroke_node_features_bbox, cleaned_stroke_node_fea
 
     # Option 1: Uniform scale (average of all axes)
     uniform_scale = (scale_x + scale_y + scale_z) / 3.0
-
-    print("lifted_stroke_node_features_bbox", lifted_stroke_node_features_bbox)
-    print("cleaned_stroke_node_features_bbox", cleaned_stroke_node_features_bbox)
-    print("scale_x", scale_x, "scale_y", scale_y, "scale_z", scale_z, "uniform_scale", uniform_scale)
     return uniform_scale
-      
+
+
+def transform_stroke_node_features(
+    lifted_stroke_node_features,
+    lifted_bbox,
+    cleaned_bbox
+):
+    # --- Compute centers ---
+    lifted_center = {
+        'x': (lifted_bbox['x_min'] + lifted_bbox['x_max']) / 2,
+        'y': (lifted_bbox['y_min'] + lifted_bbox['y_max']) / 2,
+        'z': (lifted_bbox['z_min'] + lifted_bbox['z_max']) / 2,
+    }
+
+    cleaned_center = {
+        'x': (cleaned_bbox['x_min'] + cleaned_bbox['x_max']) / 2,
+        'y': (cleaned_bbox['y_min'] + cleaned_bbox['y_max']) / 2,
+        'z': (cleaned_bbox['z_min'] + cleaned_bbox['z_max']) / 2,
+    }
+
+    # --- Compute uniform scale factor ---
+    lifted_size = {
+        'x': lifted_bbox['x_max'] - lifted_bbox['x_min'],
+        'y': lifted_bbox['y_max'] - lifted_bbox['y_min'],
+        'z': lifted_bbox['z_max'] - lifted_bbox['z_min'],
+    }
+
+    cleaned_size = {
+        'x': cleaned_bbox['x_max'] - cleaned_bbox['x_min'],
+        'y': cleaned_bbox['y_max'] - cleaned_bbox['y_min'],
+        'z': cleaned_bbox['z_max'] - cleaned_bbox['z_min'],
+    }
+
+    scale_x = cleaned_size['x'] / lifted_size['x'] if lifted_size['x'] != 0 else 1.0
+    scale_y = cleaned_size['y'] / lifted_size['y'] if lifted_size['y'] != 0 else 1.0
+    scale_z = cleaned_size['z'] / lifted_size['z'] if lifted_size['z'] != 0 else 1.0
+
+    uniform_scale = (scale_x + scale_y + scale_z) / 3.0
+
+    # --- Transform only the first 6 values of each stroke ---
+    transformed_strokes = []
+    for stroke in lifted_stroke_node_features:
+        transformed_coords = []
+        for i in range(0, 6, 3):
+            x = (stroke[i]   - lifted_center['x']) * uniform_scale + cleaned_center['x']
+            y = (stroke[i+1] - lifted_center['y']) * uniform_scale + cleaned_center['y']
+            z = (stroke[i+2] - lifted_center['z']) * uniform_scale + cleaned_center['z']
+            transformed_coords.extend([x, y, z])
+        # Keep the rest of the stroke untouched
+        transformed_stroke = transformed_coords + list(stroke[6:])
+        transformed_strokes.append(transformed_stroke)
+
+    return transformed_strokes
+
 
 # ------------------------------------------------------------------------------------# 
 
