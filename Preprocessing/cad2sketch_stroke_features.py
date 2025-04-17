@@ -2268,6 +2268,7 @@ def ensure_loop(stroke_node_features, selected_indices, tol=1e-4):
         stroke = stroke_node_features[idx]
         points.append(stroke[0:3])
         points.append(stroke[3:6])
+        stroke_length = np.linalg.norm(stroke[0:3] - stroke[3:6])
 
     # Count occurrences using distance-based matching
     matched_flags = [False] * len(points)
@@ -2277,7 +2278,7 @@ def ensure_loop(stroke_node_features, selected_indices, tol=1e-4):
         if matched_flags[i]:
             continue
         for j, p2 in enumerate(points):
-            if np.linalg.norm(np.array(p1) - np.array(p2)) < tol:
+            if np.linalg.norm(np.array(p1) - np.array(p2)) < 0.2 * stroke_length:
                 counts[i] += 1
                 matched_flags[j] = True  # mark as used in match
 
