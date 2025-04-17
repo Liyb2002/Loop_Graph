@@ -9,6 +9,7 @@ from itertools import combinations
 
 from itertools import product
 
+import Preprocessing.proc_CAD.global_thresholding
 
 import json
 import os
@@ -1433,6 +1434,114 @@ def vis_stroke_node_features_and_brep(stroke_node_features, brep_edges):
 
     # Show plot
     plt.show()
+
+
+
+
+def vis_stroke_node_features_and_brep_sameGraph(stroke_node_features, brep_edges):
+        # Initialize the 3D plot
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+    ax.axis('off')  # Turn off axis background and borders
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    perturb_factor = 0.000002
+
+    # Plot all strokes in blue with perturbations
+    for idx, stroke in enumerate(stroke_node_features):
+        start, end = stroke[:3], stroke[3:6]
+        
+
+        # Update min and max limits based on strokes (ignoring circles)
+        if stroke[-1] == 1:
+            # straight line
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+        
+        if stroke[-1] == 2:
+            # Circle face
+            x_values, y_values, z_values = plot_circle(stroke)
+            ax.plot(x_values, y_values, z_values, color='black', alpha=1, linewidth=0.5)
+            continue
+
+        if stroke[-1] ==3:
+            # Arc
+            x_values, y_values, z_values = plot_arc(stroke)
+            ax.plot(x_values, y_values, z_values, color='black', alpha=1, linewidth=0.5)
+            continue
+
+        else:
+            # Hand-drawn effect for regular stroke line
+            x_values = np.array([start[0], end[0]])
+            y_values = np.array([start[1], end[1]])
+            z_values = np.array([start[2], end[2]])
+            
+            # Add perturbations for hand-drawn effect
+            perturbations = np.random.normal(0, perturb_factor, (10, 3))
+            t = np.linspace(0, 1, 10)
+            x_interpolated = np.linspace(x_values[0], x_values[1], 10) + perturbations[:, 0]
+            y_interpolated = np.linspace(y_values[0], y_values[1], 10) + perturbations[:, 1]
+            z_interpolated = np.linspace(z_values[0], z_values[1], 10) + perturbations[:, 2]
+
+            # Smooth curve with cubic splines
+            cs_x = CubicSpline(t, x_interpolated)
+            cs_y = CubicSpline(t, y_interpolated)
+            cs_z = CubicSpline(t, z_interpolated)
+            smooth_t = np.linspace(0, 1, 100)
+            smooth_x = cs_x(smooth_t)
+            smooth_y = cs_y(smooth_t)
+            smooth_z = cs_z(smooth_t)
+
+            # Plot perturbed line
+            ax.plot(smooth_x, smooth_y, smooth_z, color='black', alpha=1, linewidth=0.5)
+
+
+    for brep_edge in brep_edges:
+        print("brep_edge", brep_edge)
+        if brep_edge[-1] in [1, 4]:  # line or arc
+            for stroke in stroke_node_features:
+                if stroke[-1] in [1, 3]:  # line or arc
+                    if Preprocessing.proc_CAD.global_thresholding.stroke_match(brep_edge, stroke):
+                        # Plot in red
+                        if stroke[-1] == 1:
+                            start, end = stroke[:3], stroke[3:6]
+                            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]], color='red', linewidth=1.5)
+                        elif stroke[-1] == 3:
+                            x_vals, y_vals, z_vals = plot_arc(stroke)
+                            ax.plot(x_vals, y_vals, z_vals, color='red', linewidth=1.5)
+                        break
+
+
+
+
+
+
+
+    # Compute the center and rescale
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Remove axis ticks and labels
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+
+    # Show plot
+    plt.show()
+
+
 
 
 

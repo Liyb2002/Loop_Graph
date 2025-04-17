@@ -36,3 +36,12 @@ def circle_radius_close(center, radius, point):
     - bool: True if point is close to the circle's boundary
     """
     return abs(dist(center, point) - abs(radius)) < 0.15 * abs(radius)
+
+
+
+def stroke_match(brep, stroke):
+    # Compares brep line with stroke line, returns True if both ends match (order doesn't matter)
+    d1 = np.linalg.norm(brep[:3] - stroke[:3]) + np.linalg.norm(brep[3:6] - stroke[3:6])
+    d2 = np.linalg.norm(brep[:3] - stroke[3:6]) + np.linalg.norm(brep[3:6] - stroke[:3])
+    stroke_len = np.linalg.norm(stroke[:3] - stroke[3:6])
+    return min(d1, d2) < stroke_len * 0.2

@@ -1390,14 +1390,7 @@ def ensure_brep_edges(stroke_node_features, edge_features_list):
                         break
 
             if no_match:
-                # Find closest existing stroke points for both ends of this brep edge
-                dists_to_pt1 = np.linalg.norm(unique_stroke_points - brep_pt1, axis=1)
-                dists_to_pt2 = np.linalg.norm(unique_stroke_points - brep_pt2, axis=1)
-
-                closest_pt1 = unique_stroke_points[np.argmin(dists_to_pt1)]
-                closest_pt2 = unique_stroke_points[np.argmin(dists_to_pt2)]
-
-                new_stroke = np.array(list(closest_pt1) + list(closest_pt2) + [0, 0, 0, 0, 1], dtype=np.float32)
+                new_stroke = np.array(list(brep_pt1) + list(brep_pt2) + [0, 0, 0, 0, 1], dtype=np.float32)
                 new_edges.append(new_stroke)
                 stroke_node_features = np.vstack([stroke_node_features, new_stroke])
                 num_add_edges += 1

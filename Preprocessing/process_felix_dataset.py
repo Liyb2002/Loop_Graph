@@ -164,8 +164,9 @@ class cad2sketch_dataset_loader(Dataset):
 
             stroke_node_features, num_add_edges, added_feature_lines= Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, new_edge_features_list)
 
+            Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_brep_sameGraph(stroke_node_features, new_edge_features_list)
             # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
-            Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_brep(stroke_node_features, new_edge_features_list)
+            # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_brep(stroke_node_features, new_edge_features_list)
 
         # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
 
