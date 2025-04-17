@@ -206,14 +206,14 @@ class cad2sketch_dataset_loader(Dataset):
                 else:
                     loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_edge_features_list)
                     selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
-                    Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_node_features, selected_indices)
+                    # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_node_features, selected_indices)
 
                     # if len(new_edge_features_list) >= 5 or not Preprocessing.cad2sketch_stroke_features.ensure_loop(stroke_node_features, selected_indices) or not Preprocessing.cad2sketch_stroke_features.ensure_loop_plane(stroke_node_features, selected_indices): 
                     #     Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
                     #     print("ensure loop failed")
                     #     return False
                     
-                
+
                     if selected_indices not in stroke_cloud_loops:
                         stroke_cloud_loops.append(selected_indices)
                     stroke_operations_order_matrix[:, idx] = np.array(loop_strokes).flatten()
