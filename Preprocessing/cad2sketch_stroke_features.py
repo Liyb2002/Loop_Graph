@@ -1504,7 +1504,6 @@ def vis_stroke_node_features_and_brep_sameGraph(stroke_node_features, brep_edges
 
 
     for brep_edge in brep_edges:
-        print("brep_edge", brep_edge)
         if brep_edge[-1] in [1, 4]:  # line or arc
             for stroke in stroke_node_features:
                 if stroke[-1] in [1, 3]:  # line or arc

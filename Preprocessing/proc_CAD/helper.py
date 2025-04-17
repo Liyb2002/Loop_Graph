@@ -600,88 +600,101 @@ def is_planar(points, tol=1e-5):
     
 
 #----------------------------------------------------------------------------------#
+import numpy as np
+import networkx as nx
+from itertools import combinations, permutations
+
 def face_aggregate_networkx(stroke_matrix):
     """
-    This function finds all valid loops of strokes with size 3 or 4 using NetworkX.
-    It generates all possible valid cycles by permuting over nodes and checking for a valid cycle.
+    Finds all valid planar loops (triangles or quads) from strokes using NetworkX,
+    where each stroke is a 3D line segment and points are considered identical if they are 'close enough'
+    according to a custom closeness function.
 
     Parameters:
-    stroke_matrix (numpy.ndarray): A matrix of shape (num_strokes, 7) where each row represents a stroke
-                                   with start and end points in 3D space.
+    stroke_matrix (numpy.ndarray): A matrix of shape (num_strokes, 7). Each row is a stroke with start/end 3D points.
 
     Returns:
-    list: A list of indices of valid loops of strokes, where each loop contains either 3 or 4 strokes.
+    list: A list of sets of stroke indices that form valid planar loops (triangles or quads).
     """
     
-    # Ensure input is a numpy array and ignore the last column
     stroke_matrix = np.array(stroke_matrix)[:, :6]
-    
-    # Initialize the graph
     G = nx.Graph()
-    
-    # Add edges to the graph based on strokes and store the edge-to-stroke mapping
     edge_to_stroke_id = {}
-    for idx, stroke in enumerate(stroke_matrix):
-        start_point = tuple(np.round(stroke[:3], 4))
-        end_point = tuple(np.round(stroke[3:], 4))
-        G.add_edge(start_point, end_point)
-        # Store both directions in the dictionary to handle undirected edges
-        edge_to_stroke_id[(start_point, end_point)] = idx
-        edge_to_stroke_id[(end_point, start_point)] = idx  # Add both directions for undirected graph
 
-    # List to store valid groups
+    point_registry = []
+
+    def get_registered_point(point, current_stroke):
+        for registered_point, reg_stroke in point_registry:
+            if Preprocessing.proc_CAD.global_thresholding.point_close(point, registered_point, current_stroke, reg_stroke):
+                return registered_point
+        point_registry.append((point, current_stroke))
+        return point
+
+    # Build graph with custom closeness-based point matching
+    for idx, stroke in enumerate(stroke_matrix):
+        start_raw = tuple(stroke[:3])
+        end_raw = tuple(stroke[3:])
+
+        start_point = get_registered_point(start_raw, stroke)
+        end_point = get_registered_point(end_raw, stroke)
+
+        G.add_edge(start_point, end_point)
+        edge_to_stroke_id[(start_point, end_point)] = idx
+        edge_to_stroke_id[(end_point, start_point)] = idx  # undirected
+
     valid_groups = []
 
-    # Generate all possible combinations of nodes of size 3 or 4
-    nodes = list(G.nodes)
-
-    # Helper function to check if a set of edges forms a valid cycle
     def check_valid_edges(edges):
         point_count = {}
         for edge in edges:
             point_count[edge[0]] = point_count.get(edge[0], 0) + 1
             point_count[edge[1]] = point_count.get(edge[1], 0) + 1
-        # A valid cycle has each node exactly twice
         return all(count == 2 for count in point_count.values())
 
-    # Check for valid loops of size 3 and 4
+    nodes = list(G.nodes)
+
     for group_nodes in combinations(nodes, 3):
-        # Check if these nodes can form a valid subgraph
-        if nx.is_connected(G.subgraph(group_nodes)):
-            # Generate all permutations of the edges
+        subgraph = G.subgraph(group_nodes)
+        if nx.is_connected(subgraph):
             for perm_edges in permutations(combinations(group_nodes, 2), 3):
                 if check_valid_edges(perm_edges):
-                    strokes_in_group = [edge_to_stroke_id.get(edge) or edge_to_stroke_id.get((edge[1], edge[0])) for edge in perm_edges]
-                    if None not in strokes_in_group:  # Ensure all edges are found in the mapping
+                    strokes_in_group = [
+                        edge_to_stroke_id.get(edge) or edge_to_stroke_id.get((edge[1], edge[0]))
+                        for edge in perm_edges
+                    ]
+                    if None not in strokes_in_group:
                         valid_groups.append(sorted(strokes_in_group))
 
     for group_nodes in combinations(nodes, 4):
-        # Check if these nodes can form a valid subgraph
-        if nx.is_connected(G.subgraph(group_nodes)):
-            # Generate all permutations of the edges
+        subgraph = G.subgraph(group_nodes)
+        if nx.is_connected(subgraph):
             for perm_edges in permutations(combinations(group_nodes, 2), 4):
                 if check_valid_edges(perm_edges):
-                    strokes_in_group = [edge_to_stroke_id.get(edge) or edge_to_stroke_id.get((edge[1], edge[0])) for edge in perm_edges]
-                    if None not in strokes_in_group:  # Ensure all edges are found in the mapping
+                    strokes_in_group = [
+                        edge_to_stroke_id.get(edge) or edge_to_stroke_id.get((edge[1], edge[0]))
+                        for edge in perm_edges
+                    ]
+                    if None not in strokes_in_group:
                         valid_groups.append(sorted(strokes_in_group))
 
-    # Remove duplicate loops by converting to a set of frozensets
+    # Remove duplicates
     unique_groups = list(set(frozenset(group) for group in valid_groups))
 
 
-    # Final check: Ensure each group has the same number of unique points as edges
-    final_groups = []
-    for group in unique_groups:
-        points = set()
-        for edge_id in group:
-            stroke = stroke_matrix[edge_id]
-            points.add(tuple(stroke[:3]))
-            points.add(tuple(stroke[3:]))
-        if len(points) == len(group) and is_planar(list(points)):
-            final_groups.append(group)
+    # final_groups = []
+    # for group in unique_groups:
+    #     group_points = []
+    #     for edge_id in group:
+    #         stroke = stroke_matrix[edge_id]
+    #         group_points.append(stroke[:3])  # start point
+    #         group_points.append(stroke[3:6]) # end point
+        
+    #     if is_planar(group_points):
+    #         final_groups.append(group)
+
+    return unique_groups
 
 
-    return final_groups
 
 
 
@@ -1010,7 +1023,7 @@ def stroke_relations(stroke_node_features, connected_stroke_nodes):
                 dot_product = np.dot(vector_i, vector_j)
                 
                 # Check if the strokes are perpendicular
-                if np.isclose(dot_product, 0):
+                if np.isclose(dot_product, 0, atol=1e-7, rtol=0):
                     strokes_perpendicular[i, j] = 1
                 else:
                     strokes_non_perpendicular[i, j] = 1
