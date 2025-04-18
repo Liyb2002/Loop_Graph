@@ -2322,6 +2322,37 @@ def split_and_merge_brep(edge_features_list):
 
 
 
+def merge_stroke_cloud_fromCleaned(stroke_node_features, cleaned_stroke_node_features):
+
+    num_add_edges = 0
+
+    for cleaned_stroke in cleaned_stroke_node_features:
+        if cleaned_stroke[-1] == 1 or cleaned_stroke[-1] == 3:  # Line or Arc
+            cleaned_pt_1 = cleaned_stroke[:3]
+            cleaned_pt_2 = cleaned_stroke[3:6]
+
+            no_match = True
+
+            for stroke_idx, stroke in enumerate(stroke_node_features):
+                if stroke[-1] == 1 or stroke[-1] == 3:
+                    stroke_pt1 = stroke[:3]
+                    stroke_pt2 = stroke[3:6]
+
+                    d1 = np.linalg.norm(cleaned_pt_1 - stroke_pt1) + np.linalg.norm(cleaned_pt_2 - stroke_pt2)
+                    d2 = np.linalg.norm(cleaned_pt_1 - stroke_pt2) + np.linalg.norm(cleaned_pt_2 - stroke_pt1)
+                    stroke_length = np.linalg.norm(stroke_pt1 - stroke_pt2)
+
+                    if min(d1, d2) < stroke_length * 0.2:
+                        no_match = False
+                        break
+
+            if no_match:
+                new_stroke = np.array(list(cleaned_pt_1) + list(cleaned_pt_2) + [0, 0, 0, 0, 1], dtype=np.float32)
+                stroke_node_features = np.vstack([stroke_node_features, new_stroke])
+                num_add_edges += 1
+
+    return stroke_node_features
+
 def ensure_loop(stroke_node_features, selected_indices, tol=1e-4):
     """
     Checks whether the selected strokes form a valid loop:
