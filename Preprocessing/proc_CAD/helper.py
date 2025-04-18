@@ -961,7 +961,8 @@ def loop_neighboring_complex(loops, stroke_node_features, loop_neighboring_all):
                 shared_stroke = list(shared_strokes)[0]  # Take the first shared stroke
                 
                 # Check if the normals are different
-                if not np.allclose(loop_normals[i], loop_normals[j]):
+                dot_product = np.dot(loop_normals[i], loop_normals[j])
+                if np.isclose(dot_product, 0):
                     neighboring_matrix[i, j] = shared_stroke
                     neighboring_matrix[j, i] = shared_stroke  # Since the matrix is symmetric
 

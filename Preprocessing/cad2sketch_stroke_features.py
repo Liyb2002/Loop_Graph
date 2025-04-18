@@ -774,6 +774,80 @@ def transform_stroke_node_features(
 
     return np.array(transformed_strokes)
 
+
+def transform_stroke_node_features_reverse(
+    cleaned_stroke_node_features,
+    lifted_bbox,
+    cleaned_bbox
+):
+    """
+    Reverses the stroke transformation from cleaned space back to lifted space.
+
+    Parameters:
+    - cleaned_stroke_node_features: np.ndarray of shape (N, ≥10)
+    - lifted_bbox: dict with keys 'x_min', 'x_max', 'y_min', etc.
+    - cleaned_bbox: same format as lifted_bbox
+
+    Returns:
+    - lifted_stroke_node_features: np.ndarray in lifted space
+    """
+    # --- Compute centers ---
+    lifted_center = {
+        'x': (lifted_bbox['x_min'] + lifted_bbox['x_max']) / 2,
+        'y': (lifted_bbox['y_min'] + lifted_bbox['y_max']) / 2,
+        'z': (lifted_bbox['z_min'] + lifted_bbox['z_max']) / 2,
+    }
+
+    cleaned_center = {
+        'x': (cleaned_bbox['x_min'] + cleaned_bbox['x_max']) / 2,
+        'y': (cleaned_bbox['y_min'] + cleaned_bbox['y_max']) / 2,
+        'z': (cleaned_bbox['z_min'] + cleaned_bbox['z_max']) / 2,
+    }
+
+    # --- Compute uniform scale factor ---
+    lifted_size = {
+        'x': lifted_bbox['x_max'] - lifted_bbox['x_min'],
+        'y': lifted_bbox['y_max'] - lifted_bbox['y_min'],
+        'z': lifted_bbox['z_max'] - lifted_bbox['z_min'],
+    }
+
+    cleaned_size = {
+        'x': cleaned_bbox['x_max'] - cleaned_bbox['x_min'],
+        'y': cleaned_bbox['y_max'] - cleaned_bbox['y_min'],
+        'z': cleaned_bbox['z_max'] - cleaned_bbox['z_min'],
+    }
+
+    scale_x = cleaned_size['x'] / lifted_size['x'] if lifted_size['x'] != 0 else 1.0
+    scale_y = cleaned_size['y'] / lifted_size['y'] if lifted_size['y'] != 0 else 1.0
+    scale_z = cleaned_size['z'] / lifted_size['z'] if lifted_size['z'] != 0 else 1.0
+
+    uniform_scale = max(scale_x, scale_y, scale_z) * 1.2
+
+    # --- Reverse Transform ---
+    reversed_strokes = []
+    for stroke in cleaned_stroke_node_features:
+        if stroke[-1] != 2:
+            # Regular stroke with 2 endpoints
+            reversed_coords = []
+            for i in range(0, 6, 3):
+                x = (stroke[i]   - cleaned_center['x']) / uniform_scale + lifted_center['x']
+                y = (stroke[i+1] - cleaned_center['y']) / uniform_scale + lifted_center['y']
+                z = (stroke[i+2] - cleaned_center['z']) / uniform_scale + lifted_center['z']
+                reversed_coords.extend([x, y, z])
+            reversed_stroke = reversed_coords + list(stroke[6:])
+        else:
+            # Circle stroke: reverse center and radius
+            x = (stroke[0] - cleaned_center['x']) / uniform_scale + lifted_center['x']
+            y = (stroke[1] - cleaned_center['y']) / uniform_scale + lifted_center['y']
+            z = (stroke[2] - cleaned_center['z']) / uniform_scale + lifted_center['z']
+            radius_unscaled = stroke[7] / uniform_scale
+
+            reversed_stroke = [x, y, z] + list(stroke[3:7]) + [radius_unscaled] + list(stroke[8:]) 
+
+        reversed_strokes.append(reversed_stroke)
+
+    return np.array(reversed_strokes)
+
 # ------------------------------------------------------------------------------------# 
 
 
