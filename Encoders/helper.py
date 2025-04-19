@@ -9,6 +9,9 @@ from scipy.interpolate import CubicSpline
 
 import os
 import pathlib
+
+import Preprocessing.cad2sketch_stroke_features
+
 def get_kth_operation(op_to_index_matrix, k):
     squeezed_matrix = op_to_index_matrix.squeeze(0)
     try:
@@ -892,11 +895,14 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
     - alpha_value: Float, optional. The transparency level of the lines (0.0 is fully transparent, 1.0 is fully opaque).
     """
     
+
     # Initialize the 3D plot
     final_edges_file_path = os.path.join(
     os.getcwd(), 'dataset', 'cad2sketch_annotated', data_idx, 'final_edges.json')
     final_edges_data = read_json(final_edges_file_path)
     all_lines = extract_all_lines(final_edges_data)
+
+
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -972,6 +978,117 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
                     linewidth=1.0)
 
     plt.show()
+
+
+
+
+
+def vis_selected_strokes_bbox(stroke_node_features, selected_stroke_idx, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox):
+    """
+    Visualizes selected strokes in 3D space with a hand-drawn effect.
+
+    Parameters:
+    - stroke_node_features: A numpy array or list containing the features of each stroke.
+      Each stroke should contain its start and end coordinates, and potentially a flag indicating if it's a circle.
+    - selected_stroke_idx: A list or array of indices of the strokes that should be highlighted in red.
+    - alpha_value: Float, optional. The transparency level of the lines (0.0 is fully transparent, 1.0 is fully opaque).
+    """
+    
+
+    # Initialize the 3D plot
+
+    # Get the mapping file
+    mapping_path = os.path.join(os.getcwd(), 'dataset', 'mapping', 'mapping_train.json')
+    with open(mapping_path, 'r') as f:
+        mapping_file = json.load(f)
+
+    lifted_path = mapping_file[data_idx]
+    final_edges_data = read_json(os.path.join(lifted_path, 'final_edges.json'))
+    all_lines = extract_all_lines(final_edges_data)
+
+
+    # rescale the stroke cloud
+    stroke_node_features = Preprocessing.cad2sketch_stroke_features.transform_stroke_node_features_reverse(stroke_node_features, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
+
+
+
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Remove axis labels, ticks, and background
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.set_frame_on(False)
+    ax.grid(False)
+    ax.set_axis_off()
+
+    # Initialize bounding box variables
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # First pass: plot all strokes in black and compute bounding box
+    for stroke in all_lines:
+        geometry = stroke["geometry"]
+
+        if len(geometry) < 2:
+            continue
+
+        for j in range(1, len(geometry)):
+            start = geometry[j - 1]
+            end = geometry[j]
+
+            # Update bounding box
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+            # Plot the stroke in black
+            ax.plot([start[0], end[0]], 
+                    [start[1], end[1]], 
+                    [start[2], end[2]], 
+                    color='black', 
+                    linewidth=0.5)
+
+    # Compute the center and rescale
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Second pass: highlight chosen strokes in red
+    for idx in selected_stroke_idx:
+        if idx < len(all_lines):
+            geometry = all_lines[idx]["geometry"]
+            if len(geometry) < 2:
+                continue
+            for j in range(1, len(geometry)):
+                start = geometry[j - 1]
+                end = geometry[j]
+                ax.plot([start[0], end[0]],
+                        [start[1], end[1]],
+                        [start[2], end[2]],
+                        color='red',
+                        linewidth=1.0)
+        else:
+            stroke = stroke_node_features[idx]
+            start = stroke[0:3]
+            end = stroke[3:6]
+            ax.plot([start[0], end[0]],
+                    [start[1], end[1]],
+                    [start[2], end[2]],
+                    color='red',
+                    linewidth=1.0)
+
+    plt.show()
+
+
 
 
 

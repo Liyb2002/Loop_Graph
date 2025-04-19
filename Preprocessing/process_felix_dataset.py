@@ -393,7 +393,10 @@ class cad2sketch_dataset_loader(Dataset):
                     'loop_neighboring_contained': loop_neighboring_contained,
 
                     'stroke_to_loop': stroke_to_loop,
-                    'stroke_to_edge': stroke_to_edge
+                    'stroke_to_edge': stroke_to_edge,
+
+                    'lifted_stroke_node_features_bbox' : lifted_stroke_node_features_bbox,
+                    'cleaned_stroke_node_features_bbox' : cleaned_stroke_node_features_bbox
                 }, f)
             
             file_count += 1
