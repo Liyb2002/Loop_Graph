@@ -44,4 +44,4 @@ def stroke_match(brep, stroke):
     d1 = np.linalg.norm(brep[:3] - stroke[:3]) + np.linalg.norm(brep[3:6] - stroke[3:6])
     d2 = np.linalg.norm(brep[:3] - stroke[3:6]) + np.linalg.norm(brep[3:6] - stroke[:3])
     stroke_len = np.linalg.norm(stroke[:3] - stroke[3:6])
-    return min(d1, d2) < stroke_len * 0.2
+    return min(d1, d2) < stroke_len * 0.3

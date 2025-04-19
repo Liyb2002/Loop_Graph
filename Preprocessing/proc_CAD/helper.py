@@ -1338,7 +1338,7 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
             best_d = min(d1, d2)
             stroke_length = np.linalg.norm(stroke_pt1 - stroke_pt2)
 
-            if best_d < min_distance and  min(d1, d2) < stroke_length * 0.2:
+            if best_d < min_distance and  min(d1, d2) < stroke_length * 0.3:
                 
                 min_distance = best_d
                 best_stroke_idx = stroke_idx
@@ -1400,7 +1400,7 @@ def ensure_brep_edges(stroke_node_features, edge_features_list):
                     d2 = np.linalg.norm(brep_pt1 - stroke_pt2) + np.linalg.norm(brep_pt2 - stroke_pt1)
                     stroke_length = np.linalg.norm(stroke_pt1 - stroke_pt2)
 
-                    if min(d1, d2) < stroke_length * 0.2:
+                    if min(d1, d2) < stroke_length * 0.3:
                         no_match = False
                         break
 
@@ -1414,7 +1414,103 @@ def ensure_brep_edges(stroke_node_features, edge_features_list):
 
 
 
-import numpy as np
+
+def ensure_brep_edges_selected(stroke_node_features, edge_features_list, prev_sketch):
+    """
+    Ensures all brep edges of type 1 or 4 are represented in stroke_node_features.
+    If a brep edge is not matched by any existing stroke (based on endpoint distance),
+    it is added to stroke_node_features using the closest stroke points.
+
+    Parameters:
+    - stroke_node_features: np.ndarray of shape (num_strokes, 11)
+    - edge_features_list: np.ndarray of shape (num_edges, 11)
+
+    Returns:
+    - stroke_node_features: np.ndarray with unmatched brep edges added
+    - num_add_edges: int, number of added edges
+    - new_edges: np.ndarray of shape (num_added, 11)
+    """
+    def is_perpendicular(v1, v2, tol=5e-6):
+        """Check if two vectors are perpendicular within a tolerance."""
+        return abs(np.dot(v1, v2)) < tol
+
+    threshold = 5e-4
+    num_add_edges = 0
+    new_edges = []
+
+    # Collect all unique stroke points
+    unique_stroke_points = []
+    for stroke in stroke_node_features:
+        if stroke[-1] == 1 or stroke[-1] == 3:
+            pt1 = tuple(np.round(stroke[:3], 6))
+            pt2 = tuple(np.round(stroke[3:6], 6))
+            if pt1 not in unique_stroke_points:
+                unique_stroke_points.append(pt1)
+            if pt2 not in unique_stroke_points:
+                unique_stroke_points.append(pt2)
+
+    unique_stroke_points = np.array(unique_stroke_points)
+    
+
+    for brep_edge in edge_features_list:
+        if brep_edge[-1] == 1 or brep_edge[-1] == 4:  # Line or Arc
+            brep_pt1 = brep_edge[:3]
+            brep_pt2 = brep_edge[3:6]
+
+            no_match = True
+
+            for stroke_idx, stroke in enumerate(stroke_node_features):
+                if stroke[-1] == 1 or stroke[-1] == 3:
+                    stroke_pt1 = stroke[:3]
+                    stroke_pt2 = stroke[3:6]
+
+                    d1 = np.linalg.norm(brep_pt1 - stroke_pt1) + np.linalg.norm(brep_pt2 - stroke_pt2)
+                    d2 = np.linalg.norm(brep_pt1 - stroke_pt2) + np.linalg.norm(brep_pt2 - stroke_pt1)
+                    stroke_length = np.linalg.norm(stroke_pt1 - stroke_pt2)
+
+                    if min(d1, d2) < stroke_length * 0.3:
+                        no_match = False
+                        break
+
+        if no_match:
+            brep_vec = np.array(brep_pt2) - np.array(brep_pt1)
+
+            all_perpendicular = True
+            for prev_sketch_brep in prev_sketch:
+                sketch_pt1 = prev_sketch_brep[:3]
+                sketch_pt2 = prev_sketch_brep[3:6]
+                sketch_vec = np.array(sketch_pt2) - np.array(sketch_pt1)
+
+                if not is_perpendicular(sketch_vec, brep_vec):
+                    all_perpendicular = False
+                    break
+
+            if all_perpendicular:
+                for prev_sketch_brep in prev_sketch:
+                    sketch_pt1 = prev_sketch_brep[:3]
+                    sketch_pt2 = prev_sketch_brep[3:6]
+
+                    condition1 = (
+                        Preprocessing.proc_CAD.global_thresholding.point_close(sketch_pt1, brep_pt1, prev_sketch_brep, brep_edge) and
+                        not Preprocessing.proc_CAD.global_thresholding.point_close(sketch_pt2, brep_pt2, prev_sketch_brep, brep_edge)
+                    )
+                    condition2 = (
+                        Preprocessing.proc_CAD.global_thresholding.point_close(sketch_pt1, brep_pt2, prev_sketch_brep, brep_edge) and
+                        not Preprocessing.proc_CAD.global_thresholding.point_close(sketch_pt2, brep_pt1, prev_sketch_brep, brep_edge)
+                    )
+
+                    if condition1 or condition2:
+                        new_stroke = np.array(list(brep_pt1) + list(brep_pt2) + [0, 0, 0, 0, 1], dtype=np.float32)
+                        new_edges.append(new_stroke)
+                        stroke_node_features = np.vstack([stroke_node_features, new_stroke])
+                        num_add_edges += 1
+                        
+
+    return stroke_node_features, num_add_edges, np.array(new_edges)
+
+
+
+
 
 def match(center1, center2, radius):
     """Utility function to check if two centers are approximately equal."""

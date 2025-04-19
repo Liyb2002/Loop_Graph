@@ -660,6 +660,12 @@ def compute_normal(points):
 
 
 
+
+# ------------------------------------------------------------------------------------------ #
+
+
+
+
 def bbox(stroke_node_features):
     x_coords = []
     y_coords = []
@@ -690,6 +696,101 @@ def bbox(stroke_node_features):
     }
 
     return bbox, center
+
+
+
+def line_segments_intersect_3d(p1, p2, q1, q2, epsilon=1e-5):
+    """
+    Finds intersection point of two 3D line segments if they intersect (within epsilon).
+    Returns the midpoint between the closest points if they are close enough.
+    Otherwise, returns None.
+    """
+    p1 = np.array(p1, dtype=float)
+    p2 = np.array(p2, dtype=float)
+    q1 = np.array(q1, dtype=float)
+    q2 = np.array(q2, dtype=float)
+
+    u = p2 - p1
+    v = q2 - q1
+    w0 = p1 - q1
+
+    a = np.dot(u, u)
+    b = np.dot(u, v)
+    c = np.dot(v, v)
+    d = np.dot(u, w0)
+    e = np.dot(v, w0)
+
+    denom = a * c - b * b
+    if abs(denom) < epsilon:
+        return None  # Lines are parallel or too close to handle
+
+    s = (b * e - c * d) / denom
+    t = (a * e - b * d) / denom
+
+    # Clamp s and t to [0,1] to stay within the line segments
+    s = np.clip(s, 0.0, 1.0)
+    t = np.clip(t, 0.0, 1.0)
+
+    closest_point_on_p = p1 + s * u
+    closest_point_on_q = q1 + t * v
+
+    dist = np.linalg.norm(closest_point_on_p - closest_point_on_q)
+
+    if dist < epsilon:
+        return (closest_point_on_p + closest_point_on_q) / 2
+    else:
+        return None
+
+
+
+def lifted_bbox(stroke_node_features):
+    intersections = []
+
+    for i, stroke1 in enumerate(stroke_node_features):
+        if stroke1[-1] == 2:
+            continue
+
+        p1 = stroke1[0:3]
+        p2 = stroke1[3:6]
+
+        for j, stroke2 in enumerate(stroke_node_features):
+            if i == j or stroke2[-1] == 2:
+                continue
+
+            q1 = stroke2[0:3]
+            q2 = stroke2[3:6]
+
+            intersection = line_segments_intersect_3d(p1, p2, q1, q2)
+            if intersection is not None:
+                intersections.append(intersection)
+
+    if not intersections:
+        return None, None
+
+    print("intersections", intersections)
+    x_coords = [pt[0] for pt in intersections]
+    y_coords = [pt[1] for pt in intersections]
+    z_coords = [pt[2] for pt in intersections]
+
+    bbox = {
+        'x_min': min(x_coords), 'x_max': max(x_coords),
+        'y_min': min(y_coords), 'y_max': max(y_coords),
+        'z_min': min(z_coords), 'z_max': max(z_coords)
+    }
+
+    center = {
+        'x': (bbox['x_min'] + bbox['x_max']) / 2,
+        'y': (bbox['y_min'] + bbox['y_max']) / 2,
+        'z': (bbox['z_min'] + bbox['z_max']) / 2
+    }
+
+    return bbox, center
+
+
+
+
+
+
 
 
 def get_scaling_factor(lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox):
@@ -747,7 +848,7 @@ def transform_stroke_node_features(
     scale_y = cleaned_size['y'] / lifted_size['y'] if lifted_size['y'] != 0 else 1.0
     scale_z = cleaned_size['z'] / lifted_size['z'] if lifted_size['z'] != 0 else 1.0
 
-    uniform_scale = max(scale_x, scale_y, scale_z) * 1.2
+    uniform_scale = max(scale_x, scale_y, scale_z)
 
     # --- Transform strokes ---
     transformed_strokes = []
@@ -847,6 +948,173 @@ def transform_stroke_node_features_reverse(
         reversed_strokes.append(reversed_stroke)
 
     return np.array(reversed_strokes)
+
+
+
+def rotate_stroke_node_features(stroke_node_features):
+    """
+    Rotates stroke node features 270 degrees around the Z-axis (Z-up),
+    without translation (rotation around origin).
+    """
+    rotated_features = []
+
+    for stroke in stroke_node_features:
+        if stroke[-1] != 2:
+            # Regular stroke
+            rotated_coords = []
+            for i in range(0, 6, 3):
+                x, y, z = stroke[i], stroke[i+1], stroke[i+2]
+                new_x = y
+                new_y = -x
+                new_z = z
+                rotated_coords.extend([new_x, new_y, new_z])
+            rotated_stroke = rotated_coords + list(stroke[6:])
+        else:
+            # Circle stroke
+            x, y, z = stroke[0], stroke[1], stroke[2]
+            nx, ny, nz = stroke[3], stroke[4], stroke[5]
+
+            # Rotate center
+            new_x = y
+            new_y = -x
+            new_z = z
+
+            # Rotate normal
+            new_nx = ny
+            new_ny = -nx
+            new_nz = nz
+
+            rotated_stroke = [new_x, new_y, new_z, new_nx, new_ny, new_nz] + list(stroke[6:])
+
+        rotated_features.append(rotated_stroke)
+
+    return np.array(rotated_features)
+
+
+
+
+
+def translate_stroke_node_features(stroke_node_features, cleaned_stroke_node_features):
+    """
+    Translates stroke_node_features to align with cleaned_stroke_node_features
+    based on the center of their bounding boxes.
+    """
+    def compute_bbox_center(features):
+        coords = []
+        for stroke in features:
+            if stroke[-1] != 2:
+                # Regular stroke
+                coords.extend(stroke[:6])
+            else:
+                # Circle stroke: use center only
+                coords.extend(stroke[:3])
+        coords = np.array(coords).reshape(-1, 3)
+        center = np.mean(coords, axis=0)
+        return center
+
+    # Compute centers
+    source_center = compute_bbox_center(stroke_node_features)
+    target_center = compute_bbox_center(cleaned_stroke_node_features)
+    
+    # Translation vector
+    translation = target_center - source_center
+
+    # Apply translation
+    translated_features = []
+    for stroke in stroke_node_features:
+        if stroke[-1] != 2:
+            # Regular stroke
+            translated_coords = []
+            for i in range(0, 6, 3):
+                x, y, z = stroke[i:i+3]
+                new_x = x + translation[0]
+                new_y = y + translation[1]
+                new_z = z + translation[2]
+                translated_coords.extend([new_x, new_y, new_z])
+            translated_stroke = translated_coords + list(stroke[6:])
+        else:
+            # Circle stroke
+            x, y, z = stroke[0:3]
+            new_x = x + translation[0]
+            new_y = y + translation[1]
+            new_z = z + translation[2]
+            translated_stroke = [new_x, new_y, new_z] + list(stroke[3:])
+        
+        translated_features.append(translated_stroke)
+
+    return np.array(translated_features)
+    
+
+
+def enlarge_stroke_node_features(stroke_node_features, factor=1.2):
+    enlarged_strokes = []
+
+    for stroke in stroke_node_features:
+        start = stroke[:3]
+        end = stroke[3:6]
+
+        # Scale both start and end points from the origin
+        start_scaled = start * factor
+        end_scaled = end * factor
+
+        # Keep remaining features unchanged
+        new_stroke = np.concatenate([start_scaled, end_scaled, stroke[6:]])
+        enlarged_strokes.append(new_stroke)
+
+    return np.array(enlarged_strokes, dtype=np.float32)
+
+
+import open3d as o3d
+
+def sample_stroke_points(stroke, num_points=10):
+    p0 = stroke[:3]
+    p1 = stroke[3:6]
+    return np.linspace(p0, p1, num_points)
+
+def build_point_cloud_from_strokes(stroke_cloud, num_points_per_stroke=10):
+    points = []
+    for stroke in stroke_cloud:
+        if stroke[-1] == -1:
+            continue
+        stroke_points = sample_stroke_points(stroke, num_points_per_stroke)
+        points.append(stroke_points)
+    return np.vstack(points)
+
+def apply_transformation_to_strokes(stroke_node_features, transformation):
+    transformed = []
+    for stroke in stroke_node_features:
+        start = stroke[:3]
+        end = stroke[3:6]
+
+        start_t = np.dot(transformation[:3, :3], start) + transformation[:3, 3]
+        end_t = np.dot(transformation[:3, :3], end) + transformation[:3, 3]
+
+        new_stroke = np.concatenate([start_t, end_t, stroke[6:]])
+        transformed.append(new_stroke)
+
+    return np.array(transformed, dtype=np.float32)
+
+def icp(stroke_node_features, cleaned_stroke_node_features, threshold=0.05, num_points_per_stroke=10):
+    # stroke_node_features is the one we want to transform
+    # cleaned_stroke_node_features is the target
+
+    source_points = build_point_cloud_from_strokes(stroke_node_features, num_points_per_stroke)
+    target_points = build_point_cloud_from_strokes(cleaned_stroke_node_features, num_points_per_stroke)
+
+    source_pcd = o3d.geometry.PointCloud()
+    source_pcd.points = o3d.utility.Vector3dVector(source_points)
+
+    target_pcd = o3d.geometry.PointCloud()
+    target_pcd.points = o3d.utility.Vector3dVector(target_points)
+
+    trans_init = np.eye(4)
+    reg_p2p = o3d.pipelines.registration.registration_icp(
+        source_pcd, target_pcd, threshold, trans_init,
+        o3d.pipelines.registration.TransformationEstimationPointToPoint()
+    )
+
+    T = reg_p2p.transformation
+    return apply_transformation_to_strokes(stroke_node_features, T)
 
 # ------------------------------------------------------------------------------------# 
 
@@ -1331,6 +1599,8 @@ def vis_stroke_node_features(stroke_node_features):
     ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
     ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
 
+
+
     # Remove axis ticks and labels
     ax.set_xticks([])
     ax.set_yticks([])
@@ -1605,6 +1875,7 @@ def vis_stroke_node_features_and_brep_sameGraph(stroke_node_features, brep_edges
     ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
     ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
     ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
 
     # Remove axis ticks and labels
     ax.set_xticks([])
@@ -2342,7 +2613,7 @@ def merge_stroke_cloud_fromCleaned(stroke_node_features, cleaned_stroke_node_fea
                     d2 = np.linalg.norm(cleaned_pt_1 - stroke_pt2) + np.linalg.norm(cleaned_pt_2 - stroke_pt1)
                     stroke_length = np.linalg.norm(stroke_pt1 - stroke_pt2)
 
-                    if min(d1, d2) < stroke_length * 0.2:
+                    if min(d1, d2) < stroke_length * 0.3:
                         no_match = False
                         break
 
@@ -2352,6 +2623,49 @@ def merge_stroke_cloud_fromCleaned(stroke_node_features, cleaned_stroke_node_fea
                 num_add_edges += 1
 
     return stroke_node_features
+
+
+import numpy as np
+
+def merge_stroke_cloud_fromBrep(stroke_node_features, edge_features_list, cylinder_features):
+    """
+    Adds edge features from BREP (edge_features_list) that are not represented in stroke_node_features.
+    Ignores cylinder_features for now.
+    """
+    def is_match(stroke_a, stroke_b, threshold_ratio=0.3):
+        pt_a1 = np.array(stroke_a[:3])
+        pt_a2 = np.array(stroke_a[3:6])
+        pt_b1 = np.array(stroke_b[:3])
+        pt_b2 = np.array(stroke_b[3:6])
+
+        d1 = np.linalg.norm(pt_a1 - pt_b1) + np.linalg.norm(pt_a2 - pt_b2)
+        d2 = np.linalg.norm(pt_a1 - pt_b2) + np.linalg.norm(pt_a2 - pt_b1)
+        stroke_len = np.linalg.norm(pt_a1 - pt_a2)
+
+        return min(d1, d2) < stroke_len * threshold_ratio
+
+    for edge in edge_features_list:
+        if edge[-1] != 1 and edge[-1] != 3:
+            continue  # Only consider line or arc
+
+        match_found = False
+        for stroke in stroke_node_features:
+            if stroke[-1] != 1 and stroke[-1] != 3:
+                continue
+            if is_match(edge, stroke):
+                match_found = True
+                break
+
+        if not match_found:
+            pt1 = edge[:3]
+            pt2 = edge[3:6]
+            stroke_type = edge[-1]  # Should be 1 (line) or 3 (arc)
+            new_stroke = np.array(list(pt1) + list(pt2) + [0, 0, 0, 0, stroke_type], dtype=np.float32)
+            stroke_node_features = np.vstack([stroke_node_features, new_stroke])
+
+    return stroke_node_features
+
+
 
 def ensure_loop(stroke_node_features, selected_indices, tol=1e-4):
     """
@@ -2391,7 +2705,7 @@ def ensure_loop(stroke_node_features, selected_indices, tol=1e-4):
     for c in counts:
         if c==2 or c==0:
             return True
-
+    print('counts', counts)
     return False
 
 
