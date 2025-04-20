@@ -126,10 +126,11 @@ def face_aggregate_addStroke(stroke_matrix):
 def reorder_strokes_to_neighbors(strokes):
     """
     Reorder strokes so that they form a continuous loop of connected points.
-    When points are close (within a dynamic threshold), they are averaged.
+    When points are close (within a dynamic threshold), they are merged
+    by selecting the coordinate with the smallest absolute value per axis.
 
     Parameters:
-    strokes (list): A list of strokes, where each stroke is a tuple (A, B) representing two torch.Tensors (2D points).
+    strokes (list): A list of strokes, where each stroke is a tuple (A, B) representing two torch.Tensors (3D points).
 
     Returns:
     ordered_points (torch.Tensor): A tensor of ordered points forming a continuous loop.
@@ -142,9 +143,9 @@ def reorder_strokes_to_neighbors(strokes):
         threshold = 0.2 * max(length1, length2)
         return torch.norm(p1 - p2) < threshold
 
-    def average_if_close(p1, p2, length1, length2):
+    def merge_if_close(p1, p2, length1, length2):
         if points_are_close(p1, p2, length1, length2):
-            return (p1 + p2) / 2
+            return torch.where(torch.abs(p1) < torch.abs(p2), p1, p2)
         return None
 
     # Deduplicate strokes
@@ -163,7 +164,7 @@ def reorder_strokes_to_neighbors(strokes):
             unique_strokes.append((A, B))
 
     if not unique_strokes:
-        return torch.empty((0, 2))
+        return torch.empty((0, 3))  # assuming 3D
 
     first_A, first_B = unique_strokes[0]
     ordered_points = [first_A, first_B]
@@ -177,18 +178,18 @@ def reorder_strokes_to_neighbors(strokes):
             len_stroke = stroke_length(A, B)
             prev_len = stroke_length(ordered_points[-2], ordered_points[-1])
 
-            avg = average_if_close(last_point, A, len_stroke, prev_len)
-            if avg is not None:
-                ordered_points[-1] = avg  # Update previous point to avg
-                ordered_points.append((avg + B) / 2 if points_are_close(avg, B, len_stroke, prev_len) else B)
+            merged = merge_if_close(last_point, A, len_stroke, prev_len)
+            if merged is not None:
+                ordered_points[-1] = merged
+                ordered_points.append(B)
                 remaining_strokes.pop(i)
                 found_connection = True
                 break
 
-            avg = average_if_close(last_point, B, len_stroke, prev_len)
-            if avg is not None:
-                ordered_points[-1] = avg
-                ordered_points.append((avg + A) / 2 if points_are_close(avg, A, len_stroke, prev_len) else A)
+            merged = merge_if_close(last_point, B, len_stroke, prev_len)
+            if merged is not None:
+                ordered_points[-1] = merged
+                ordered_points.append(A)
                 remaining_strokes.pop(i)
                 found_connection = True
                 break
@@ -200,10 +201,12 @@ def reorder_strokes_to_neighbors(strokes):
         loop_len_1 = stroke_length(ordered_points[-2], ordered_points[-1])
         loop_len_2 = stroke_length(ordered_points[0], ordered_points[1])
         if points_are_close(ordered_points[-1], ordered_points[0], loop_len_1, loop_len_2):
-            # Close the loop with an average
-            avg = (ordered_points[-1] + ordered_points[0]) / 2
-            ordered_points[-1] = avg
-            ordered_points[0] = avg
+            # Close the loop using the coordinate with the smallest abs value per axis
+            p1 = ordered_points[-1]
+            p2 = ordered_points[0]
+            min_point = torch.where(torch.abs(p1) < torch.abs(p2), p1, p2)
+            ordered_points[-1] = min_point
+            ordered_points[0] = min_point
             break
 
     # Remove duplicate endpoint if looped

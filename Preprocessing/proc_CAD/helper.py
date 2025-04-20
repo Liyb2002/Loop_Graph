@@ -1990,7 +1990,7 @@ def get_fillet_amount(target_output_edge, brep_edges):
 
     candidate_edges = []
     min_distance = float('inf')
-    tolerance = 1e-6
+    tolerance = 1e-5
 
     for edge in brep_edges:
         verts = edge.vertices()
@@ -2002,7 +2002,7 @@ def get_fillet_amount(target_output_edge, brep_edges):
             distance1 = distance(point1, edge_mid_point)
             distance2 = distance(point2, edge_mid_point)
 
-            if abs(distance1 - distance2) < 1e-6:
+            if abs(distance1 - distance2) < 5e-4:
                 if distance1 < min_distance - tolerance:
                     # New minimum found
                     min_distance = distance1
