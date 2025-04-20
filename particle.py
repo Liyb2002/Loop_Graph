@@ -196,8 +196,8 @@ class Particle():
             stroke_to_edge
         )
 
-        Encoders.helper.vis_brep(self.brep_edges)
-        # Encoders.helper.vis_used_strokes(gnn_graph['stroke'].x.cpu().numpy(), self.data_idx)
+        # Encoders.helper.vis_brep(self.brep_edges)
+        Encoders.helper.vis_used_strokes_lifted(gnn_graph['stroke'].x.cpu().numpy(), self.data_idx, self.lifted_stroke_node_features_bbox, self.cleaned_stroke_node_features_bbox)
 
         if self.mark_off_new_strokes(stroke_to_edge, stroke_to_edge_circle) == False:
             print("No new feature added")
