@@ -123,53 +123,72 @@ def face_aggregate_addStroke(stroke_matrix):
 
 # --------------------------------------------------------------------------- #
 
-import torch
-
 def reorder_strokes_to_neighbors(strokes):
     """
     Reorder strokes so that they form a continuous loop of connected points.
+    When points are close (within a dynamic threshold), they are averaged.
 
     Parameters:
-    strokes (list): A list of strokes, where each stroke is a tuple (A, B) representing two points.
+    strokes (list): A list of strokes, where each stroke is a tuple (A, B) representing two torch.Tensors (2D points).
 
     Returns:
     ordered_points (torch.Tensor): A tensor of ordered points forming a continuous loop.
     """
-    def points_are_close(p1, p2, tol=5e-4):
-        return torch.norm(p1 - p2) < tol
 
-    # Deduplicate strokes based on proximity
+    def stroke_length(A, B):
+        return torch.norm(A - B)
+
+    def points_are_close(p1, p2, length1, length2):
+        threshold = 0.2 * max(length1, length2)
+        return torch.norm(p1 - p2) < threshold
+
+    def average_if_close(p1, p2, length1, length2):
+        if points_are_close(p1, p2, length1, length2):
+            return (p1 + p2) / 2
+        return None
+
+    # Deduplicate strokes
     unique_strokes = []
     for stroke in strokes:
         A, B = stroke
+        len_ab = stroke_length(A, B)
         is_duplicate = False
         for uA, uB in unique_strokes:
-            if (points_are_close(A, uA) and points_are_close(B, uB)) or \
-               (points_are_close(A, uB) and points_are_close(B, uA)):
+            len_uab = stroke_length(uA, uB)
+            if (points_are_close(A, uA, len_ab, len_uab) and points_are_close(B, uB, len_ab, len_uab)) or \
+               (points_are_close(A, uB, len_ab, len_uab) and points_are_close(B, uA, len_ab, len_uab)):
                 is_duplicate = True
                 break
         if not is_duplicate:
             unique_strokes.append((A, B))
 
     if not unique_strokes:
-        return torch.empty((0, 2))  # or raise an error depending on context
+        return torch.empty((0, 2))
 
-    # Start with the first stroke
-    first_stroke = unique_strokes[0]
-    ordered_points = [first_stroke[0], first_stroke[1]]
+    first_A, first_B = unique_strokes[0]
+    ordered_points = [first_A, first_B]
     remaining_strokes = unique_strokes[1:]
 
     while remaining_strokes:
         last_point = ordered_points[-1]
         found_connection = False
+
         for i, (A, B) in enumerate(remaining_strokes):
-            if points_are_close(last_point, A):
-                ordered_points.append(B)
+            len_stroke = stroke_length(A, B)
+            prev_len = stroke_length(ordered_points[-2], ordered_points[-1])
+
+            avg = average_if_close(last_point, A, len_stroke, prev_len)
+            if avg is not None:
+                ordered_points[-1] = avg  # Update previous point to avg
+                ordered_points.append((avg + B) / 2 if points_are_close(avg, B, len_stroke, prev_len) else B)
                 remaining_strokes.pop(i)
                 found_connection = True
                 break
-            elif points_are_close(last_point, B):
-                ordered_points.append(A)
+
+            avg = average_if_close(last_point, B, len_stroke, prev_len)
+            if avg is not None:
+                ordered_points[-1] = avg
+                ordered_points.append((avg + A) / 2 if points_are_close(avg, A, len_stroke, prev_len) else A)
                 remaining_strokes.pop(i)
                 found_connection = True
                 break
@@ -178,10 +197,17 @@ def reorder_strokes_to_neighbors(strokes):
             print("Warning: Some strokes are disconnected and will be ignored.")
             break
 
-        if points_are_close(ordered_points[-1], ordered_points[0]):
+        loop_len_1 = stroke_length(ordered_points[-2], ordered_points[-1])
+        loop_len_2 = stroke_length(ordered_points[0], ordered_points[1])
+        if points_are_close(ordered_points[-1], ordered_points[0], loop_len_1, loop_len_2):
+            # Close the loop with an average
+            avg = (ordered_points[-1] + ordered_points[0]) / 2
+            ordered_points[-1] = avg
+            ordered_points[0] = avg
             break
 
-    if points_are_close(ordered_points[-1], ordered_points[0]):
+    # Remove duplicate endpoint if looped
+    if torch.allclose(ordered_points[0], ordered_points[-1]):
         ordered_points.pop()
 
     return torch.stack(ordered_points)
@@ -222,8 +248,38 @@ def extract_unique_points(max_prob_loop_idx, gnn_graph):
     # 4. Reorder the strokes to form a continuous loop
     ordered_points_tensor = reorder_strokes_to_neighbors(strokes)
 
+    ordered_points_tensor = points_fit_to_plane(ordered_points_tensor)
+    
     return ordered_points_tensor
 
+
+
+def points_fit_to_plane(ordered_points_tensor):
+    """
+    Flattens the given 3D points to the axis-aligned plane with the least variation.
+
+    Parameters:
+    ordered_points_tensor (torch.Tensor): Tensor of shape (N, 3) representing 3D points.
+
+    Returns:
+    torch.Tensor: Modified tensor with points projected onto the best-fit axis-aligned plane.
+    """
+    if ordered_points_tensor.ndim != 2 or ordered_points_tensor.size(1) != 3:
+        raise ValueError("Input must be a (N, 3) tensor.")
+
+    # Compute standard deviation for x, y, z
+    std_devs = torch.std(ordered_points_tensor, dim=0)
+    axis_to_flatten = torch.argmin(std_devs)
+
+    # Compute the mean value of the least-varying axis
+    mean_val = torch.mean(ordered_points_tensor[:, axis_to_flatten])
+
+    # Create a copy and flatten the axis
+    flattened = ordered_points_tensor.clone()
+    flattened[:, axis_to_flatten] = mean_val
+
+    return flattened
+    
 
 
 # --------------------------------------------------------------------------- #

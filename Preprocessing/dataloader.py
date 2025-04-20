@@ -83,7 +83,7 @@ class Program_Graph_Dataset(Dataset):
         stroke_to_loop = torch.tensor(base_shape_data['stroke_to_loop'], dtype=torch.long)
         stroke_to_edge = torch.tensor(base_shape_data['stroke_to_edge'], dtype=torch.long)
 
-        if self.bbox:
+        if self.bbox or self.return_data_path:
             lifted_stroke_node_features_bbox = base_shape_data['lifted_stroke_node_features_bbox']
             cleaned_stroke_node_features_bbox = base_shape_data['cleaned_stroke_node_features_bbox']
 
@@ -109,7 +109,7 @@ class Program_Graph_Dataset(Dataset):
             return data_dir, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox
 
         if self.return_data_path:
-            return data_dir, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge, data_path
+            return data_dir, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge, data_path, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox
         
         return data_dir, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge
 

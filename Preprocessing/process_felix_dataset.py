@@ -144,6 +144,7 @@ class cad2sketch_dataset_loader(Dataset):
         matrix_path = os.path.join(subfolder_path, 'canvas', 'matrix.json')
         with open(matrix_path, 'r') as f:
             rotation_matrix = json.load(f)
+        edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
 
 
 
@@ -165,7 +166,8 @@ class cad2sketch_dataset_loader(Dataset):
         stroke_node_features = Preprocessing.cad2sketch_stroke_features.rotate_stroke_node_features(stroke_node_features)
         stroke_node_features = Preprocessing.cad2sketch_stroke_features.translate_stroke_node_features(stroke_node_features, cleaned_stroke_node_features)
         
-     
+        Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_brep(stroke_node_features, edge_features_list)
+
         # stroke_node_features = Preprocessing.cad2sketch_stroke_features.merge_stroke_cloud_fromCleaned(stroke_node_features, cleaned_stroke_node_features)
         # stroke_node_features = Preprocessing.cad2sketch_stroke_features.merge_stroke_cloud_fromBrep(stroke_node_features, edge_features_list, cylinder_features)
 

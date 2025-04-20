@@ -1188,6 +1188,10 @@ def vis_used_strokes(stroke_node_features, data_idx, alpha_value=0.7):
     plt.show()
 
 
+
+
+
+
 def vis_selected_loops(stroke_node_features, edge_features_slice, selected_loop_idx, data_idx):
     """
     Visualizes selected strokes in 3D space with a hand-drawn effect.
