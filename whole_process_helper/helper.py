@@ -249,7 +249,7 @@ def extract_unique_points(max_prob_loop_idx, gnn_graph):
     ordered_points_tensor = reorder_strokes_to_neighbors(strokes)
 
     ordered_points_tensor = points_fit_to_plane(ordered_points_tensor)
-    
+
     return ordered_points_tensor
 
 
@@ -374,34 +374,32 @@ def ensure_valid_extrude(extrude_direction, sketch_points):
     return True
     
 
-
 def find_good_extrude(sketch_points, stroke_features):
     """
     Finds the best available stroke for extrusion:
-    - One endpoint must be in sketch_points.
+    - One endpoint must be near a sketch point (within 0.2 * stroke length).
     - Chooses the stroke whose direction (from the sketch point to the other point)
       is as perpendicular as possible (on average) to all sketch lines.
-    
+
     Parameters:
     sketch_points (torch.Tensor): A tensor of shape (num_points, 3).
     stroke_features (torch.Tensor): A tensor of shape (num_strokes, 11). The first 6 entries in each row
                                     represent two 3D points (endpoints of the stroke). The last two entries
                                     are flags used for selection.
-    
+
     Returns:
     tuple: (extrude_amount (float), extrude_direction (Tensor), confidence (float))
     """
     tol = 1e-5
     num_points = sketch_points.shape[0]
 
-    def is_in_sketch(point):
-        # Check if any of the sketch_points is close enough to the given point
-        return torch.any(torch.all(torch.isclose(sketch_points, point.unsqueeze(0), atol=tol), dim=1))
+    def is_in_sketch(point, stroke_len):
+        distances = torch.norm(sketch_points - point.unsqueeze(0), dim=1)
+        return torch.any(distances < 0.2 * stroke_len)
 
     def average_abs_dot_with_sketch_lines(direction):
         total_dot = 0.0
         count = 0
-        # For every unique pair of sketch points, compute the dot product with the direction vector.
         for i in range(num_points):
             for j in range(i + 1, num_points):
                 vec = sketch_points[j] - sketch_points[i]
@@ -419,19 +417,18 @@ def find_good_extrude(sketch_points, stroke_features):
         if stroke_feature[-1] == 0 and stroke_feature[-2] == 1:
             p1 = stroke_feature[:3]
             p2 = stroke_feature[3:6]
+            stroke_len = torch.norm(p1 - p2)
 
-            # Determine which point is in the sketch
-            if is_in_sketch(p1):
+            if is_in_sketch(p1, stroke_len):
                 base_point = p1
                 extrude_point = p2
-            elif is_in_sketch(p2):
+            elif is_in_sketch(p2, stroke_len):
                 base_point = p2
                 extrude_point = p1
             else:
-                continue  # Skip this stroke if none of the endpoints is in sketch_points
+                continue  # Skip if neither endpoint is near sketch
 
             direction_vec = extrude_point - base_point
-
             direction_norm = F.normalize(direction_vec, dim=0)
             score = average_abs_dot_with_sketch_lines(direction_norm)
 
@@ -444,8 +441,8 @@ def find_good_extrude(sketch_points, stroke_features):
                 best_result = (extrude_amount, extrude_direction, 1.0)
 
     if best_result is None:
-        raise ValueError("No stroke with an endpoint in sketch_points found.")
-    
+        raise ValueError("No stroke with an endpoint near sketch_points found.")
+
     return best_result
 
 
