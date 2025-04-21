@@ -1,5 +1,6 @@
 import os
 import json
+import Preprocessing.perturb_stroke_cloud
 import torch
 from torch.utils.data import Dataset
 import shutil
@@ -8,6 +9,7 @@ import numpy as np
 import pickle
 
 import Preprocessing.cad2sketch_stroke_features
+import Preprocessing.proc_CAD.perturbation_helper
 
 
 import Preprocessing.proc_CAD.proc_gen
@@ -24,7 +26,6 @@ import Preprocessing.SBGCN.brep_read
 import Encoders.helper
 from tqdm import tqdm
 from pathlib import Path
-from deepdiff import DeepDiff
 
 class perturbation_dataset_loader(Dataset):
     def __init__(self):
@@ -105,17 +106,22 @@ class perturbation_dataset_loader(Dataset):
         # Load and visualize only feature lines version
         final_edges_data = self.read_json(final_edges_file_path)
         feature_lines = Preprocessing.cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
-        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(feature_lines)
+        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(feature_lines)
 
 
         # Load and visualize only final edges (feature + construction lines)
         all_lines = Preprocessing.cad2sketch_stroke_features.extract_all_lines(final_edges_data)
-        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
-
+        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
 
         # Load and visualize only construction lines (construction lines)
         # construction_lines = Preprocessing.cad2sketch_stroke_features.extract_only_construction_lines(final_edges_data)
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(construction_lines)
+
+
+        stroke_node_features, _= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
+
+        perturbed_all_lines = Preprocessing.proc_CAD.perturbation_helper.do_perturb(all_lines, stroke_node_features)
+        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(perturbed_all_lines)
 
 
 

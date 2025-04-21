@@ -24,7 +24,6 @@ import Preprocessing.SBGCN.brep_read
 import Encoders.helper
 from tqdm import tqdm
 from pathlib import Path
-from deepdiff import DeepDiff
 
 class cad2sketch_dataset_loader(Dataset):
     def __init__(self):
@@ -32,12 +31,7 @@ class cad2sketch_dataset_loader(Dataset):
         Initializes the dataset generator by setting paths and loading the dataset.
         """
 
-        self.data_path = os.path.join(os.getcwd(), 'dataset', 'cad2sketch_lifted')
-        mapping_path = os.path.join(os.getcwd(), 'dataset', 'mapping', 'mapping_train.json')
-        with open(mapping_path, 'r') as f:
-            self.mapping_file = json.load(f)
-
-        self.lifted_path = os.path.join(os.getcwd(), 'dataset', 'shm_cad2sketch_dataset_fixed_ellipses_line_type_correct')
+        self.data_path = os.path.join(os.getcwd(), 'dataset', 'small')
 
         self.subfolder_paths = []
 
@@ -83,20 +77,11 @@ class cad2sketch_dataset_loader(Dataset):
         Processes an individual subfolder by reading JSON files and extracting relevant data.
         """
 
-        data_idx = Path(subfolder_path).name
-    
-        try:
-            lifted_path = self.mapping_file[data_idx]
-        except KeyError:
-            return  False
-
-        lifted_path = self.mapping_file[data_idx]
-
-        print("data_idx", data_idx)
-
+        print("subfolder_path", subfolder_path)
         
-        final_edges_file_path = os.path.join(lifted_path, 'final_edges.json')
-        cleaned_edges_file_path = os.path.join(subfolder_path, 'final_edges.json')
+        final_edges_file_path = os.path.join(subfolder_path, 'final_edges.json')
+        all_edges_file_path = os.path.join(subfolder_path, 'unique_edges.json')
+        strokes_dict_path = os.path.join(subfolder_path, 'strokes_dict.json')
         program_path = os.path.join(subfolder_path, 'program.json')
 
         # Check if required JSON files exist, printing which one is missing
@@ -104,36 +89,33 @@ class cad2sketch_dataset_loader(Dataset):
         
         if not os.path.exists(final_edges_file_path):
             missing_files.append("final_edges.json")
+        if not os.path.exists(all_edges_file_path):
+            missing_files.append("unique_edges.json")
+        if not os.path.exists(strokes_dict_path):
+            missing_files.append("strokes_dict.json")
         if not os.path.exists(program_path):
             missing_files.append("program_path.json")
 
         if missing_files:
-            print(f"Skipping {lifted_path}: Missing files: {', '.join(missing_files)}")
+            print(f"Skipping {subfolder_path}: Missing files: {', '.join(missing_files)}")
             return None, None, None
 
+        # Do some vis
+        # Load and visualize only feature lines version
         final_edges_data = self.read_json(final_edges_file_path)
-        cleaned_edges_data = self.read_json(cleaned_edges_file_path)
-
-        # feature_lines = Preprocessing.cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
+        feature_lines = Preprocessing.cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(feature_lines)
 
 
+        # Load and visualize only final edges (feature + construction lines)
         all_lines = Preprocessing.cad2sketch_stroke_features.extract_all_lines(final_edges_data)
-        all_cleaned_lines = Preprocessing.cad2sketch_stroke_features.extract_all_lines(cleaned_edges_data)
-        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
-        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_cleaned_lines)
+        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
 
-        
+
+        # Load and visualize only construction lines (construction lines)
         # construction_lines = Preprocessing.cad2sketch_stroke_features.extract_only_construction_lines(final_edges_data)
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(construction_lines)
 
-
-
-
-
-
-
-        # -------------------------------------------------------------------------------- #
 
         # Load program
         program = self.read_json(program_path)
@@ -145,261 +127,177 @@ class cad2sketch_dataset_loader(Dataset):
             step_files = [f for f in os.listdir(brep_folder_path) if f.endswith('.step')]
             step_files.sort(key=lambda x: int(re.search(r'step_(\d+)\.step', x).group(1)) if re.search(r'step_(\d+)\.step', x) else float('inf'))
 
-        edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_files[-1]))
+
         matrix_path = os.path.join(subfolder_path, 'canvas', 'matrix.json')
         with open(matrix_path, 'r') as f:
             rotation_matrix = json.load(f)
-        edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
 
 
+        # ------------------------------------------------------------ #
+        # 1) stroke cloud  information processing
+        stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
+        stroke_node_features, added_feature_lines= Preprocessing.cad2sketch_stroke_features.split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix)
+
+        # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_highlights(stroke_node_features, added_feature_lines)
 
 
-        # -------------------------------------------------------------------------------- #
-
-
-        # find the scaling matrix and scale the stroke cloud
-        # 1) stroke cloud information processing
-        lifted_stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
-        stroke_node_features = Preprocessing.cad2sketch_stroke_features.find_best_transformation(lifted_stroke_node_features, edge_features_list)
-        # lifted_stroke_node_features_bbox, lifted_stroke_node_features_center = Preprocessing.cad2sketch_stroke_features.bbox_useIntersections(lifted_stroke_node_features)
-        # Brep_bbx, _ = Preprocessing.cad2sketch_stroke_features.bbox(edge_features_list)
-        # stroke_node_features = Preprocessing.cad2sketch_stroke_features.transform_stroke_node_features(lifted_stroke_node_features, lifted_stroke_node_features_bbox, Brep_bbx)
-        
-
-        # # stroke_node_features = Preprocessing.cad2sketch_stroke_features.find_best_rotation_and_apply(stroke_node_features, edge_features_list)
-                
-        # stroke_node_features = Preprocessing.cad2sketch_stroke_features.merge_stroke_cloud_fromBrep(stroke_node_features, edge_features_list, cylinder_features)
-       
-        # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(edge_features_list))
-        # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
-
-        # # # 1.1) Stroke Cloud: ensure strokes
-        # # we need to make sure all brep_edges has a corresponding stroke 
-        # prev_sketch = None
-        # total_added_strokes = 0
-        # for idx, step_file in enumerate(step_files):
-        #     edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
-        #     edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
+        # we need to make sure all brep_edges has a corresponding stroke 
+        for idx, step_file in enumerate(step_files):
+            edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
+            edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
             
-        #     if program[idx]['operation'][0] == 'sketch':
-        #         new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
-        #         stroke_node_features, num_add_edges, added_feature_lines= Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, new_edge_features_list)
-        #         prev_sketch = new_edge_features_list
-        #         total_added_strokes += num_add_edges
-        #     elif program[idx]['operation'][0] == 'extrude':
-        #         new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
-        #         stroke_node_features, num_add_edges, _= Preprocessing.proc_CAD.helper.ensure_brep_edges_selected(stroke_node_features, new_edge_features_list, prev_sketch)
-        #         total_added_strokes += num_add_edges
-        #     else:
-        #         new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
+            if program[idx]['operation'][0] == 'sketch':
+                new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
+            else:
+                new_edge_features_list, _ = Preprocessing.cad2sketch_stroke_features.split_and_merge_brep(edge_features_list)
+                # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list  + cylinder_features))
 
-        #     # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_brep_sameGraph(stroke_node_features, new_edge_features_list)
-        #     # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_brep(stroke_node_features, new_edge_features_list)
+            stroke_node_features, num_add_edges, added_feature_lines= Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, new_edge_features_list)
 
-        # # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
-
-        # if not Preprocessing.cad2sketch_stroke_features.ensure_paired_circle(stroke_node_features):
-        #     print("ensure cylinder failed")
-        #     return False
-        
-        # if total_added_strokes > stroke_node_features.shape[0] * 0.4:
-        #     print("shape doesn't fit")
-        #     return False
+            # if num_add_edges !=0:
+            #     Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_highlights(stroke_node_features, added_feature_lines)
+            #     print("num_add_edges", num_add_edges)
+            #     print("-----")
+        stroke_operations_order_matrix = None
 
 
-        # stroke_operations_order_matrix = None
-        # connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(stroke_node_features)
-        # strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, connected_stroke_nodes)
+        connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(stroke_node_features)
+        strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, connected_stroke_nodes)
 
 
-        # stroke_operations_order_matrix = np.zeros((stroke_node_features.shape[0], len(step_files)))
+        stroke_operations_order_matrix = np.zeros((stroke_node_features.shape[0], len(step_files)))
 
-
-
-
-        # # -------------------------------------------------------------------------------- #
-
-
-
-
-
-
-        # # 2) Get the loops
-        # stroke_cloud_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
-        # stroke_cloud_loops = Preprocessing.proc_CAD.helper.reorder_loops(stroke_cloud_loops)
-        # stroke_cloud_loops = [list(loop) for loop in stroke_cloud_loops]
-
-        # # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_cloud_loops)
-        # # ensure sketch loops exist:
-        # for idx, step_file in enumerate(step_files):
-        #     if program[idx]['operation'][0] == 'sketch':
+        # 2) Get the loops
+        stroke_cloud_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
+        stroke_cloud_loops = Preprocessing.proc_CAD.helper.reorder_loops(stroke_cloud_loops)
+        stroke_cloud_loops = [list(loop) for loop in stroke_cloud_loops]
+        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_cloud_loops)
+        # ensure sketch loops exist:
+        for idx, step_file in enumerate(step_files):
+            if program[idx]['operation'][0] == 'sketch':
                 
-        #         edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
-        #         edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
-        #         new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
+                edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
+                edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
+                new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
 
-
-        #         if len(cylinder_features) != 0:
-        #             loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, cylinder_features)
-        #             selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
-        #             stroke_operations_order_matrix[:, idx] = np.array(loop_strokes).flatten()
+                if len(cylinder_features) != 0:
+                    loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, cylinder_features)
+                    selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
+                    stroke_operations_order_matrix[:, idx] = np.array(loop_strokes).flatten()
                 
-        #         else:
-        #             loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_edge_features_list)
-        #             selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
-        #             # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_node_features, selected_indices)
+                else:
+                    loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_edge_features_list)
+                    selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
+                    # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_node_features, selected_indices)
 
-        #             if not Preprocessing.cad2sketch_stroke_features.ensure_loop(stroke_node_features, selected_indices):
-        #                 # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
-        #                 print("ensure loop failed")
-        #                 return False
+                    if len(new_edge_features_list) >= 5 or not Preprocessing.cad2sketch_stroke_features.ensure_loop(stroke_node_features, selected_indices) or not Preprocessing.cad2sketch_stroke_features.ensure_loop_plane(stroke_node_features, selected_indices): 
+                        Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
+                        return False
                     
+                
+                    if selected_indices not in stroke_cloud_loops:
+                        stroke_cloud_loops.append(selected_indices)
+                    stroke_operations_order_matrix[:, idx] = np.array(loop_strokes).flatten()
 
-        #             if selected_indices not in stroke_cloud_loops:
-        #                 stroke_cloud_loops.append(selected_indices)
-        #             stroke_operations_order_matrix[:, idx] = np.array(loop_strokes).flatten()
-
-        #             # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
-        #             # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_node_features, [selected_indices])
-
-
-
-        # # -------------------------------------------------------------------------------- #
+                    # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list))
+                    # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_node_features, [selected_indices])
 
 
-
-
-
-
-
-        # # 3) Compute Loop Neighboring Information
-        # loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(stroke_cloud_loops)
-        # loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(stroke_cloud_loops, stroke_node_features, loop_neighboring_all)
-        # loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(loop_neighboring_all, loop_neighboring_vertical)
-        # loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(stroke_cloud_loops, stroke_node_features)
+        # 3) Compute Loop Neighboring Information
+        loop_neighboring_all = Preprocessing.proc_CAD.helper.loop_neighboring_simple(stroke_cloud_loops)
+        loop_neighboring_vertical = Preprocessing.proc_CAD.helper.loop_neighboring_complex(stroke_cloud_loops, stroke_node_features, loop_neighboring_all)
+        loop_neighboring_horizontal = Preprocessing.proc_CAD.helper.coplanr_neighorbing_loop(loop_neighboring_all, loop_neighboring_vertical)
+        loop_neighboring_contained = Preprocessing.proc_CAD.helper.loop_contained(stroke_cloud_loops, stroke_node_features)
 
 
 
-
-
-        # # -------------------------------------------------------------------------------- #
-
-
-
-
-
-
-
-        # # now, process the brep files
+        # now, process the brep files
     
-        # final_brep_edges = []
-        # final_cylinder_features = []
-        # new_features = []
+        final_brep_edges = []
+        final_cylinder_features = []
+        new_features = []
 
-        # data_directory = os.path.join(subfolder_path, 'shape_info')
-        # os.makedirs(data_directory, exist_ok=True)
+        data_directory = os.path.join(subfolder_path, 'shape_info')
+        os.makedirs(data_directory, exist_ok=True)
 
-        # file_count = 0
-        # for idx, step_file in enumerate(step_files):
-        #     edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
-        #     edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
-        #     # edge_features_list, _ = Preprocessing.cad2sketch_stroke_features.split_and_merge_brep(edge_features_list)
-        #     edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
+        file_count = 0
+        for idx, step_file in enumerate(step_files):
+            edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
+            edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
+            # edge_features_list, _ = Preprocessing.cad2sketch_stroke_features.split_and_merge_brep(edge_features_list)
+            # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(edge_features_list))
 
+            if len(final_brep_edges) == 0:
+                new_features = edge_features_list
+                new_features_cylinder = cylinder_features
 
-        #     if len(final_brep_edges) == 0:
-        #         new_features = edge_features_list
-        #         new_features_cylinder = cylinder_features
+                final_brep_edges = edge_features_list
+                final_cylinder_features = cylinder_features
+            else:
+                # We already have brep
 
-        #         final_brep_edges = edge_features_list
-        #         final_cylinder_features = cylinder_features
-        #     else:
-        #         # We already have brep
+                if len(edge_features_list) + len(cylinder_features) > 5:
+                    new_features = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_brep_edges, edge_features_list) 
+                    new_features_cylinder = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_cylinder_features, cylinder_features)
+                else:
+                    # sketch operation
+                    new_features = edge_features_list
+                    new_features_cylinder = cylinder_features
 
-        #         if len(edge_features_list) + len(cylinder_features) > 5:
-        #             new_features = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_brep_edges, edge_features_list) 
-        #             new_features_cylinder = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_cylinder_features, cylinder_features)
-        #         else:
-        #             # sketch operation
-        #             new_features = edge_features_list
-        #             new_features_cylinder = cylinder_features
-
-        #         final_brep_edges += new_features
-        #         final_cylinder_features += new_features_cylinder
+                final_brep_edges += new_features
+                final_cylinder_features += new_features_cylinder
         
-        #     output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
-        #     # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_features + new_features_cylinder))
+            output_brep_edges = Preprocessing.proc_CAD.helper.pad_brep_features(final_brep_edges + final_cylinder_features)
+            # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_features + new_features_cylinder))
 
+            # 5) Stroke_Cloud - Brep Connection
+            stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
+            stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle_full(stroke_node_features, output_brep_edges)
+            stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
+            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, stroke_node_features, stroke_to_edge)
 
-
-
-
-
-
-
-
-
-        # # -------------------------------------------------------------------------------- #
-
-
-
-
-
-
-
-        #     # 5) Stroke_Cloud - Brep Connection
-        #     stroke_to_edge_lines = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, output_brep_edges)
-        #     stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, output_brep_edges)
-        #     stroke_to_edge = Preprocessing.proc_CAD.helper.union_matrices(stroke_to_edge_lines, stroke_to_edge_circle)
+            stroke_to_loop = Preprocessing.cad2sketch_stroke_features.from_stroke_to_edge(stroke_to_edge, stroke_cloud_loops)
+            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_ver(all_lines, stroke_to_loop, stroke_cloud_loops)
             
-        #     original_stroke_node_features = Preprocessing.cad2sketch_stroke_features.transform_stroke_node_features_reverse(stroke_node_features, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
-        #     # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_selected(all_lines, original_stroke_node_features, stroke_to_edge)
+            # print("stroke_cloud_loops", len(stroke_cloud_loops))
+            # print("stroke_node_features", stroke_node_features.shape)
+            # strokes_mark_off = np.sum(stroke_to_edge == 1)
+            # loops_mark_off = np.sum(stroke_to_loop == 1)
+            # print("strokes_mark_off", strokes_mark_off)
+            # print("loops_mark_off", loops_mark_off)
 
-        #     stroke_to_loop = Preprocessing.cad2sketch_stroke_features.from_stroke_to_edge(stroke_to_edge, stroke_cloud_loops)
-        #     # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_ver(all_lines, stroke_to_loop, stroke_cloud_loops)
+
+            # 6) We need to build the stroke_operations_order_matrix
+            if program[idx]['operation'][0] != 'sketch':
+                new_stroke_to_edge_straight = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_features)
+                new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, new_features_cylinder)
+                new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.union_matrices(new_stroke_to_edge_straight, new_stroke_to_edge_circle)
             
-        #     # print("stroke_cloud_loops", len(stroke_cloud_loops))
-        #     # print("stroke_node_features", stroke_node_features.shape)
-        #     # strokes_mark_off = np.sum(stroke_to_edge == 1)
-        #     # loops_mark_off = np.sum(stroke_to_loop == 1)
-        #     # print("strokes_mark_off", strokes_mark_off)
-        #     # print("loops_mark_off", loops_mark_off)
+                # chosen_strokes = np.where((new_stroke_to_edge_matrix == 1).any(axis=1))[0]
 
+                stroke_operations_order_matrix[:, idx] = np.array(new_stroke_to_edge_matrix).flatten()
 
-        #     # 6) We need to build the stroke_operations_order_matrix
-        #     if program[idx]['operation'][0] != 'sketch':
-        #         new_stroke_to_edge_straight = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_features)
-        #         new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, new_features_cylinder)
-        #         new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.union_matrices(new_stroke_to_edge_straight, new_stroke_to_edge_circle)
+            # 7) Write the data to file
+            output_file_path = os.path.join(data_directory, f'shape_info_{file_count}.pkl')
+            with open(output_file_path, 'wb') as f:
+                pickle.dump({
+                    'stroke_cloud_loops': stroke_cloud_loops, 
+
+                    'stroke_node_features': stroke_node_features,
+                    'stroke_type_features': np.matrix([]),
+                    'strokes_perpendicular': strokes_perpendicular,
+                    'output_brep_edges': output_brep_edges,
+                    'stroke_operations_order_matrix': stroke_operations_order_matrix, 
+
+                    'loop_neighboring_vertical': loop_neighboring_vertical,
+                    'loop_neighboring_horizontal': loop_neighboring_horizontal,
+                    'loop_neighboring_contained': loop_neighboring_contained,
+
+                    'stroke_to_loop': stroke_to_loop,
+                    'stroke_to_edge': stroke_to_edge
+                }, f)
             
-        #         # chosen_strokes = np.where((new_stroke_to_edge_matrix == 1).any(axis=1))[0]
-
-        #         stroke_operations_order_matrix[:, idx] = np.array(new_stroke_to_edge_matrix).flatten()
-
-        #     # 7) Write the data to file
-        #     output_file_path = os.path.join(data_directory, f'shape_info_{file_count}.pkl')
-        #     with open(output_file_path, 'wb') as f:
-        #         pickle.dump({
-        #             'stroke_cloud_loops': stroke_cloud_loops, 
-
-        #             'stroke_node_features': stroke_node_features,
-        #             'stroke_type_features': np.matrix([]),
-        #             'strokes_perpendicular': strokes_perpendicular,
-        #             'output_brep_edges': output_brep_edges,
-        #             'stroke_operations_order_matrix': stroke_operations_order_matrix, 
-
-        #             'loop_neighboring_vertical': loop_neighboring_vertical,
-        #             'loop_neighboring_horizontal': loop_neighboring_horizontal,
-        #             'loop_neighboring_contained': loop_neighboring_contained,
-
-        #             'stroke_to_loop': stroke_to_loop,
-        #             'stroke_to_edge': stroke_to_edge,
-
-        #             'lifted_stroke_node_features_bbox' : lifted_stroke_node_features_bbox,
-        #             'cleaned_stroke_node_features_bbox' : cleaned_stroke_node_features_bbox
-        #         }, f)
-            
-        #     file_count += 1
+            file_count += 1
   
         return True
 
