@@ -699,6 +699,76 @@ def bbox(stroke_node_features):
 
 
 
+
+
+def bbox_useIntersections(stroke_node_features):
+    """
+    Computes the bounding box and center based on intersection points only.
+    Two points are considered the same if their distance is less than 20% of the max stroke length.
+    """
+
+    # Step 1: Collect all points from strokes
+    all_points = []
+    stroke_lengths = []
+
+    for stroke in stroke_node_features:
+        if stroke[-1] == 2:
+            continue  # Skip circles/arcs
+        
+        pt1 = np.array(stroke[0:3])
+        pt2 = np.array(stroke[3:6])
+        all_points.append(pt1)
+        all_points.append(pt2)
+        stroke_lengths.append(np.linalg.norm(pt1 - pt2))
+
+    if len(stroke_lengths) == 0:
+        raise ValueError("No valid strokes to compute bounding box.")
+
+    max_len = max(stroke_lengths)
+    threshold = max_len * 0.2
+
+    # Step 2: Identify intersection points
+    all_points = np.array(all_points)
+    used = np.zeros(len(all_points), dtype=bool)
+    intersection_points = []
+
+    for i in range(len(all_points)):
+        if used[i]:
+            continue
+        count = 1
+        close_indices = [i]
+        for j in range(i+1, len(all_points)):
+            if np.linalg.norm(all_points[i] - all_points[j]) < threshold:
+                count += 1
+                close_indices.append(j)
+        if count >= 2:
+            mean_point = np.mean(all_points[close_indices], axis=0)
+            intersection_points.append(mean_point)
+            used[close_indices] = True
+
+    if len(intersection_points) == 0:
+        raise ValueError("No intersection points found.")
+
+    intersection_points = np.array(intersection_points)
+    x_min, y_min, z_min = intersection_points.min(axis=0)
+    x_max, y_max, z_max = intersection_points.max(axis=0)
+
+    bbox = {
+        'x_min': x_min, 'x_max': x_max,
+        'y_min': y_min, 'y_max': y_max,
+        'z_min': z_min, 'z_max': z_max
+    }
+
+    center = {
+        'x': (x_min + x_max) / 2,
+        'y': (y_min + y_max) / 2,
+        'z': (z_min + z_max) / 2
+    }
+
+    return bbox, center
+
+
+
 def line_segments_intersect_3d(p1, p2, q1, q2, epsilon=1e-5):
     """
     Finds intersection point of two 3D line segments if they intersect (within epsilon).
@@ -813,67 +883,68 @@ def get_scaling_factor(lifted_stroke_node_features_bbox, cleaned_stroke_node_fea
     uniform_scale = (scale_x + scale_y + scale_z) / 3.0
     return uniform_scale
 
-def transform_stroke_node_features(
-    lifted_stroke_node_features,
-    lifted_bbox,
-    cleaned_bbox
-):
-    # --- Compute centers ---
-    lifted_center = {
-        'x': (lifted_bbox['x_min'] + lifted_bbox['x_max']) / 2,
-        'y': (lifted_bbox['y_min'] + lifted_bbox['y_max']) / 2,
-        'z': (lifted_bbox['z_min'] + lifted_bbox['z_max']) / 2,
-    }
 
-    cleaned_center = {
-        'x': (cleaned_bbox['x_min'] + cleaned_bbox['x_max']) / 2,
-        'y': (cleaned_bbox['y_min'] + cleaned_bbox['y_max']) / 2,
-        'z': (cleaned_bbox['z_min'] + cleaned_bbox['z_max']) / 2,
-    }
+import numpy as np
 
-    # --- Compute uniform scale factor ---
-    lifted_size = {
-        'x': lifted_bbox['x_max'] - lifted_bbox['x_min'],
-        'y': lifted_bbox['y_max'] - lifted_bbox['y_min'],
-        'z': lifted_bbox['z_max'] - lifted_bbox['z_min'],
-    }
+def transform_stroke_node_features(test_stroke_node_features, stroke_node_features_bbox, Brep_bbx):
+    """
+    Scales and translates test_stroke_node_features so that its bounding box
+    aligns with Brep_bbx along x, y, z axes independently.
+    
+    Both bbox inputs are dictionaries with keys: x_min, x_max, y_min, y_max, z_min, z_max
+    """
 
-    cleaned_size = {
-        'x': cleaned_bbox['x_max'] - cleaned_bbox['x_min'],
-        'y': cleaned_bbox['y_max'] - cleaned_bbox['y_min'],
-        'z': cleaned_bbox['z_max'] - cleaned_bbox['z_min'],
-    }
+    # Compute scale and shift per axis
+    def compute_scale_shift(min_src, max_src, min_tgt, max_tgt):
+        src_len = max_src - min_src
+        tgt_len = max_tgt - min_tgt
+        scale = tgt_len / src_len if src_len > 1e-8 else 1.0
+        shift = min_tgt - min_src * scale
+        return scale, shift
 
-    scale_x = cleaned_size['x'] / lifted_size['x'] if lifted_size['x'] != 0 else 1.0
-    scale_y = cleaned_size['y'] / lifted_size['y'] if lifted_size['y'] != 0 else 1.0
-    scale_z = cleaned_size['z'] / lifted_size['z'] if lifted_size['z'] != 0 else 1.0
+    sx, tx = compute_scale_shift(stroke_node_features_bbox['x_min'], stroke_node_features_bbox['x_max'],
+                                 Brep_bbx['x_min'], Brep_bbx['x_max'])
+    sy, ty = compute_scale_shift(stroke_node_features_bbox['y_min'], stroke_node_features_bbox['y_max'],
+                                 Brep_bbx['y_min'], Brep_bbx['y_max'])
+    sz, tz = compute_scale_shift(stroke_node_features_bbox['z_min'], stroke_node_features_bbox['z_max'],
+                                 Brep_bbx['z_min'], Brep_bbx['z_max'])
 
-    uniform_scale = max(scale_x, scale_y, scale_z)
+    def transform_point(x, y, z):
+        return x * sx + tx, y * sy + ty, z * sz + tz
 
-    # --- Transform strokes ---
-    transformed_strokes = []
-    for stroke in lifted_stroke_node_features:
+    transformed_features = []
+
+    for stroke in test_stroke_node_features:
         if stroke[-1] != 2:
-            # Regular stroke with 2 endpoints
-            transformed_coords = []
+            # Regular stroke
+            new_coords = []
             for i in range(0, 6, 3):
-                x = (stroke[i]   - lifted_center['x']) * uniform_scale + cleaned_center['x']
-                y = (stroke[i+1] - lifted_center['y']) * uniform_scale + cleaned_center['y']
-                z = (stroke[i+2] - lifted_center['z']) * uniform_scale + cleaned_center['z']
-                transformed_coords.extend([x, y, z])
-            transformed_stroke = transformed_coords + list(stroke[6:])
+                x, y, z = stroke[i], stroke[i+1], stroke[i+2]
+                tx_, ty_, tz_ = transform_point(x, y, z)
+                new_coords.extend([tx_, ty_, tz_])
+            transformed_stroke = new_coords + list(stroke[6:])
         else:
-            # Circle stroke: scale the center and the radius
-            x = (stroke[0] - lifted_center['x']) * uniform_scale + cleaned_center['x']
-            y = (stroke[1] - lifted_center['y']) * uniform_scale + cleaned_center['y']
-            z = (stroke[2] - lifted_center['z']) * uniform_scale + cleaned_center['z']
-            radius_scaled = stroke[7] * uniform_scale
+            # Circle stroke
+            x, y, z = stroke[0], stroke[1], stroke[2]
+            nx, ny, nz = stroke[3], stroke[4], stroke[5]
+            tx_, ty_, tz_ = transform_point(x, y, z)
 
-            transformed_stroke = [x, y, z] + list(stroke[3:7]) + [radius_scaled] + list(stroke[8:]) 
+            # Normalize the normal
+            norm = np.linalg.norm([nx, ny, nz])
+            if norm > 1e-8:
+                new_nx = nx / norm
+                new_ny = ny / norm
+                new_nz = nz / norm
+            else:
+                new_nx, new_ny, new_nz = nx, ny, nz
 
-        transformed_strokes.append(transformed_stroke)
+            transformed_stroke = [tx_, ty_, tz_, new_nx, new_ny, new_nz] + list(stroke[6:])
 
-    return np.array(transformed_strokes)
+        transformed_features.append(transformed_stroke)
+
+    return np.array(transformed_features, dtype=np.float32)
+
+
 
 
 def transform_stroke_node_features_reverse(
@@ -951,12 +1022,31 @@ def transform_stroke_node_features_reverse(
 
 
 
-def rotate_stroke_node_features(stroke_node_features):
+
+# ------------------------------------------------------------------------ #
+
+import numpy as np
+import math
+
+def rotate_stroke_node_features(stroke_node_features, angle=0):
     """
-    Rotates stroke node features 270 degrees around the Z-axis (Z-up),
-    without translation (rotation around origin).
+    Rotates stroke node features counter-clockwise around the Z-axis (Z-up)
+    by the specified angle (0, 90, 180, or 270 degrees).
+    Rotation is around the origin, no translation is applied.
     """
+    assert angle in [0, 90, 180, 270], "Only axis-aligned 90-degree steps are supported."
+
     rotated_features = []
+
+    # Define rotation matrix for Z axis
+    radians = math.radians(angle)
+    cos_theta = round(math.cos(radians), 6)
+    sin_theta = round(math.sin(radians), 6)
+
+    def rotate_xy(x, y):
+        new_x = cos_theta * x - sin_theta * y
+        new_y = sin_theta * x + cos_theta * y
+        return new_x, new_y
 
     for stroke in stroke_node_features:
         if stroke[-1] != 2:
@@ -964,85 +1054,144 @@ def rotate_stroke_node_features(stroke_node_features):
             rotated_coords = []
             for i in range(0, 6, 3):
                 x, y, z = stroke[i], stroke[i+1], stroke[i+2]
-                new_x = y
-                new_y = -x
-                new_z = z
-                rotated_coords.extend([new_x, new_y, new_z])
+                new_x, new_y = rotate_xy(x, y)
+                rotated_coords.extend([new_x, new_y, z])
             rotated_stroke = rotated_coords + list(stroke[6:])
         else:
             # Circle stroke
             x, y, z = stroke[0], stroke[1], stroke[2]
             nx, ny, nz = stroke[3], stroke[4], stroke[5]
 
-            # Rotate center
-            new_x = y
-            new_y = -x
-            new_z = z
+            # Rotate center and normal
+            new_x, new_y = rotate_xy(x, y)
+            new_nx, new_ny = rotate_xy(nx, ny)
 
-            # Rotate normal
-            new_nx = ny
-            new_ny = -nx
-            new_nz = nz
-
-            rotated_stroke = [new_x, new_y, new_z, new_nx, new_ny, new_nz] + list(stroke[6:])
+            rotated_stroke = [new_x, new_y, z, new_nx, new_ny, nz] + list(stroke[6:])
 
         rotated_features.append(rotated_stroke)
 
-    return np.array(rotated_features)
+    return np.array(rotated_features, dtype=np.float32)
 
 
 
 
 
-def translate_stroke_node_features(stroke_node_features, cleaned_stroke_node_features):
+def test_merging(stroke_node_features, edge_features_list):
     """
-    Translates stroke_node_features to align with cleaned_stroke_node_features
-    based on the center of their bounding boxes.
+    Counts how many BREP strokes (type 1 or 3) from edge_features_list
+    can be matched to strokes in stroke_node_features.
+
+    Returns:
+        num_matched (int): number of matched BREP strokes
+    """
+
+    def is_match(stroke_a, stroke_b, threshold_ratio=0.3):
+        pt_a1 = np.array(stroke_a[:3])
+        pt_a2 = np.array(stroke_a[3:6])
+        pt_b1 = np.array(stroke_b[:3])
+        pt_b2 = np.array(stroke_b[3:6])
+
+        d1 = np.linalg.norm(pt_a1 - pt_b1) + np.linalg.norm(pt_a2 - pt_b2)
+        d2 = np.linalg.norm(pt_a1 - pt_b2) + np.linalg.norm(pt_a2 - pt_b1)
+        stroke_len = np.linalg.norm(pt_a1 - pt_a2)
+
+        return min(d1, d2) < stroke_len * threshold_ratio
+
+    num_matched = 0
+
+    for edge in edge_features_list:
+        if edge[-1] != 1 and edge[-1] != 3:
+            continue  # Only match lines and arcs
+
+        for stroke in stroke_node_features:
+            if stroke[-1] != 1 and stroke[-1] != 3:
+                continue
+
+            if is_match(edge, stroke):
+                num_matched += 1
+                break
+
+    return num_matched
+
+
+
+def find_best_transformation(stroke_node_features, edge_features_list):
+
+    Brep_bbx, _= bbox(edge_features_list)
+
+    # --- Step 2: Try 4 rotations ---
+    best_score = -1
+    best_transformed = None
+
+    for angle in [0, 90, 180, 270]:
+        # Rotate
+        test_stroke_node_features = rotate_stroke_node_features(stroke_node_features, angle=angle)
+        
+        stroke_node_features_bbox, _ = bbox_useIntersections(stroke_node_features)  
+
+        # Translate to align bounding boxes
+        test_stroke_node_features = transform_stroke_node_features(test_stroke_node_features, stroke_node_features_bbox, Brep_bbx)
+
+        # Score this transformation by counting how many brep edges are matched
+        matched_brep = test_merging(test_stroke_node_features, edge_features_list)
+
+        if matched_brep > best_score:
+            best_score = matched_brep
+            best_transformed = test_stroke_node_features
+
+    return best_transformed
+
+
+
+
+# ------------------------------------------------------------------------ #
+
+
+
+
+
+def translate_stroke_node_features(stroke_node_features, edge_features_list):
+    """
+    Translates stroke_node_features to align with edge_features_list
+    based on the center of their bounding boxes (computed via min/max).
     """
     def compute_bbox_center(features):
         coords = []
         for stroke in features:
             if stroke[-1] != 2:
-                # Regular stroke
-                coords.extend(stroke[:6])
+                coords.extend(stroke[:6])   # Use start and end points
             else:
-                # Circle stroke: use center only
-                coords.extend(stroke[:3])
+                coords.extend(stroke[:3])   # Use center point for circle
         coords = np.array(coords).reshape(-1, 3)
-        center = np.mean(coords, axis=0)
+
+        min_xyz = coords.min(axis=0)
+        max_xyz = coords.max(axis=0)
+        center = (min_xyz + max_xyz) / 2.0
         return center
 
-    # Compute centers
+    # Compute bounding box centers
     source_center = compute_bbox_center(stroke_node_features)
-    target_center = compute_bbox_center(cleaned_stroke_node_features)
-    
-    # Translation vector
+    target_center = compute_bbox_center(edge_features_list)
+
+    # Compute translation vector
     translation = target_center - source_center
 
-    # Apply translation
+    # Apply translation to all strokes
     translated_features = []
     for stroke in stroke_node_features:
         if stroke[-1] != 2:
-            # Regular stroke
-            translated_coords = []
-            for i in range(0, 6, 3):
-                x, y, z = stroke[i:i+3]
-                new_x = x + translation[0]
-                new_y = y + translation[1]
-                new_z = z + translation[2]
-                translated_coords.extend([new_x, new_y, new_z])
-            translated_stroke = translated_coords + list(stroke[6:])
+            # Translate start and end points
+            new_start = stroke[:3] + translation
+            new_end = stroke[3:6] + translation
+            translated_stroke = np.concatenate([new_start, new_end, stroke[6:]])
         else:
-            # Circle stroke
-            x, y, z = stroke[0:3]
-            new_x = x + translation[0]
-            new_y = y + translation[1]
-            new_z = z + translation[2]
-            translated_stroke = [new_x, new_y, new_z] + list(stroke[3:])
+            # Translate center of circle
+            new_center = stroke[:3] + translation
+            translated_stroke = np.concatenate([new_center, stroke[3:]])
         
         translated_features.append(translated_stroke)
 
-    return np.array(translated_features)
+    return np.array(translated_features, dtype=np.float32)
     
 
 
@@ -2625,13 +2774,14 @@ def merge_stroke_cloud_fromCleaned(stroke_node_features, cleaned_stroke_node_fea
     return stroke_node_features
 
 
-import numpy as np
-
 def merge_stroke_cloud_fromBrep(stroke_node_features, edge_features_list, cylinder_features):
     """
-    Adds edge features from BREP (edge_features_list) that are not represented in stroke_node_features.
+    Updates stroke_node_features by:
+    1. Adding BREP edges (from edge_features_list) of type 1 or 3 that are not matched.
+    2. Removing type-1 strokes from stroke_node_features that are not matched to any BREP edge.
     Ignores cylinder_features for now.
     """
+
     def is_match(stroke_a, stroke_b, threshold_ratio=0.3):
         pt_a1 = np.array(stroke_a[:3])
         pt_a2 = np.array(stroke_a[3:6])
@@ -2644,6 +2794,28 @@ def merge_stroke_cloud_fromBrep(stroke_node_features, edge_features_list, cylind
 
         return min(d1, d2) < stroke_len * threshold_ratio
 
+    # Step 1: Remove unmatched type-1 strokes
+    filtered_strokes = []
+    for stroke in stroke_node_features:
+        if stroke[-1] != 1:
+            filtered_strokes.append(stroke)
+            continue
+
+        matched = False
+        for edge in edge_features_list:
+            if edge[-1] != 1 and edge[-1] != 3:
+                continue
+            if is_match(stroke, edge):
+                matched = True
+                break
+
+        if matched:
+            filtered_strokes.append(stroke)
+        # else: skip this stroke (i.e., remove)
+
+    stroke_node_features = np.array(filtered_strokes, dtype=np.float32)
+
+    # Step 2: Add new BREP edges not already in stroke_node_features
     for edge in edge_features_list:
         if edge[-1] != 1 and edge[-1] != 3:
             continue  # Only consider line or arc
@@ -2659,7 +2831,7 @@ def merge_stroke_cloud_fromBrep(stroke_node_features, edge_features_list, cylind
         if not match_found:
             pt1 = edge[:3]
             pt2 = edge[3:6]
-            stroke_type = edge[-1]  # Should be 1 (line) or 3 (arc)
+            stroke_type = edge[-1]
             new_stroke = np.array(list(pt1) + list(pt2) + [0, 0, 0, 0, stroke_type], dtype=np.float32)
             stroke_node_features = np.vstack([stroke_node_features, new_stroke])
 
