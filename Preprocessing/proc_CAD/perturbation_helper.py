@@ -65,6 +65,15 @@ def do_perturb(all_lines, stroke_node_features,
             )
             stroke["geometry"] = perturbed.tolist()
 
+        # circle perturbation
+        if stroke_node_features[i][-1] == 2:
+            geometry = stroke["geometry"]
+            if len(geometry) < 6:
+                continue
+
+            perturbed = perturb_circle_geometry(np.array(geometry))
+            stroke["geometry"] = perturbed.tolist()
+
 
     return new_all_lines
 
@@ -135,3 +144,57 @@ def perturb_arc_by_interpolation(pts, t_range=np.pi/2, num_points=None,
         arc_points.append(pt)
 
     return np.array(arc_points)
+
+
+
+
+def perturb_circle_geometry(pts):
+    """
+    Perturb a clean circle to resemble a human-drawn ellipse, with smooth imperfections.
+    """
+    pts = np.array(pts)
+    N = len(pts)
+    if N < 6:
+        return pts
+
+    # Estimate best-fit plane
+    center = pts.mean(axis=0)
+    centered = pts - center
+    _, _, vh = np.linalg.svd(centered)
+    u, v, normal = vh[0], vh[1], vh[2]
+
+    # Project to 2D and get radius
+    coords_2d = np.array([[np.dot(p - center, u), np.dot(p - center, v)] for p in pts])
+    radius = np.mean(np.linalg.norm(coords_2d, axis=1))
+
+    # === Randomized parameters ===
+    rx = radius * np.random.uniform(0.8, 1.2)
+    ry = radius * np.random.uniform(0.8, 1.2)
+    theta = np.random.uniform(0, 2 * np.pi)
+    noise_scale = np.random.uniform(0.001, 0.005) * radius
+    shift_last_point = np.random.uniform(0.4, 0.8) * radius
+
+    # Rotation matrix
+    rot = np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta),  np.cos(theta)]
+    ])
+
+    # Generate ellipse
+    t_vals = np.linspace(0, 2 * np.pi, N, endpoint=False)
+    ellipse = np.stack([rx * np.cos(t_vals), ry * np.sin(t_vals)], axis=1)
+    ellipse = ellipse @ rot.T
+    ellipse += np.random.normal(scale=noise_scale, size=ellipse.shape)
+
+    # Back to 3D
+    new_pts = np.array([center + x * u + y * v for x, y in ellipse])
+
+    # Spread final distortion across last ~5 points smoothly
+    distortion = np.random.normal(scale=shift_last_point, size=3)
+    decay_weights = np.linspace(1.0, 0.9, 5)
+    for k, w in enumerate(decay_weights):
+        idx = -2 - k
+        if idx >= 0:
+            new_pts[idx] += w * distortion
+
+    return new_pts
