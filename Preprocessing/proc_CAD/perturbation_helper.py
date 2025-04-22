@@ -294,7 +294,7 @@ def perturb_arc_by_interpolation(pts, t_range=np.pi/2, num_points=None,
 
     # Determine curvature strength
     if arc_fraction is None:
-        arc_fraction = np.random.uniform(0.5, 0.8)
+        arc_fraction = np.random.uniform(0.7, 1.2)
 
     # Generate arc + straight line blend
     noise_scale = R * noise_scale_ratio

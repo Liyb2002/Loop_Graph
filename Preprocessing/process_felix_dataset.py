@@ -102,7 +102,7 @@ class cad2sketch_dataset_loader(Dataset):
 
         # Do some vis
         all_lines = self.read_json(final_edges_file_path)
-        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
+        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
 
 
         # Load program

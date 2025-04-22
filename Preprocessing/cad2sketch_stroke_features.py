@@ -120,9 +120,6 @@ def build_node_features(geometry):
 
         return point1 + point2 + [alpha_value] + [0, 0, 0, 1]
 
-    print("residual", residual)
-    print("threshold", threshold)
-    print("-------")
     # Check if geometry is closed
     distance, closed = is_closed_shape(geometry)
 
@@ -649,7 +646,7 @@ def fit_ellipse_3d(points):
 def is_closed_shape(points):
     points = np.array(points)
     distance = np.linalg.norm(points[0] - points[-1])
-    tolerance = feature_dist(points) * 2
+    tolerance = feature_dist(points) * 5
     
 
     return distance, distance < tolerance
