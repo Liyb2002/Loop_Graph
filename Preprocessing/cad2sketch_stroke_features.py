@@ -1331,62 +1331,56 @@ def build_intersection_matrix(strokes_dict_data):
 
 def vis_feature_lines(feature_lines):
     """
-    Visualize only the feature_line strokes in 3D space without axes, background, or automatic zooming.
+    Visualize 3D strokes in space using each line's 'opacity' to control transparency and thickness.
 
     Parameters:
-    - feature_lines (list): List of stroke dictionaries containing geometry (list of 3D points).
+    - feature_lines (list): List of stroke dictionaries with 3D geometry and 'opacity'.
     """
-    # Initialize the 3D plot
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    
-    # Remove axis labels, ticks, and background
+
+    # Clean visual style
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_zticks([])
-    ax.set_frame_on(False)
-    ax.grid(False)
     ax.set_xticklabels([])
     ax.set_yticklabels([])
     ax.set_zticklabels([])
-    ax.set_axis_off()  # Hides the axis completely
+    ax.set_frame_on(False)
+    ax.grid(False)
+    ax.set_axis_off()
 
-    # Initialize bounding box variables
+    # Initialize bounding box
     x_min, x_max = float('inf'), float('-inf')
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
-    # Loop through all feature_line strokes
     for stroke in feature_lines:
-        geometry = stroke["geometry"]
-
+        geometry = stroke.get("geometry", [])
         if len(geometry) < 2:
-            continue  # Ensure there are enough points to plot
-            
-        if len(geometry) > 2:
-            for j in range(0, len(geometry)):
-                pt = geometry[j]
+            continue
 
+        # Use the precomputed opacity
+        alpha = stroke.get("opacity", 0.5)
+        # linewidth = 0.5 + alpha  # make thicker for higher opacity
+        linewidth = 0.6
 
-        # Plot each segment of the stroke
         for j in range(1, len(geometry)):
             start = geometry[j - 1]
             end = geometry[j]
 
-            # Update bounding box
+            # Update bounds
             x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
 
-            # Extract coordinates for plotting
             x_values = [start[0], end[0]]
             y_values = [start[1], end[1]]
             z_values = [start[2], end[2]]
 
-            # Plot the stroke as a black line
-            ax.plot(x_values, y_values, z_values, color='black', linewidth=0.5)
+            ax.plot(x_values, y_values, z_values, color='black', linewidth=linewidth, alpha=alpha)
 
-    # Compute the center and rescale
+    # Rescale the view to fit all strokes
     x_center = (x_min + x_max) / 2
     y_center = (y_min + y_max) / 2
     z_center = (z_min + z_max) / 2
@@ -1396,7 +1390,6 @@ def vis_feature_lines(feature_lines):
     ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
     ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
 
-    # Show the plot
     plt.show()
 
 
@@ -2386,6 +2379,20 @@ def plot_arc(stroke):
 
 
 # ------------------------------------------------------------------------------------# 
+
+
+def extract_line_types(final_edges_data):
+    line_types = []
+
+    for key, stroke in final_edges_data.items():
+        stroke_type = stroke['type']
+
+        if stroke_type == 'feature_line' or stroke_type == 'extrude_line' or stroke_type == 'fillet_line':
+            line_types.append('feature_line')
+        else:
+            line_types.append('construction_line')
+
+    return line_types
 
 
 def extract_feature_lines(final_edges_data):

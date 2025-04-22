@@ -106,6 +106,7 @@ class perturbation_dataset_loader(Dataset):
         # Load and visualize only feature lines version
         final_edges_data = self.read_json(final_edges_file_path)
         feature_lines = Preprocessing.cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
+        line_types = Preprocessing.cad2sketch_stroke_features.extract_line_types(final_edges_data)
         # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(feature_lines)
 
 
@@ -120,7 +121,9 @@ class perturbation_dataset_loader(Dataset):
 
         stroke_node_features, _= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
         all_lines, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.remove_contained_lines(all_lines, stroke_node_features)
+        all_lines, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.duplicate_lines(all_lines, stroke_node_features)
 
+        all_lines = Preprocessing.proc_CAD.perturbation_helper.compute_opacity(all_lines)
 
         perturbed_all_lines = Preprocessing.proc_CAD.perturbation_helper.do_perturb(all_lines, stroke_node_features)
         Preprocessing.cad2sketch_stroke_features.vis_feature_lines(perturbed_all_lines)

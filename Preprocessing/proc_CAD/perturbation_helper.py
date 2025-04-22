@@ -1,8 +1,8 @@
 import numpy as np
 import copy
+import random
 
 
-import numpy as np
 
 def points_are_close(p1, p2, tol=1e-6):
     return np.linalg.norm(np.array(p1) - np.array(p2)) < tol
@@ -30,28 +30,40 @@ def stroke_is_contained(small, big, tol=1e-5):
 
     return point_on_segment(a1, b1, b2, tol) and point_on_segment(a2, b1, b2, tol)
 
+
+
 def remove_contained_lines(all_lines, stroke_node_features):
     """
-    Remove feature strokes that are fully contained inside any other stroke.
+    Remove feature strokes (type == 1) if:
+    - They are contained in another stroke, OR
+    - With 20% probability even if not contained.
+
+    Returns:
+    - new_all_lines: filtered list of line dicts
+    - new_stroke_node_features: filtered array of features
+    - new_line_types: filtered list of types
     """
     removed_idx = []
     num_strokes = len(stroke_node_features)
 
     for i in range(num_strokes):
         stroke_i = stroke_node_features[i]
-        if stroke_i[-1] != 1:
-            continue  # Only remove feature strokes
 
-        for j in range(num_strokes):
-            if i == j:
-                continue
+        if stroke_i[-1] == 1:
+            contained = False
+            for j in range(num_strokes):
+                if i == j:
+                    continue
+                stroke_j = stroke_node_features[j]
+                if stroke_is_contained(stroke_i, stroke_j):
+                    contained = True
+                    break
 
-            stroke_j = stroke_node_features[j]
-            if stroke_is_contained(stroke_i, stroke_j):
+            # Remove if contained or randomly with 20% chance
+            if contained and random.random() < 0.5:
                 removed_idx.append(i)
-                break  # one match is enough
 
-    # Remove from both lists
+    # Filter all outputs
     new_all_lines = [line for idx, line in enumerate(all_lines) if idx not in removed_idx]
     new_stroke_node_features = np.array([
         stroke for idx, stroke in enumerate(stroke_node_features) if idx not in removed_idx
@@ -60,6 +72,78 @@ def remove_contained_lines(all_lines, stroke_node_features):
     return new_all_lines, new_stroke_node_features
 
 
+
+
+def duplicate_lines(all_lines, stroke_node_features):
+    """
+    Duplicate strokes based on their type:
+    - Arc (3): 50% chance
+    - Circle (2): 80% chance
+    - Other: 30% chance
+
+    Duplicated lines will have their type set to 'duplicate'.
+
+    Parameters:
+    - all_lines: list of stroke dicts
+    - stroke_node_features: np.ndarray of shape (N, F)
+
+    Returns:
+    - new_all_lines: extended list with duplicates (with type='duplicate')
+    - new_stroke_node_features: extended np.ndarray with duplicates
+    """
+    new_all_lines = copy.deepcopy(all_lines)
+    new_stroke_node_features = np.copy(stroke_node_features)
+
+    for i, line in enumerate(all_lines):
+        stroke_type = stroke_node_features[i][-1]
+
+        # Determine duplication probability
+        if stroke_type == 3:
+            prob = 0.5
+        elif stroke_type == 2:
+            prob = 0.5
+        else:
+            prob = 0.1
+
+        if random.random() < prob:
+            duplicated_line = copy.deepcopy(line)
+            duplicated_features = stroke_node_features[i]
+
+            # Set the line's type to 'duplicate'
+            duplicated_line["type"] = "duplicate"
+
+            new_all_lines.append(duplicated_line)
+            new_stroke_node_features = np.vstack([new_stroke_node_features, duplicated_features])
+
+    return new_all_lines, new_stroke_node_features
+    
+
+
+# --------------------------------------------------------------------------------- #
+
+
+def compute_opacity(all_lines):
+    """
+    Adds an 'opacity' field to each line in all_lines based on its type.
+
+    - 'feature_line': opacity ∈ [0.8, 1.0]
+    - 'construction_line': opacity ∈ [0.2, 0.5]
+    """
+    for line in all_lines:
+        line_type = line.get("type", "construction_line")
+
+        if line_type in ['feature_line', 'extrude_line', 'fillet_line', 'extrude_face']:
+            line["opacity"] = random.uniform(0.6, 0.8)
+        elif line_type in ['duplicate']:
+            line["opacity"] = random.uniform(0.2, 0.4)
+        else:
+            line["opacity"] = random.uniform(0.2, 0.4)
+
+    return all_lines
+
+
+
+# --------------------------------------------------------------------------------- #
 
 
 
@@ -103,6 +187,9 @@ def do_perturb(all_lines, stroke_node_features):
 def perturb_straight_line(pts):
     """
     Perturb a straight line stroke to resemble a hand-drawn stroke.
+    Original geometry is perturbed first.
+    Then 5 evenly spaced points are sampled from the perturbed endpoints.
+    Jitter is added only to the interior points.
 
     Parameters:
     - pts: np.ndarray of shape (N, 3)
@@ -118,8 +205,8 @@ def perturb_straight_line(pts):
     if stroke_length < 1e-8:
         return pts
 
-    # Randomize perturbation strengths for this stroke
-    point_jitter_ratio = np.random.uniform(0.01, 0.03)
+    # Randomize perturbation strengths
+    point_jitter_ratio = np.random.uniform(0.002, 0.005)
     endpoint_shift_ratio = np.random.uniform(0.01, 0.05)
     overdraw_ratio = np.random.uniform(0.001, 0.2)
 
@@ -127,7 +214,7 @@ def perturb_straight_line(pts):
     endpoint_shift = endpoint_shift_ratio * stroke_length
     overdraw = overdraw_ratio * stroke_length
 
-    # Perturb points
+    # Perturb original geometry
     for j in range(len(pts)):
         if j == 0 or j == len(pts) - 1:
             shift = np.random.uniform(-endpoint_shift, endpoint_shift, size=3)
@@ -135,16 +222,25 @@ def perturb_straight_line(pts):
             shift = np.random.normal(scale=point_jitter, size=3)
         pts[j] += shift
 
-    # Overdraw start and end
-    if len(pts) >= 2:
-        vec_start = pts[1] - pts[0]
-        vec_end = pts[-2] - pts[-1]
-        vec_start /= np.linalg.norm(vec_start) + 1e-8
-        vec_end /= np.linalg.norm(vec_end) + 1e-8
-        pts[0] -= overdraw * vec_start
-        pts[-1] -= overdraw * vec_end
+    # Overdraw
+    vec_start = pts[1] - pts[0]
+    vec_end = pts[-2] - pts[-1]
+    vec_start /= np.linalg.norm(vec_start) + 1e-8
+    vec_end /= np.linalg.norm(vec_end) + 1e-8
+    pts[0] -= overdraw * vec_start
+    pts[-1] -= overdraw * vec_end
 
-    return pts
+    # === Final step: resample from endpoints + jitter ===
+    start, end = pts[0], pts[-1]
+    t_vals = np.linspace(0, 1, 5)
+    resampled_pts = np.array([(1 - t) * start + t * end for t in t_vals])
+
+    # Add jitter to interior points only
+    for i in range(1, len(resampled_pts) - 1):
+        resampled_pts[i] += np.random.normal(scale=point_jitter, size=3)
+
+    return resampled_pts
+
 
 
 
