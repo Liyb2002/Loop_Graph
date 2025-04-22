@@ -21,8 +21,30 @@ import os
 
 
 
-
 def build_final_edges_json(all_lines):
+    node_features_list = []
+
+    num_edges = len(all_lines)
+    is_feature_line_matrix = np.zeros((num_edges, 1))
+
+    for i, stroke in enumerate(all_lines.values()):  # fix: iterate over the values, not keys
+        geometry = stroke["geometry"]
+
+        node_feature = build_node_features(geometry)
+        node_features_list.append(node_feature)
+
+        stroke_type = stroke['type']
+        if stroke_type in ['feature_line', 'extrude_line', 'fillet_line']:
+            is_feature_line_matrix[i] = 1
+        else:
+            is_feature_line_matrix[i] = 0
+
+    node_features_matrix = np.array(node_features_list)
+
+    return node_features_matrix, is_feature_line_matrix
+
+
+def build_final_edges_json_main(all_lines):
     node_features_list = []
 
     num_edges = len(all_lines)
@@ -33,7 +55,6 @@ def build_final_edges_json(all_lines):
 
         node_feature = build_node_features(geometry)
 
-
         node_features_list.append(node_feature)
 
         stroke_type = stroke['type']
@@ -42,10 +63,10 @@ def build_final_edges_json(all_lines):
         else:
             is_feature_line_matrix[i] = 0
 
-
     node_features_matrix = np.array(node_features_list)
 
     return node_features_matrix, is_feature_line_matrix
+
 
 
 
@@ -93,13 +114,15 @@ def build_node_features(geometry):
     # Case 1: Check if the geometry has low residual fitting straight line  -> (Straight Line)
     residual = fit_straight_line(geometry)
     threshold = feature_dist(geometry) * 2
-
     if residual < threshold:
         point1 = geometry[0]
         point2 = geometry[-1]
 
         return point1 + point2 + [alpha_value] + [0, 0, 0, 1]
 
+    print("residual", residual)
+    print("threshold", threshold)
+    print("-------")
     # Check if geometry is closed
     distance, closed = is_closed_shape(geometry)
 
@@ -439,7 +462,7 @@ def fit_straight_line(points):
         residual = np.linalg.norm(point - projected_point)
         residuals.append(residual)
 
-    avg_residual = np.mean(residuals)
+    avg_residual = np.max(residuals)
 
     return avg_residual
 

@@ -123,7 +123,7 @@ class cad2sketch_dataset_loader(Dataset):
 
         # ------------------------------------------------------------ #
         # 1) stroke cloud  information processing
-        stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(all_lines)
+        stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json_main(all_lines)
         stroke_node_features, added_feature_lines= Preprocessing.cad2sketch_stroke_features.split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix)
         Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
         # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_highlights(stroke_node_features, added_feature_lines)
