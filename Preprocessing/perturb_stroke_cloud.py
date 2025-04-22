@@ -119,6 +119,8 @@ class perturbation_dataset_loader(Dataset):
 
 
         stroke_node_features, _= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
+        all_lines, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.remove_contained_lines(all_lines, stroke_node_features)
+
 
         perturbed_all_lines = Preprocessing.proc_CAD.perturbation_helper.do_perturb(all_lines, stroke_node_features)
         Preprocessing.cad2sketch_stroke_features.vis_feature_lines(perturbed_all_lines)

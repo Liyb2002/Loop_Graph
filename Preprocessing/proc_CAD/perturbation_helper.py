@@ -1,81 +1,151 @@
 import numpy as np
 import copy
 
-def do_perturb(all_lines, stroke_node_features, 
-               point_jitter_ratio=0.02, endpoint_shift_ratio=0.04, overdraw_ratio=0.1):
-    """
-    Perturbs only feature strokes in all_lines (1: straight, 3: arc).
-    
-    Parameters:
-    - all_lines: list of dicts with 'geometry' key (list of 3D points)
-    - stroke_node_features: (num_strokes, 11) array-like
-    - *_ratio: proportional values w.r.t. stroke length
 
-    Returns:
-    - new_all_lines: copy of all_lines with perturbed geometries
+import numpy as np
+
+def points_are_close(p1, p2, tol=1e-6):
+    return np.linalg.norm(np.array(p1) - np.array(p2)) < tol
+
+def point_on_segment(pt, seg_start, seg_end, tol=1e-5):
+    """Check if pt lies on the segment [seg_start, seg_end] within tolerance."""
+    pt = np.array(pt)
+    seg_start = np.array(seg_start)
+    seg_end = np.array(seg_end)
+
+    seg_vec = seg_end - seg_start
+    pt_vec = pt - seg_start
+
+    proj_len = np.dot(pt_vec, seg_vec) / (np.linalg.norm(seg_vec)**2 + 1e-8)
+    if proj_len < -tol or proj_len > 1 + tol:
+        return False
+
+    closest_point = seg_start + proj_len * seg_vec
+    return np.linalg.norm(pt - closest_point) < tol
+
+def stroke_is_contained(small, big, tol=1e-5):
+    """Check if stroke 'small' is fully contained within stroke 'big'."""
+    a1, a2 = small[:3], small[3:6]
+    b1, b2 = big[:3], big[3:6]
+
+    return point_on_segment(a1, b1, b2, tol) and point_on_segment(a2, b1, b2, tol)
+
+def remove_contained_lines(all_lines, stroke_node_features):
+    """
+    Remove feature strokes that are fully contained inside any other stroke.
+    """
+    removed_idx = []
+    num_strokes = len(stroke_node_features)
+
+    for i in range(num_strokes):
+        stroke_i = stroke_node_features[i]
+        if stroke_i[-1] != 1:
+            continue  # Only remove feature strokes
+
+        for j in range(num_strokes):
+            if i == j:
+                continue
+
+            stroke_j = stroke_node_features[j]
+            if stroke_is_contained(stroke_i, stroke_j):
+                removed_idx.append(i)
+                break  # one match is enough
+
+    # Remove from both lists
+    new_all_lines = [line for idx, line in enumerate(all_lines) if idx not in removed_idx]
+    new_stroke_node_features = np.array([
+        stroke for idx, stroke in enumerate(stroke_node_features) if idx not in removed_idx
+    ])
+
+    return new_all_lines, new_stroke_node_features
+
+
+
+
+
+def do_perturb(all_lines, stroke_node_features):
+    """
+    Perturbs only feature strokes in all_lines (1: straight, 3: arc, 2: circle).
+    Returns new_all_lines with perturbed geometry.
     """
     new_all_lines = copy.deepcopy(all_lines)
 
     for i, stroke in enumerate(new_all_lines):
+        geometry = stroke["geometry"]
+        stroke_type = stroke_node_features[i][-1]
 
-        # straight stroke perturbation
-        if stroke_node_features[i][-1] == 1:
-            geometry = stroke["geometry"]
-            if len(geometry) < 2 or len(geometry) > 5:
-                continue
-            
-            pts = np.array(geometry)
-            stroke_length = np.linalg.norm(pts[0] - pts[-1])
-            if stroke_length < 1e-8:
-                continue
+        # Straight stroke
+        if stroke_type == 1:
+            stroke["geometry"] = perturb_straight_line(np.array(geometry)).tolist()
 
-            # Proportional perturbation magnitudes
-            point_jitter = point_jitter_ratio * stroke_length
-            endpoint_shift = endpoint_shift_ratio * stroke_length
-            overdraw = overdraw_ratio * stroke_length
-
-            # Perturb all points
-            for j in range(len(pts)):
-                if j == 0 or j == len(pts) - 1:
-                    shift = np.random.uniform(-endpoint_shift, endpoint_shift, size=3)
-                else:
-                    shift = np.random.normal(scale=point_jitter, size=3)
-                pts[j] += shift
-
-            # Overdraw
-            vec_start = pts[1] - pts[0]
-            vec_end = pts[-2] - pts[-1]
-            vec_start /= np.linalg.norm(vec_start) + 1e-8
-            vec_end /= np.linalg.norm(vec_end) + 1e-8
-            pts[0] -= overdraw * vec_start
-            pts[-1] -= overdraw * vec_end
-
-            stroke["geometry"] = pts.tolist()
-
-        # arc perturbation
-        if stroke_node_features[i][-1] == 3:
-            geometry = stroke["geometry"]
+        # Arc
+        elif stroke_type == 3:
             if len(geometry) < 3:
                 continue
-
             perturbed = perturb_arc_by_interpolation(
                 geometry,
-                arc_fraction=np.random.uniform(0.3, 0.6),  # people usually stop short
+                arc_fraction=np.random.uniform(0.3, 0.6),
                 noise_scale_ratio=0.0005
             )
             stroke["geometry"] = perturbed.tolist()
 
-        # circle perturbation
-        if stroke_node_features[i][-1] == 2:
-            geometry = stroke["geometry"]
+        # Circle
+        elif stroke_type == 2:
             if len(geometry) < 6:
                 continue
-
             perturbed = perturb_circle_geometry(np.array(geometry))
             stroke["geometry"] = perturbed.tolist()
 
-
     return new_all_lines
+
+
+
+def perturb_straight_line(pts):
+    """
+    Perturb a straight line stroke to resemble a hand-drawn stroke.
+
+    Parameters:
+    - pts: np.ndarray of shape (N, 3)
+
+    Returns:
+    - np.ndarray of perturbed points
+    """
+    pts = np.array(pts)
+    if len(pts) < 2 or len(pts) > 5:
+        return pts
+
+    stroke_length = np.linalg.norm(pts[0] - pts[-1])
+    if stroke_length < 1e-8:
+        return pts
+
+    # Randomize perturbation strengths for this stroke
+    point_jitter_ratio = np.random.uniform(0.01, 0.03)
+    endpoint_shift_ratio = np.random.uniform(0.01, 0.05)
+    overdraw_ratio = np.random.uniform(0.001, 0.2)
+
+    point_jitter = point_jitter_ratio * stroke_length
+    endpoint_shift = endpoint_shift_ratio * stroke_length
+    overdraw = overdraw_ratio * stroke_length
+
+    # Perturb points
+    for j in range(len(pts)):
+        if j == 0 or j == len(pts) - 1:
+            shift = np.random.uniform(-endpoint_shift, endpoint_shift, size=3)
+        else:
+            shift = np.random.normal(scale=point_jitter, size=3)
+        pts[j] += shift
+
+    # Overdraw start and end
+    if len(pts) >= 2:
+        vec_start = pts[1] - pts[0]
+        vec_end = pts[-2] - pts[-1]
+        vec_start /= np.linalg.norm(vec_start) + 1e-8
+        vec_end /= np.linalg.norm(vec_end) + 1e-8
+        pts[0] -= overdraw * vec_start
+        pts[-1] -= overdraw * vec_end
+
+    return pts
+
 
 
 def perturb_arc_by_interpolation(pts, t_range=np.pi/2, num_points=None,
@@ -127,7 +197,7 @@ def perturb_arc_by_interpolation(pts, t_range=np.pi/2, num_points=None,
 
     # Arc strength
     if arc_fraction is None:
-        arc_fraction = np.random.uniform(0.3, 0.9)
+        arc_fraction = np.random.uniform(0.5, 0.9)
 
     noise_scale = R * noise_scale_ratio
     t_vals = np.linspace(0, t_range, num_points)
@@ -144,8 +214,6 @@ def perturb_arc_by_interpolation(pts, t_range=np.pi/2, num_points=None,
         arc_points.append(pt)
 
     return np.array(arc_points)
-
-
 
 
 def perturb_circle_geometry(pts):
