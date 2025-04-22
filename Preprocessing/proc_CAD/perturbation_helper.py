@@ -197,4 +197,17 @@ def perturb_circle_geometry(pts):
         if idx >= 0:
             new_pts[idx] += w * distortion
 
+
+    # === Add extension line beyond the circle ===
+    num_extra_points = np.random.randint(1, 4)  # 1 to 3 extra points
+    extension_spacing = np.random.uniform(0.05, 0.1) * radius
+
+    # Tangent direction at end
+    tangent = new_pts[-1] - new_pts[-2]
+    tangent /= np.linalg.norm(tangent) + 1e-8
+
+    for i in range(1, num_extra_points + 1):
+        extension_point = new_pts[-1] + i * extension_spacing * tangent
+        new_pts = np.vstack([new_pts, extension_point])
+
     return new_pts
