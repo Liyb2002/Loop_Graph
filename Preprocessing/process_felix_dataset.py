@@ -79,7 +79,7 @@ class cad2sketch_dataset_loader(Dataset):
 
         print("subfolder_path", subfolder_path)
         
-        final_edges_file_path = os.path.join(subfolder_path, 'final_edges.json')
+        final_edges_file_path = os.path.join(subfolder_path, 'perturbed_all_lines.json')
         all_edges_file_path = os.path.join(subfolder_path, 'unique_edges.json')
         strokes_dict_path = os.path.join(subfolder_path, 'strokes_dict.json')
         program_path = os.path.join(subfolder_path, 'program.json')
@@ -101,20 +101,8 @@ class cad2sketch_dataset_loader(Dataset):
             return None, None, None
 
         # Do some vis
-        # Load and visualize only feature lines version
-        final_edges_data = self.read_json(final_edges_file_path)
-        feature_lines = Preprocessing.cad2sketch_stroke_features.extract_feature_lines(final_edges_data)
-        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(feature_lines)
-
-
-        # Load and visualize only final edges (feature + construction lines)
-        all_lines = Preprocessing.cad2sketch_stroke_features.extract_all_lines(final_edges_data)
-        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
-
-
-        # Load and visualize only construction lines (construction lines)
-        # construction_lines = Preprocessing.cad2sketch_stroke_features.extract_only_construction_lines(final_edges_data)
-        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(construction_lines)
+        all_lines = self.read_json(final_edges_file_path)
+        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(all_lines)
 
 
         # Load program
@@ -135,9 +123,9 @@ class cad2sketch_dataset_loader(Dataset):
 
         # ------------------------------------------------------------ #
         # 1) stroke cloud  information processing
-        stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(final_edges_data)
+        stroke_node_features, is_feature_line_matrix= Preprocessing.cad2sketch_stroke_features.build_final_edges_json(all_lines)
         stroke_node_features, added_feature_lines= Preprocessing.cad2sketch_stroke_features.split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix)
-
+        Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
         # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_highlights(stroke_node_features, added_feature_lines)
 
 

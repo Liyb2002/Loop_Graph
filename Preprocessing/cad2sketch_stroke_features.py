@@ -22,15 +22,13 @@ import os
 
 
 
-def build_final_edges_json(final_edges_json):
+def build_final_edges_json(all_lines):
     node_features_list = []
 
-    num_edges = len(final_edges_json)
+    num_edges = len(all_lines)
     is_feature_line_matrix = np.zeros((num_edges, 1))
 
-    for i, key in enumerate(final_edges_json.keys()):
-        stroke = final_edges_json[key]
-
+    for i, stroke in enumerate(all_lines):
         geometry = stroke["geometry"]
 
         node_feature = build_node_features(geometry)
