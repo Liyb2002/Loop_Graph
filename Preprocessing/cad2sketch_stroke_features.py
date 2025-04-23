@@ -168,6 +168,65 @@ def build_node_features(geometry):
 
 
 
+def remove_duplicate(stroke_node_features):
+    """
+    For strokes that are duplicates (based on geometry), zero them out.
+    
+    - Case 1: if stroke[-1] == 1 or 3 → compare 2 endpoints (first 6 values)
+    - Case 2: if stroke[-1] == 2 → compare center (first 3 values)
+    - Use relative distance: if total distance < max(lengths) * 0.2, it's a duplicate
+    
+    Modifies stroke_node_features in-place and prints how many strokes were removed.
+    """
+    num_strokes = len(stroke_node_features)
+    removed_count = 0
+
+    for i in range(num_strokes):
+        if all(v == 0 for v in stroke_node_features[i]):
+            continue  # already removed
+        type_i = stroke_node_features[i][-1]
+
+        for j in range(i + 1, num_strokes):
+            if all(v == 0 for v in stroke_node_features[j]):
+                continue  # already removed
+            type_j = stroke_node_features[j][-1]
+
+            # === Case 1: straight or arc ===
+            if (type_i in [1, 3]) and (type_j in [1, 3]):
+                a1 = stroke_node_features[i][0:3]
+                a2 = stroke_node_features[i][3:6]
+                b1 = stroke_node_features[j][0:3]
+                b2 = stroke_node_features[j][3:6]
+
+                len_i = sum((a1[k] - a2[k])**2 for k in range(3)) ** 0.5
+                len_j = sum((b1[k] - b2[k])**2 for k in range(3)) ** 0.5
+                threshold = max(len_i, len_j) * 0.2
+
+                d1 = sum((a1[k] - b1[k])**2 for k in range(3)) ** 0.5 + \
+                     sum((a2[k] - b2[k])**2 for k in range(3)) ** 0.5
+                d2 = sum((a1[k] - b2[k])**2 for k in range(3)) ** 0.5 + \
+                     sum((a2[k] - b1[k])**2 for k in range(3)) ** 0.5
+
+                if min(d1, d2) < threshold:
+                    stroke_node_features[j] = [0] * len(stroke_node_features[j])
+                    removed_count += 1
+
+            # === Case 2: circle ===
+            elif type_i == 2 and type_j == 2:
+                c1 = stroke_node_features[i][0:3]
+                c2 = stroke_node_features[j][0:3]
+                r1 = stroke_node_features[i][7]
+                r2 = stroke_node_features[j][7]
+                threshold = max(r1, r2) * 0.2
+
+                dist = sum((c1[k] - c2[k])**2 for k in range(3)) ** 0.5
+                if dist < threshold:
+                    stroke_node_features[j] = [0] * len(stroke_node_features[j])
+                    removed_count += 1
+
+    # print(f"Removed {removed_count} duplicate strokes.")
+    return stroke_node_features
+
 # Brep edge format:
 # 1)Straight Line: Point_1 (3 value), Point_2 (3 value), 0, 0, 0, 1
 # 2)Cicles: Center (3 value), normal (3 value), 0, radius, 0, 2
@@ -1499,6 +1558,95 @@ def vis_feature_lines_selected(feature_lines, stroke_node_features, new_stroke_t
                         linewidth=1.0)
 
     plt.show()
+
+
+
+
+def vis_feature_lines_by_index_list(feature_lines, stroke_node_features, selected_indices):
+    """
+    Visualize 3D strokes, with a subset of chosen strokes highlighted in red.
+
+    Parameters:
+    - feature_lines (list): List of stroke dictionaries containing geometry (list of 3D points).
+    - stroke_node_features: (unused in this function, can be removed if not needed).
+    - selected_indices: is a list 
+    """
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Remove axis labels, ticks, and background
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.set_frame_on(False)
+    ax.grid(False)
+    ax.set_axis_off()
+
+    # Initialize bounding box variables
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # First pass: plot all strokes in black and compute bounding box
+    for stroke in feature_lines:
+        geometry = stroke["geometry"]
+
+        if len(geometry) < 2:
+            continue
+
+        for j in range(1, len(geometry)):
+            start = geometry[j - 1]
+            end = geometry[j]
+
+            # Update bounding box
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+
+            # Plot the stroke in black
+            ax.plot([start[0], end[0]], 
+                    [start[1], end[1]], 
+                    [start[2], end[2]], 
+                    color='black', 
+                    linewidth=0.5)
+
+    # Compute the center and rescale
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Second pass: highlight chosen strokes in red
+    for idx in selected_indices:
+        if idx < len(feature_lines):
+            geometry = feature_lines[idx]["geometry"]
+            if len(geometry) < 2:
+                continue
+            for j in range(1, len(geometry)):
+                start = geometry[j - 1]
+                end = geometry[j]
+                ax.plot([start[0], end[0]],
+                        [start[1], end[1]],
+                        [start[2], end[2]],
+                        color='red',
+                        linewidth=1.0)
+        else:
+            stroke = stroke_node_features[idx]
+            start = stroke[0:3]
+            end = stroke[3:6]
+            ax.plot([start[0], end[0]],
+                    [start[1], end[1]],
+                    [start[2], end[2]],
+                    color='red',
+                    linewidth=1.0)
+
+    plt.show()
+
 
 
 
@@ -2902,7 +3050,6 @@ def ensure_loop(stroke_node_features, selected_indices, tol=1e-4):
     for c in counts:
         if c==2 or c==0:
             return True
-    print('counts', counts)
     return False
 
 
