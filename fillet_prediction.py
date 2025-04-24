@@ -285,7 +285,7 @@ def eval():
     batch_size = 16
 
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/small')
     print(f"Total number of shape data: {len(dataset)}")
 
     graphs = []
@@ -338,7 +338,7 @@ def eval():
         if len(graphs) > 2000:
             break
 
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
 
         
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -394,4 +394,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

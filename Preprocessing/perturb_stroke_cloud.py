@@ -28,12 +28,12 @@ from tqdm import tqdm
 from pathlib import Path
 
 class perturbation_dataset_loader(Dataset):
-    def __init__(self):
+    def __init__(self, target):
         """
         Initializes the dataset generator by setting paths and loading the dataset.
         """
 
-        self.data_path = os.path.join(os.getcwd(), 'dataset', 'small')
+        self.data_path = os.path.join(os.getcwd(), 'dataset', target)
 
         self.subfolder_paths = []
 
@@ -79,7 +79,7 @@ class perturbation_dataset_loader(Dataset):
         Processes an individual subfolder by reading JSON files and extracting relevant data.
         """
 
-        print("subfolder_path", subfolder_path)
+        print("Perturbing Stroke Cloud:", subfolder_path)
         
         final_edges_file_path = os.path.join(subfolder_path, 'final_edges.json')
         all_edges_file_path = os.path.join(subfolder_path, 'unique_edges.json')

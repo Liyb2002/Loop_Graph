@@ -70,46 +70,44 @@ def is_perpendicular(line1, line2, tol=5e-6):
     vec1 = np.array(line1[1]) - np.array(line1[0])
     vec2 = np.array(line2[1]) - np.array(line2[0])
     dot_product = np.dot(vec1, vec2)
+
     return abs(dot_product) < tol
 
 
-def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features):
-    """
-    Parameters:
-    stroke_selection_mask (np.ndarray): Binary mask of shape (num_strokes, 1) for extrude strokes.
-    sketch_selection_mask (np.ndarray): Binary mask of shape (num_strokes, 1) for sketch strokes.
-    stroke_node_features (np.ndarray): Array of shape (num_strokes, 6), each row = [x1, y1, z1, x2, y2, z2].
+def point_matches(p, endpoints, threshold):
+    """Return True if point `p` is within `threshold` distance of any point in `endpoints`."""
+    for ep in endpoints:
+        if np.linalg.norm(np.array(p) - np.array(ep)) < threshold:
+            return True
+    return False
 
-    Returns:
-    extrude_strokes (np.ndarray): Binary mask of shape (num_strokes, 1), indicating chosen extrude strokes.
-    """
+def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features):
     num_strokes = stroke_node_features.shape[0]
     extrude_strokes = np.zeros((num_strokes, 1), dtype=int)
-
-    # determine if the sketch is circle
+    
+    # Determine if the sketch is a circle
     from_circle = False
     for i in range(num_strokes):
         if sketch_selection_mask[i] == 1:
             if stroke_node_features[i][-1] == 2:
                 from_circle = True
                 break
-    
+
     if from_circle: 
         return choose_extrude_strokes_from_circle(stroke_selection_mask, sketch_selection_mask, stroke_node_features)
 
-
-    # Collect sketch strokes as 3D point pairs
+    # Collect sketch lines and endpoints
     sketch_lines = []
-    sketch_points = set()
+    sketch_endpoints = []
     for i in range(num_strokes):
         if sketch_selection_mask[i] == 1:
             p1 = tuple(stroke_node_features[i][:3])
             p2 = tuple(stroke_node_features[i][3:6])
             sketch_lines.append((p1, p2))
-            sketch_points.add(p1)
-            sketch_points.add(p2)
+            sketch_endpoints.append(p1)
+            sketch_endpoints.append(p2)
 
-    # First pass: check strokes already marked as extrude
+    # First pass: extrude if perpendicular to all sketch lines
     for i in range(num_strokes):
         if stroke_selection_mask[i] == 1:
             p1 = tuple(stroke_node_features[i][:3])
@@ -119,20 +117,28 @@ def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_
             if all(is_perpendicular(candidate_line, sketch_line) for sketch_line in sketch_lines):
                 extrude_strokes[i] = 1
 
-    # Fallback: no extrude stroke selected
+    # Fallback: no valid extrude strokes found
     if not np.any(extrude_strokes):
         for i in range(num_strokes):
+            if stroke_node_features[i][-1] != 1:
+                continue
+
             p1 = tuple(stroke_node_features[i][:3])
             p2 = tuple(stroke_node_features[i][3:6])
             candidate_line = (p1, p2)
 
-
             if all(is_perpendicular(candidate_line, sketch_line) for sketch_line in sketch_lines):
-                # Check if either endpoint is in any sketch line
-                extrude_strokes[i] = 1
+                # Compute stroke length and matching threshold
+                stroke_len = np.linalg.norm(np.array(p2) - np.array(p1))
+                threshold = stroke_len * 0.2
+
+                match_count = int(point_matches(p1, sketch_endpoints, threshold)) + \
+                              int(point_matches(p2, sketch_endpoints, threshold))
+
+                if match_count == 1:
+                    extrude_strokes[i] = 1
 
     return extrude_strokes
-
 
 
 # Circle Feature: 10 values + type 2
@@ -170,10 +176,13 @@ def choose_extrude_strokes_from_circle(stroke_selection_mask, sketch_selection_m
             center_dist = dist(center, sketch_center)
             radius_diff = abs(radius - sketch_radius) 
 
-            if center_dist > 1e-4 and radius_diff < 1e-5:
+            radius_threshold = sketch_radius * 0.1
+            center_threshold = sketch_radius * 0.1
+
+            if center_dist > center_threshold and radius_diff < radius_threshold:
                 cylinder_height = center_dist
                 break
-
+    
     # Find lines that connect the two circles (extrude strokes)
     for i in range(num_strokes):
         if stroke_node_features[i][-1] == 1:
@@ -182,11 +191,11 @@ def choose_extrude_strokes_from_circle(stroke_selection_mask, sketch_selection_m
             length = dist(point_1, point_2)
 
 
-            if abs(length - cylinder_height) < EPSILON and dist(point_1, point_2) > 1e-5:
+            if abs(length - cylinder_height) < 5e-4 and dist(point_1, point_2) > 1e-5:
                 d1 = dist(point_1, sketch_center)
                 d2 = dist(point_2, sketch_center)
 
-                if abs(d1 - sketch_radius) < EPSILON or abs(d2 - sketch_radius) < EPSILON:
+                if abs(d1 - sketch_radius) < 5e-4 or abs(d2 - sketch_radius) < 5e-4:
                     extrude_strokes[i] = 1
 
     return extrude_strokes
@@ -890,24 +899,24 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
 
     Parameters:
     - stroke_node_features: A numpy array or list containing the features of each stroke.
-      Each stroke should contain its start and end coordinates, and potentially a flag indicating if it's a circle.
     - selected_stroke_idx: A list or array of indices of the strokes that should be highlighted in red.
-    - alpha_value: Float, optional. The transparency level of the lines (0.0 is fully transparent, 1.0 is fully opaque).
+    - data_idx: string to locate the dataset subfolder
+    - alpha_value: Float, default 0.7, controls transparency of red highlighted strokes.
     """
-    
+    import os
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    import random
 
-    # Initialize the 3D plot
+    # Load the already-processed all_lines
     final_edges_file_path = os.path.join(
-    os.getcwd(), 'dataset', 'cad2sketch_annotated', data_idx, 'final_edges.json')
-    final_edges_data = read_json(final_edges_file_path)
-    all_lines = extract_all_lines(final_edges_data)
-
-
+        os.getcwd(), 'dataset', 'small', data_idx, 'perturbed_all_lines.json')
+    all_lines = read_json(final_edges_file_path)
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    
-    # Remove axis labels, ticks, and background
+
+    # Clean plot styling
     ax.set_xticks([])
     ax.set_yticks([])
     ax.set_zticks([])
@@ -915,35 +924,37 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
     ax.grid(False)
     ax.set_axis_off()
 
-    # Initialize bounding box variables
+    # Bounding box init
     x_min, x_max = float('inf'), float('-inf')
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
-    # First pass: plot all strokes in black and compute bounding box
-    for stroke in all_lines:
+    # === First pass: plot all strokes ===
+    for i, stroke in enumerate(all_lines):
         geometry = stroke["geometry"]
-
         if len(geometry) < 2:
             continue
+
+        # Assign opacity if not already in the line
+
+        alpha = stroke["opacity"]
 
         for j in range(1, len(geometry)):
             start = geometry[j - 1]
             end = geometry[j]
 
-            # Update bounding box
             x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
             y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
             z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
 
-            # Plot the stroke in black
-            ax.plot([start[0], end[0]], 
-                    [start[1], end[1]], 
-                    [start[2], end[2]], 
-                    color='black', 
-                    linewidth=0.5)
+            ax.plot([start[0], end[0]],
+                    [start[1], end[1]],
+                    [start[2], end[2]],
+                    color='black',
+                    linewidth=0.6,  # thicker for higher opacity
+                    alpha=alpha)
 
-    # Compute the center and rescale
+    # === Rescale view ===
     x_center = (x_min + x_max) / 2
     y_center = (y_min + y_max) / 2
     z_center = (z_min + z_max) / 2
@@ -953,7 +964,7 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
     ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
     ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
 
-    # Second pass: highlight chosen strokes in red
+    # === Second pass: highlight selected strokes in red ===
     for idx in selected_stroke_idx:
         if idx < len(all_lines):
             geometry = all_lines[idx]["geometry"]
@@ -966,7 +977,8 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
                         [start[1], end[1]],
                         [start[2], end[2]],
                         color='red',
-                        linewidth=1.0)
+                        linewidth=1.0,
+                        alpha=alpha_value)
         else:
             stroke = stroke_node_features[idx]
             start = stroke[0:3]
@@ -975,7 +987,8 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
                     [start[1], end[1]],
                     [start[2], end[2]],
                     color='red',
-                    linewidth=1.0)
+                    linewidth=1.0,
+                    alpha=alpha_value)
 
     plt.show()
 

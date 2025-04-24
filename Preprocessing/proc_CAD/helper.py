@@ -1405,7 +1405,7 @@ def ensure_brep_edges(stroke_node_features, edge_features_list):
                     d2 = np.linalg.norm(brep_pt1 - stroke_pt2) + np.linalg.norm(brep_pt2 - stroke_pt1)
                     stroke_length = np.linalg.norm(stroke_pt1 - stroke_pt2)
 
-                    if min(d1, d2) < stroke_length * 0.3:
+                    if min(d1, d2) < stroke_length * 0.1:
                         no_match = False
                         break
 

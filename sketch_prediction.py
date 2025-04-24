@@ -153,7 +153,7 @@ def train():
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
         if kth_operation is None:
             continue
-
+        
         chosen_strokes = (kth_operation == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
         loop_chosen_mask = []
         for loop in stroke_cloud_loops:
@@ -310,7 +310,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_lifted', False, True)
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/small')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -325,12 +325,13 @@ def eval():
         if data is None:
             continue
 
-        data_idx, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox = data
+        data_idx, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
         if program[-1] != 'sketch':
             continue
 
         if loop_neighboring_vertical.shape[0] > 400:
             continue
+        
 
         kth_operation = Encoders.helper.get_kth_operation(stroke_operations_order_matrix, len(program)-1)
 
@@ -380,10 +381,9 @@ def eval():
         )
 
 
-        # print("chosen_strokes", chosen_strokes)
+        print("chosen_strokes", chosen_strokes)
         # print("gnn_graph['stroke'].x.cpu().numpy()", gnn_graph['stroke'].x.cpu().numpy().shape)
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes , data_idx)
-        Encoders.helper.vis_selected_strokes_bbox(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes , data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes , data_idx)
 
         # Prepare the pair
         gnn_graph.to_device_withPadding(device)

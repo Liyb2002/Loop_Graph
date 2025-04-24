@@ -26,12 +26,12 @@ from tqdm import tqdm
 from pathlib import Path
 
 class cad2sketch_dataset_loader(Dataset):
-    def __init__(self):
+    def __init__(self, target):
         """
         Initializes the dataset generator by setting paths and loading the dataset.
         """
 
-        self.data_path = os.path.join(os.getcwd(), 'dataset', 'small')
+        self.data_path = os.path.join(os.getcwd(), 'dataset', target)
 
         self.subfolder_paths = []
 
@@ -77,7 +77,7 @@ class cad2sketch_dataset_loader(Dataset):
         Processes an individual subfolder by reading JSON files and extracting relevant data.
         """
 
-        print("subfolder_path", subfolder_path)
+        print("Generating Dataset:", subfolder_path)
         
         final_edges_file_path = os.path.join(subfolder_path, 'perturbed_all_lines.json')
         all_edges_file_path = os.path.join(subfolder_path, 'unique_edges.json')
@@ -264,6 +264,7 @@ class cad2sketch_dataset_loader(Dataset):
                 # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_by_index_list(all_lines, stroke_node_features, chosen_strokes)
 
                 stroke_operations_order_matrix[:, idx] = np.array(new_stroke_to_edge_matrix).flatten()
+
 
             # 7) Write the data to file
             output_file_path = os.path.join(data_directory, f'shape_info_{file_count}.pkl')

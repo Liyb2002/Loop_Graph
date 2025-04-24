@@ -329,7 +329,7 @@ def eval():
     batch_size = 16
 
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/small')
     print(f"Total number of shape data: {len(dataset)}")
 
     graphs = []
@@ -362,7 +362,7 @@ def eval():
         
         extrude_selection_mask = Encoders.helper.choose_extrude_strokes(kth_operation, sketch_operation_mask, stroke_node_features)
         extrude_selection_mask = torch.tensor(extrude_selection_mask, dtype=torch.float)
-        extrude_stroke_idx =  (kth_operation == 1).nonzero(as_tuple=True)[0]
+        extrude_stroke_idx =  (extrude_selection_mask == 1).nonzero(as_tuple=True)[0]
 
 
         # Find the sketch_loops
@@ -400,7 +400,8 @@ def eval():
 
         if len(graphs) > 50:
             break
-        # Encoders.helper.vis_selected_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['stroke', 'represents', 'loop'].edge_index, [torch.argmax(sketch_loop_selection_mask)])
+
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx, data_idx)
         Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx, data_idx)
 
         
@@ -456,4 +457,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()
