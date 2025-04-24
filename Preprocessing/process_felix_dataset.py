@@ -15,7 +15,6 @@ import Preprocessing.proc_CAD.CAD_to_stroke_cloud
 import Preprocessing.proc_CAD.render_images
 import Preprocessing.proc_CAD.Program_to_STL
 import Preprocessing.proc_CAD.helper
-import Preprocessing.proc_CAD.render_images
 import Preprocessing.proc_CAD.draw_all_lines_baseline
 
 import Preprocessing.gnn_graph
@@ -261,7 +260,7 @@ class cad2sketch_dataset_loader(Dataset):
                 new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.union_matrices(new_stroke_to_edge_straight, new_stroke_to_edge_circle)
             
                 chosen_strokes = np.where((new_stroke_to_edge_matrix == 1).any(axis=1))[0]
-                # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_by_index_list(all_lines, stroke_node_features, chosen_strokes)
+                Preprocessing.cad2sketch_stroke_features.vis_feature_lines_by_index_list(all_lines, stroke_node_features, chosen_strokes)
 
                 stroke_operations_order_matrix[:, idx] = np.array(new_stroke_to_edge_matrix).flatten()
 

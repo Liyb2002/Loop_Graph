@@ -1,6 +1,5 @@
 import os
 import json
-import Preprocessing.perturb_stroke_cloud
 import torch
 from torch.utils.data import Dataset
 import shutil
@@ -11,19 +10,6 @@ import pickle
 import Preprocessing.cad2sketch_stroke_features
 import Preprocessing.proc_CAD.perturbation_helper
 
-
-import Preprocessing.proc_CAD.proc_gen
-import Preprocessing.proc_CAD.CAD_to_stroke_cloud
-import Preprocessing.proc_CAD.render_images
-import Preprocessing.proc_CAD.Program_to_STL
-import Preprocessing.proc_CAD.helper
-import Preprocessing.proc_CAD.render_images
-import Preprocessing.proc_CAD.draw_all_lines_baseline
-
-import Preprocessing.gnn_graph
-import Preprocessing.SBGCN.brep_read
-
-import Encoders.helper
 from tqdm import tqdm
 from pathlib import Path
 
@@ -70,10 +56,6 @@ class perturbation_dataset_loader(Dataset):
                 shutil.rmtree(os.path.join(self.data_path, folder))
 
 
-    # IDEA:
-    # We are in /selected_dataset/1600
-    # Henro's code will create a /canvas folder that put all the .step files and the rotation matrix
-    # process_subfolder() will give a /shape_info folder that stores all the .pkl files
     def process_subfolder(self, subfolder_path):
         """
         Processes an individual subfolder by reading JSON files and extracting relevant data.
@@ -164,3 +146,8 @@ class perturbation_dataset_loader(Dataset):
         except Exception as e:
             print(f"Error reading JSON file {file_path}: {e}")
             return None
+
+
+
+# target = 'cad2sketch_annotated'
+# d_generator = Preprocessing.perturb_stroke_cloud.perturbation_dataset_loader(target)

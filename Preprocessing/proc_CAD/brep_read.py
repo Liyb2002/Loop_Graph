@@ -1,3 +1,6 @@
+
+
+
 from OCC.Core.STEPControl import STEPControl_Reader
 from OCC.Core.TopoDS import TopoDS_Shape, topods
 from OCC.Core.TopExp import TopExp_Explorer
@@ -109,4 +112,3 @@ def create_graph_from_step_file(step_path):
         face_explorer.Next()
     
     return edge_features_list
-

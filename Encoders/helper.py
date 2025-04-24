@@ -206,9 +206,7 @@ def choose_fillet_strokes(raw_fillet_stroke_idx, stroke_node_features):
     # Filter raw_fillet_stroke_idx based on conditions in stroke_node_features
     filtered_strokes = [
         idx for idx in raw_fillet_stroke_idx
-        if stroke_node_features[idx][7] != 0 or
-           stroke_node_features[idx][8] != 0 or
-           stroke_node_features[idx][9] != 0
+        if stroke_node_features[idx][-1] == 3
     ]
     
     num_strokes = stroke_node_features.shape[0]
@@ -910,7 +908,7 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
 
     # Load the already-processed all_lines
     final_edges_file_path = os.path.join(
-        os.getcwd(), 'dataset', 'small', data_idx, 'perturbed_all_lines.json')
+        os.getcwd(), 'dataset', 'cad2sketch_annotated', data_idx, 'perturbed_all_lines.json')
     all_lines = read_json(final_edges_file_path)
 
     fig = plt.figure()

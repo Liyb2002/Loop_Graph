@@ -151,7 +151,7 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -314,6 +314,8 @@ def eval():
         raw_fillet_stroke_idx = (kth_operation == 1).nonzero(as_tuple=True)[0] 
         fillet_stroke_idx, stroke_selection_matrix= Encoders.helper.choose_fillet_strokes(raw_fillet_stroke_idx, stroke_node_features)
 
+        if len(fillet_stroke_idx) == 0:
+            continue
 
         gnn_graph = Preprocessing.gnn_graph.SketchLoopGraph(
             stroke_cloud_loops, 
@@ -337,7 +339,8 @@ def eval():
 
         if len(graphs) > 2000:
             break
-
+        
+        
         Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
 
         
@@ -394,4 +397,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()
