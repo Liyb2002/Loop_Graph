@@ -3,7 +3,7 @@ import Preprocessing.perturb_stroke_cloud
 import Preprocessing.process_felix_dataset
 
 
-target = 'small'
+target = 'cad2sketch_annotated'
 def run():
     
     d_generator = Preprocessing.perturb_stroke_cloud.perturbation_dataset_loader(target)

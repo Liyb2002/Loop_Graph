@@ -1332,19 +1332,19 @@ def stroke_to_edge(stroke_node_features, final_brep_edges):
             stroke_pt1 = stroke[:3]
             stroke_pt2 = stroke[3:6]
 
-            d1 = np.linalg.norm(stroke_pt1 - brep_pt1) + np.linalg.norm(stroke_pt2 - brep_pt2)
-            d2 = np.linalg.norm(stroke_pt1 - brep_pt2) + np.linalg.norm(stroke_pt2 - brep_pt1)
+            d1 = max(np.linalg.norm(stroke_pt1 - brep_pt1), np.linalg.norm(stroke_pt2 - brep_pt2))
+            d2 = max(np.linalg.norm(stroke_pt1 - brep_pt2), np.linalg.norm(stroke_pt2 - brep_pt1))
 
             best_d = min(d1, d2)
             stroke_length = np.linalg.norm(stroke_pt1 - stroke_pt2)
 
             if brep_type == 4 and stroke[-1] == 3:
-                if best_d < min_distance:
+                if best_d < min_distance and min(d1, d2) < stroke_length * 0.2:
                     min_distance = best_d
                     best_stroke_idx = stroke_idx
 
                 
-            if best_d < min_distance and min(d1, d2) < stroke_length * 0.3:
+            if best_d < min_distance and min(d1, d2) < stroke_length * 0.2:
                 min_distance = best_d
                 best_stroke_idx = stroke_idx
 
