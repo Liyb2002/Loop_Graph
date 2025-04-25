@@ -76,16 +76,13 @@ class Particle():
         self.predicted_feature_strokes = None
 
 
-    def init_stroke_info(self, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox): 
+    def init_stroke_info(self, stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained): 
         self.stroke_cloud_loops = stroke_cloud_loops
         
         self.strokes_perpendicular = strokes_perpendicular
         self.loop_neighboring_vertical = loop_neighboring_vertical
         self.loop_neighboring_horizontal = loop_neighboring_horizontal
         self.loop_neighboring_contained = loop_neighboring_contained
-
-        self.lifted_stroke_node_features_bbox = lifted_stroke_node_features_bbox
-        self.cleaned_stroke_node_features_bbox = cleaned_stroke_node_features_bbox
 
 
     def set_particle_id(self, particle_id, cur_output_dir_outerFolder):
@@ -198,7 +195,9 @@ class Particle():
 
         # if self.current_op == 3:
         #     Encoders.helper.vis_brep(self.brep_edges)
-        # Encoders.helper.vis_used_strokes_lifted(gnn_graph['stroke'].x.cpu().numpy(), self.data_idx, self.lifted_stroke_node_features_bbox, self.cleaned_stroke_node_features_bbox)
+        
+        used_indices = np.where(stroke_to_edge > 0.5)[0].tolist()
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), used_indices, self.data_idx)
 
         if self.mark_off_new_strokes(stroke_to_edge, stroke_to_edge_circle) == False:
             print("No new feature added")
@@ -214,7 +213,7 @@ class Particle():
 
         if self.current_op == 1:
             print("Build sketch")
-            self.sketch_selection_mask, self.sketch_points, normal, selected_loop_idx, prob = do_sketch(gnn_graph, self.data_idx, self.lifted_stroke_node_features_bbox, self.cleaned_stroke_node_features_bbox)
+            self.sketch_selection_mask, self.sketch_points, normal, selected_loop_idx, prob = do_sketch(gnn_graph, self.data_idx)
             self.selected_loop_indices.append(selected_loop_idx)
             self.score = self.score * prob
 
@@ -236,7 +235,7 @@ class Particle():
         # Build Extrude
         if self.current_op == 2:
             print("Build extrude")
-            extrude_amount, extrude_direction, prob = do_extrude(gnn_graph, self.sketch_selection_mask, self.sketch_points, self.brep_edges, self.data_idx, self.lifted_stroke_node_features_bbox, self.cleaned_stroke_node_features_bbox)
+            extrude_amount, extrude_direction, prob = do_extrude(gnn_graph, self.sketch_selection_mask, self.sketch_points, self.brep_edges, self.data_idx)
             self.cur__brep_class.extrude_op(extrude_amount.item(), extrude_direction.detach().cpu().numpy())
             self.score = self.score * prob
 
@@ -244,7 +243,7 @@ class Particle():
         # Build fillet
         if self.current_op == 3:
             print("Build Fillet")
-            output_fillet_edge, selected_prob = do_fillet(gnn_graph, self.brep_edges, self.data_idx, self.lifted_stroke_node_features_bbox, self.cleaned_stroke_node_features_bbox)
+            output_fillet_edge, selected_prob = do_fillet(gnn_graph, self.brep_edges, self.data_idx)
             self.cur__brep_class.random_fillet(output_fillet_edge)
             self.score = self.score * selected_prob
 
@@ -447,19 +446,19 @@ sketch_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
 sketch_graph_encoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_encoder.pth'), weights_only=True))
 sketch_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_decoder.pth'), weights_only=True))
 
-def predict_sketch(gnn_graph, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox):
+def predict_sketch(gnn_graph, data_idx):
         
     x_dict = sketch_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     sketch_selection_mask = sketch_graph_decoder(x_dict)
 
     selected_loop_idx, idx_prob = whole_process_helper.helper.find_valid_sketch(gnn_graph, sketch_selection_mask)
     sketch_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
-    # Encoders.helper.vis_selected_strokes_bbox(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx, data_idx)
 
     return selected_loop_idx, sketch_selection_mask, idx_prob
 
-def do_sketch(gnn_graph, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox):
-    selected_loop_idx, sketch_selection_mask, idx_prob= predict_sketch(gnn_graph, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
+def do_sketch(gnn_graph, data_idx):
+    selected_loop_idx, sketch_selection_mask, idx_prob= predict_sketch(gnn_graph, data_idx )
     sketch_points = whole_process_helper.helper.extract_unique_points(selected_loop_idx[0], gnn_graph)
     normal = [1, 0, 0]
     sketch_selection_mask = whole_process_helper.helper.clean_mask(sketch_selection_mask, selected_loop_idx)
@@ -475,7 +474,7 @@ extrude_graph_decoder.eval()
 extrude_graph_encoder.load_state_dict(torch.load(os.path.join(extrude_dir, 'graph_encoder.pth'), weights_only=True))
 extrude_graph_decoder.load_state_dict(torch.load(os.path.join(extrude_dir, 'graph_decoder.pth'), weights_only=True))
 
-def predict_extrude(gnn_graph, sketch_selection_mask, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox):
+def predict_extrude(gnn_graph, sketch_selection_mask, data_idx):
     gnn_graph.set_select_sketch(sketch_selection_mask)
 
     x_dict = extrude_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
@@ -483,11 +482,11 @@ def predict_extrude(gnn_graph, sketch_selection_mask, data_idx, lifted_stroke_no
     
     extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
     # _, extrude_stroke_idx = torch.max(extrude_selection_mask, dim=0)
-    # Encoders.helper.vis_selected_strokes_bbox(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx, data_idx)
     return extrude_selection_mask
 
-def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox):
-    extrude_selection_mask = predict_extrude(gnn_graph, sketch_selection_mask, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
+def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges, data_idx):
+    extrude_selection_mask = predict_extrude(gnn_graph, sketch_selection_mask, data_idx)
     extrude_amount, extrude_direction, selected_prob= whole_process_helper.helper.get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges)
     return extrude_amount, extrude_direction, selected_prob
 
@@ -503,7 +502,7 @@ fillet_graph_encoder.load_state_dict(torch.load(os.path.join(fillet_dir, 'graph_
 fillet_graph_decoder.load_state_dict(torch.load(os.path.join(fillet_dir, 'graph_decoder.pth'), weights_only=True))
 
 
-def predict_fillet(gnn_graph, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox):
+def predict_fillet(gnn_graph, data_idx):
     
     x_dict = fillet_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     fillet_selection_mask = fillet_graph_decoder(x_dict)
@@ -514,12 +513,12 @@ def predict_fillet(gnn_graph, data_idx, lifted_stroke_node_features_bbox, cleane
     # _, fillet_stroke_idx = torch.max(fillet_selection_mask, dim=0)
 
     # print("gnn_graph['stroke'].x", gnn_graph['stroke'].x.shape)
-    # Encoders.helper.vis_selected_strokes_bbox(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
+    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
     return fillet_selection_mask
 
 
-def do_fillet(gnn_graph, brep_edges, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox):
-    fillet_selection_mask = predict_fillet(gnn_graph, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
+def do_fillet(gnn_graph, brep_edges, data_idx):
+    fillet_selection_mask = predict_fillet(gnn_graph, data_idx)
     # fillet_edge, fillet_amount, selected_prob= whole_process_helper.helper.get_fillet_amount(gnn_graph, fillet_selection_mask, brep_edges)
     output_fillet_edge, selected_prob = whole_process_helper.helper.get_output_fillet_edge(gnn_graph, fillet_selection_mask)
 

@@ -480,16 +480,16 @@ def get_extrude_amount_circle(gnn_graph, sketch_points, extrude_selection_mask):
 
         if torch.norm(point1 - point2) < 1e-3:
             continue
-
+        
         dist1 = torch.norm(point1 - center)
         dist2 = torch.norm(point2 - center)
 
         # Check if one point is approximately on the circle
-        if abs(dist1 - radius) < 5e-5:
+        if abs(dist1 - radius) < 5e-4:
             face_point = point1
             extrude_to_point = point2
             break
-        elif abs(dist2 - radius) < 5e-5:
+        elif abs(dist2 - radius) < 5e-4:
             face_point = point2
             extrude_to_point = point1
             break
