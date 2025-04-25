@@ -244,75 +244,63 @@ def perturb_straight_line(pts):
 
 
 
-def perturb_arc_by_interpolation(pts, t_range=np.pi/2, num_points=None,
-                                  arc_fraction=None, noise_scale_ratio=0.0001,
+def perturb_arc_by_interpolation(pts, arc_fraction=None,
+                                  noise_scale_ratio=0.0001,
                                   endpoint_shift_ratio=0.002):
     """
-    Simulate a human-drawn arc by blending between a circular arc and straight line.
+    Simulate a hand-drawn arc by perturbing the original arc,
+    blending with the straight line, and adding jitter.
 
     Parameters:
-    - pts: (N, 3) original arc polyline
-    - arc_fraction: [0 = straight line, 1 = perfect arc], sampled if None
-    - noise_scale_ratio: interior jitter as fraction of radius
-    - endpoint_shift_ratio: random offset for start/end as fraction of radius
-    - t_range: angular range of the arc (default = 90 degrees)
+    - pts: (N, 3) numpy array of original arc points
+    - arc_fraction: How close to the arc shape (1.0 = pure arc, <1 = more straight)
+    - noise_scale_ratio: interior jitter relative to arc size
+    - endpoint_shift_ratio: how much to shift start/end
 
     Returns:
-    - np.ndarray of shape (num_points, 3): perturbed arc
+    - np.ndarray of perturbed arc
     """
+    import numpy as np
+
     pts = np.array(pts)
-    if num_points is None:
-        num_points = len(pts)
+    num_points = len(pts)
+
+    if num_points < 3:
+        return pts
 
     start = pts[0].copy()
     end = pts[-1].copy()
-    mid = pts[len(pts) // 2]
+    arc_points = pts.copy()
 
-    # Estimate arc plane and radius
-    v1 = mid - start
-    v2 = mid - end
-    normal = np.cross(v1, v2)
-    normal /= np.linalg.norm(normal) + 1e-8
+    # Estimate length and radius for scaling
+    chord_len = np.linalg.norm(end - start)
+    R = chord_len / np.sqrt(2)
 
-    chord = end - start
-    chord_len = np.linalg.norm(chord)
-    R = chord_len / np.sqrt(2)  # assuming 90-degree arc
-
-    # Apply small random shift to start and end BEFORE computing basis
-    start += np.random.normal(scale=R * endpoint_shift_ratio, size=3)
-    end += np.random.normal(scale=R * endpoint_shift_ratio, size=3)
-
-    chord_mid = (start + end) / 2
-    perp = np.cross(normal, chord)
-    perp /= np.linalg.norm(perp) + 1e-8
-    center = chord_mid + R / 2 * perp
-
-    # Local basis (u, v) on the arc plane
-    u = start - center
-    u /= np.linalg.norm(u) + 1e-8
-    v = np.cross(normal, u)
-
-    # Determine curvature strength
+    # Randomize strength
     if arc_fraction is None:
-        arc_fraction = np.random.uniform(0.7, 1.2)
-
-    # Generate arc + straight line blend
+        arc_fraction = np.random.uniform(0.5, 1.3)
     noise_scale = R * noise_scale_ratio
-    t_vals = np.linspace(0, t_range, num_points)
+    endpoint_shift = R * endpoint_shift_ratio
 
-    arc_points = []
-    for j, t in enumerate(t_vals):
-        arc_pt = center + R * (np.cos(t) * u + np.sin(t) * v)
-        line_pt = start + (end - start) * (j / (num_points - 1))
-        pt = (1 - arc_fraction) * line_pt + arc_fraction * arc_pt
+    # Perturb endpoints
+    start += np.random.normal(scale=endpoint_shift, size=3)
+    end += np.random.normal(scale=endpoint_shift, size=3)
 
-        # Add interior wobble
+    # Interpolate from straight line to original arc
+    blended_points = []
+    for j in range(num_points):
+        t = j / (num_points - 1)
+        line_pt = (1 - t) * start + t * end
+        arc_pt = arc_points[j]
+
+        blended = (1 - arc_fraction) * line_pt + arc_fraction * arc_pt
+
         if 0 < j < num_points - 1:
-            pt += np.random.normal(scale=noise_scale, size=3)
+            blended += np.random.normal(scale=noise_scale, size=3)
 
-        arc_points.append(pt)
+        blended_points.append(blended)
 
-    return np.array(arc_points)
+    return np.array(blended_points)
 
 
 def perturb_circle_geometry(pts):
