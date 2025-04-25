@@ -33,7 +33,7 @@ import copy
 import re
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/small', return_data_path=True)
 
 
 # --------------------- Directory --------------------- #
@@ -64,7 +64,7 @@ def compute_start_idx():
 
 # --------------------- Main Code --------------------- #
 data_produced = compute_start_idx()
-data_limit = 1
+data_limit = 2
 if os.path.exists(os.path.join(output_dir, f'data_{data_produced}')):
     shutil.rmtree(os.path.join(output_dir, f'data_{data_produced}'))
 os.makedirs(os.path.join(output_dir, f'data_{data_produced}'), exist_ok=True)

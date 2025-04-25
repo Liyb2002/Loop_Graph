@@ -478,18 +478,18 @@ def get_extrude_amount_circle(gnn_graph, sketch_points, extrude_selection_mask):
         point1 = stroke_feature[:3]
         point2 = stroke_feature[3:6]
 
-        if torch.norm(point1 - point2) < 1e-3:
+        if torch.norm(point1 - point2) < radius * 0.3:
             continue
         
         dist1 = torch.norm(point1 - center)
         dist2 = torch.norm(point2 - center)
 
         # Check if one point is approximately on the circle
-        if abs(dist1 - radius) < 5e-4:
+        if abs(dist1 - radius) < radius * 0.3:
             face_point = point1
             extrude_to_point = point2
             break
-        elif abs(dist2 - radius) < 5e-4:
+        elif abs(dist2 - radius) < radius * 0.3:
             face_point = point2
             extrude_to_point = point1
             break
@@ -513,6 +513,12 @@ def get_extrude_amount_circle(gnn_graph, sketch_points, extrude_selection_mask):
 def dist(p1, p2):
     return np.linalg.norm(np.array(p1) - np.array(p2))
 
+def normalize(vec):
+    norm = np.linalg.norm(vec)
+    if norm == 0:
+        return vec
+    return vec / norm
+
 def get_extrude_amount_circle_fallback(sketch_points, stroke_node_features):
     """
     Fallback method to calculate the extrude amount and direction using sketch circle info
@@ -533,17 +539,20 @@ def get_extrude_amount_circle_fallback(sketch_points, stroke_node_features):
             center2 = np.array(stroke[:3])
             radius2_candidate = stroke[7]
 
-            if abs(radius1 - radius2_candidate) < 1e-5 and dist(center1, center2) > 1e-4:
+            if abs(radius1 - radius2_candidate) < radius1 * 0.3 and dist(center1, center2) > radius1 * 0.3:
                 paired_center = center2
                 radius2 = radius2_candidate
                 break
 
-    if paired_center is None:
-        raise ValueError("No paired circle found.")
+    if paired_center is not None:
+        extrude_amount = dist(center1, paired_center)
+        direction = normalize(paired_center - center1)
+        direction = torch.tensor(direction, dtype=torch.float32)
+        extrude_amount = torch.tensor(extrude_amount, dtype=torch.float32)
+        return extrude_amount * 0.95, direction, 1.0
 
-    # 3) Find the connecting cylinder line (a straight stroke connecting the two circles)
-    face_point = None
-    extrude_to_point = None
+    # 3) If still cannot find the paired, find straight strokes
+    valid_lines = []
 
     for stroke in stroke_node_features:
         stroke_type = stroke[-2]
@@ -551,25 +560,27 @@ def get_extrude_amount_circle_fallback(sketch_points, stroke_node_features):
             point1 = np.array(stroke[:3])
             point2 = np.array(stroke[3:6])
 
-            if (
-                abs(dist(point1, center1) - radius1) < 0.0015 and
-                abs(dist(point2, paired_center) - radius2) < 0.0015
-            ):
-                face_point = point1
-                extrude_to_point = point2
-                break
-            elif (
-                abs(dist(point2, center1) - radius1) < 0.0015 and
-                abs(dist(point1, paired_center) - radius2) < 0.0015
-            ):
-                face_point = point2
-                extrude_to_point = point1
-                break
+            d1 = dist(point1, center1)
+            d2 = dist(point2, center1)
 
-    if face_point is None or extrude_to_point is None:
-        raise ValueError("No suitable connecting stroke found between circles.")
+            if abs(d1 - radius1) < radius1 * 0.15 or abs(d2 - radius1) < radius1 * 0.15:
+                # This is a valid line
+                if d1 < d2:
+                    face_point = point1
+                    extrude_to_point = point2
+                else:
+                    face_point = point2
+                    extrude_to_point = point1
+                valid_lines.append((face_point, extrude_to_point))
 
-    # 4) Compute direction and extrusion amount
+    if not valid_lines:
+        # No valid fallback found
+        return None, None, 0.0
+
+    # 4) Randomly pick one valid line
+    face_point, extrude_to_point = random.choice(valid_lines)
+
+    # 5) Compute direction and extrusion amount
     raw_direction = torch.tensor(extrude_to_point - face_point, dtype=torch.float32)
     extrude_amount = torch.norm(raw_direction)
     direction = raw_direction / extrude_amount

@@ -97,14 +97,14 @@ class parsed_program():
         extrude_amount = Op['operation'][2]
         extrude_direction = np.array(Op['operation'][3])
 
-        if np.allclose(-sketch_face_normal, extrude_direction, atol=1e-5):
+        if np.allclose(-sketch_face_normal, extrude_direction, atol=1e-1):
             extrude_amount = -extrude_amount
 
         
         if self.canvas is None:
             self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
         else:
-            if random.random() < 0.5:
+            if random.random() < 0.4:
                 self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
             else:
                 self.canvas = Preprocessing.proc_CAD.build123.protocol.build_subtract(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
