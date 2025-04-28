@@ -10,19 +10,23 @@ def stroke_node_features_to_polyline(stroke_node_features):
     - feature_id: 0 (for now)
     - geometry: list of 3D points
     - id: unique id per stroke
-    - opacity: random between 0.5 and 0.8
+    - opacity: directly from stroke[6]
     """
     stroke_cloud = build_stroke_cloud_from_node_features(stroke_node_features)
 
     stroke_objects = []
 
     for idx, pts in enumerate(stroke_cloud):
+        opacity = stroke_node_features[idx][6]
+        if opacity < 0.6:
+            opacity = opacity * 0.2
+
         stroke_obj = {
             "type": "feature_line",
             "feature_id": 0,
             "geometry": pts.tolist(),
             "id": idx,
-            "opacity": random.uniform(0.5, 0.8)
+            "opacity": stroke_node_features[idx][6]
         }
         stroke_objects.append(stroke_obj)
 
@@ -68,51 +72,74 @@ def build_stroke_cloud_from_node_features(stroke_node_features,
 
 import numpy as np
 
-def slerp(v0, v1, t):
-    """Spherical linear interpolation."""
-    v0 = v0 / (np.linalg.norm(v0) + 1e-8)
-    v1 = v1 / (np.linalg.norm(v1) + 1e-8)
-
-    dot = np.clip(np.dot(v0, v1), -1.0, 1.0)
-    theta = np.arccos(dot) * t
-    relative_vec = v1 - dot * v0
-    relative_vec /= np.linalg.norm(relative_vec) + 1e-8
-    return np.cos(theta) * v0 + np.sin(theta) * relative_vec
-
-def reconstruct_arc_points(stroke, num_points=10, arc_strength=1.0):
+def reconstruct_arc_points(stroke, num_points=10):
     """
-    arc_strength: 0.0 = straight line
-                  1.0 = full arc
+    Reconstruct a 1/4 circle arc based on center, start, and end points.
+    The arc is axis-aligned (XY, YZ, or XZ plane).
     """
     start = np.array(stroke[0:3])
     end = np.array(stroke[3:6])
     center = np.array(stroke[7:10])
+    
+    # Determine the plane
+    tol = 1e-4
+    if abs(start[0] - center[0]) < tol and abs(end[0] - center[0]) < tol:
+        plane = 'YZ'
+        idx1, idx2 = 1, 2
+        fixed_idx = 0
+    elif abs(start[1] - center[1]) < tol and abs(end[1] - center[1]) < tol:
+        plane = 'XZ'
+        idx1, idx2 = 0, 2
+        fixed_idx = 1
+    elif abs(start[2] - center[2]) < tol and abs(end[2] - center[2]) < tol:
+        plane = 'XY'
+        idx1, idx2 = 0, 1
+        fixed_idx = 2
+    else:
+        raise ValueError("Arc is not axis-aligned.")
 
-    vec_start = start - center
-    vec_end = end - center
+    # Project to 2D plane
+    start_2d = np.array([start[idx1], start[idx2]])
+    center_2d = np.array([center[idx1], center[idx2]])
 
-    vec_start /= np.linalg.norm(vec_start) + 1e-8
-    vec_end /= np.linalg.norm(vec_end) + 1e-8
+    radius = np.linalg.norm(start_2d - center_2d)
 
-    radius = np.linalg.norm(start - center)
+    # Compute starting angle
+    start_angle = np.arctan2(start_2d[1] - center_2d[1], start_2d[0] - center_2d[0])
 
-    t_vals = np.linspace(0, 1, num_points)
+    # Since it's a 1/4 circle, the end angle is start + 90 degrees
+    # But we have to decide CW or CCW depending on end point
 
-    pts = []
-    for t in t_vals:
-        # Interpolate along straight line
-        straight_pt = (1 - t) * start + t * end
+    # Predict two possibilities
+    ccw_end_angle = start_angle + (np.pi / 2)   # +90 degree
+    cw_end_angle  = start_angle - (np.pi / 2)   # -90 degree
 
-        # Interpolate along the arc using SLERP
-        arc_vec = slerp(vec_start, vec_end, t)
-        arc_pt = center + radius * arc_vec
+    # Project end point
+    end_2d = np.array([end[idx1], end[idx2]])
+    target_vec = end_2d - center_2d
 
-        # Mix straight and arc based on arc_strength
-        pt = (1 - arc_strength) * straight_pt + arc_strength * arc_pt
-        pts.append(pt)
+    # Compare which angle (ccw or cw) is closer to the actual end
+    ccw_vec = np.array([np.cos(ccw_end_angle), np.sin(ccw_end_angle)])
+    cw_vec = np.array([np.cos(cw_end_angle), np.sin(cw_end_angle)])
 
-    return np.array(pts)
+    if np.linalg.norm(target_vec/np.linalg.norm(target_vec) - ccw_vec) < np.linalg.norm(target_vec/np.linalg.norm(target_vec) - cw_vec):
+        chosen_end_angle = ccw_end_angle
+    else:
+        chosen_end_angle = cw_end_angle
 
+    # Now sample angles between start and chosen_end_angle
+    angles = np.linspace(start_angle, chosen_end_angle, num_points)
+
+    # Generate points
+    points = []
+    for theta in angles:
+        point_2d = center_2d + radius * np.array([np.cos(theta), np.sin(theta)])
+        point = np.array(center)
+        point[idx1] = point_2d[0]
+        point[idx2] = point_2d[1]
+        points.append(point)
+
+    return np.array(points)
 
 
 

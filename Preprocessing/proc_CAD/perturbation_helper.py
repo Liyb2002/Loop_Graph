@@ -60,7 +60,7 @@ def remove_contained_lines(all_lines, stroke_node_features):
                     break
 
             # Remove if contained or randomly with 20% chance
-            if contained and random.random() < 0.5:
+            if contained:
                 removed_idx.append(i)
 
     # Filter all outputs
@@ -71,6 +71,41 @@ def remove_contained_lines(all_lines, stroke_node_features):
 
     return new_all_lines, new_stroke_node_features
 
+
+
+def remove_contained_lines_opacity(all_lines, stroke_node_features):
+    """
+    For feature strokes (type == 1):
+    - If contained in another stroke, set its opacity to 0
+    - Otherwise, leave it unchanged.
+
+    Returns:
+    - updated_all_lines: all lines (opacity possibly modified)
+    - updated_stroke_node_features: same (no removal)
+    """
+    num_strokes = len(stroke_node_features)
+
+    for i in range(num_strokes):
+        stroke_i = stroke_node_features[i]
+
+        if stroke_i[-1] == 1:
+            contained = False
+            for j in range(num_strokes):
+                if i == j:
+                    continue
+                stroke_j = stroke_node_features[j]
+                if stroke_is_contained(stroke_i, stroke_j):
+                    contained = True
+                    break
+
+            if contained:
+                # Set opacity to 0 in all_lines
+                if i < len(all_lines):
+                    all_lines[i]["opacity"] = 0.0
+                # Also set opacity to 0 in stroke_node_features
+                stroke_node_features[i][6] = 0.0
+
+    return all_lines, stroke_node_features
 
 
 
@@ -206,6 +241,13 @@ def perturb_straight_line(pts):
         return pts
 
     # Randomize perturbation strengths
+
+    # For Synthetic
+    point_jitter_ratio = np.random.uniform(0.002, 0.005)
+    endpoint_shift_ratio = np.random.uniform(0.002, 0.005)
+    overdraw_ratio = np.random.uniform(0.005, 0.01)
+
+    # For cad2sketch
     point_jitter_ratio = np.random.uniform(0.002, 0.005)
     endpoint_shift_ratio = np.random.uniform(0.01, 0.05)
     overdraw_ratio = np.random.uniform(0.001, 0.2)

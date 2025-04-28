@@ -116,6 +116,9 @@ class parsed_program():
         
         
         target_output_edge = Op['operation'][1]
+        if len(Op['operation']) > 5:
+            target_output_edge = Op['operation'][-1]
+            
         target_edge, fillet_amount = Preprocessing.proc_CAD.helper.get_fillet_amount(target_output_edge, self.canvas.edges())
 
 

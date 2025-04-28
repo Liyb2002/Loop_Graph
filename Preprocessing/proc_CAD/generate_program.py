@@ -117,21 +117,23 @@ class Brep:
 
         # For dataset generation process
         if extrude_amount is None:
-            amount = Preprocessing.proc_CAD.random_gen.generate_random_extrude()
+            extrude_amount = Preprocessing.proc_CAD.random_gen.generate_random_extrude()
             safe_amount = -self.safe_extrude_check()
-            if amount <0:
-                amount = max(amount, safe_amount)
+            if extrude_amount <0:
+                extrude_amount = max(extrude_amount, safe_amount)
 
             if self.idx < 2:
-                amount = abs(amount)
+                extrude_amount = abs(extrude_amount)
 
             for i, vertex in enumerate(sketch_face.vertices):
 
-                new_pos = [vertex.position[j] + sketch_face_opposite_normal[j] * amount for j in range(3)]
+                new_pos = [vertex.position[j] + sketch_face_opposite_normal[j] * extrude_amount for j in range(3)]
                 vertex_id = f"vertex_{self.idx}_{i}"
                 new_vertex = Vertex(vertex_id, new_pos)
                 self.Vertices.append(new_vertex)
                 new_vertices.append(new_vertex)
+            
+            extrude_direction = np.array([0,0,0])
 
         else:
             for i, sketch_face_vert in enumerate(sketch_face.vertices):
@@ -199,7 +201,7 @@ class Brep:
 
             amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
             safe_amount = self.safe_fillet_check([vert.position for vert in target_edge.vertices])
-            amount = min(amount * 0.5, safe_amount * 0.5)
+            amount = min(amount, safe_amount * 0.8)
 
             
             target_edge.disable_fillet()
@@ -255,13 +257,15 @@ class Brep:
 
             self.idx += 1
             self.op.append(['fillet', 
-                            target_edge.id, 
-                            {'amount': amount}, 
-                            {'old_verts_pos': verts_pos},
-                            {'verts_id': verts_id},
-                            {'arc_0': arc_0},
-                            {'arc_1': arc_1},
-                            ])
+                    target_edge.id, 
+                    {'amount': amount}, 
+                    {'old_verts_pos': verts_pos},
+                    {'verts_id': verts_id},
+                    {'arc_0': arc_0},
+                    {'arc_1': arc_1},
+                    new_A+new_B
+                    ])
+
         
 
     def random_chamfer(self, target_edge_tensor = None, amount = 0):
@@ -285,7 +289,7 @@ class Brep:
         if amount == 0:
             amount = Preprocessing.proc_CAD.random_gen.generate_random_fillet()
             safe_amount = self.safe_fillet_check([vert.position for vert in target_edge.vertices])
-            amount = min(amount * 0.5, safe_amount * 0.5)
+            amount = min(amount, safe_amount * 0.9)
 
 
         target_edge.disable_fillet()

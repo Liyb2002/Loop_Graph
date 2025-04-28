@@ -15,6 +15,7 @@ from pathlib import Path
 
 import Preprocessing.cad2sketch_stroke_features
 import Preprocessing.perturb_stroke_cloud_reverse
+import Preprocessing.proc_CAD.perturbation_helper
 
 class perturbation_dataset_loader(Dataset):
     def __init__(self):
@@ -31,7 +32,7 @@ class perturbation_dataset_loader(Dataset):
 
 
     def do_perturbation(self):
-        for dir in self.data_dirs:
+        for dir in tqdm(self.data_dirs, desc="Perturbing data"):
             shape_info_dir = os.path.join(self.data_path, dir, 'shape_info')
             pattern = re.compile(r'shape_info_(\d+)\.pkl')
 
@@ -55,9 +56,24 @@ class perturbation_dataset_loader(Dataset):
                 base_shape_data = pickle.load(f)
             
             stroke_node_features = base_shape_data['stroke_node_features']
-            stroke_cloud = Preprocessing.perturb_stroke_cloud_reverse.stroke_node_features_to_polyline(stroke_node_features)
+            try:
+                stroke_cloud = Preprocessing.perturb_stroke_cloud_reverse.stroke_node_features_to_polyline(stroke_node_features)
+                stroke_cloud, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.remove_contained_lines_opacity(stroke_cloud, stroke_node_features)
+                perturbed_all_lines = Preprocessing.proc_CAD.perturbation_helper.do_perturb(stroke_cloud, stroke_node_features)
+            except Exception as e:
+                # print(f"Error during perturbation for {dir}")
+                dir_to_remove = os.path.join(self.data_path, dir)
+                shutil.rmtree(dir_to_remove)
+                continue
+            
+
+            perturbed_output_path = os.path.join(self.data_path, dir, 'perturbed_all_lines.json')
+            # print(f"Success Perturb {dir}")
+            with open(perturbed_output_path, 'w') as f:
+                json.dump(perturbed_all_lines, f, indent=4)
+
             # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
-            Preprocessing.cad2sketch_stroke_features.vis_feature_lines(stroke_cloud)
+            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(perturbed_all_lines)
 
 
 

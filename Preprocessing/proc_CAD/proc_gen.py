@@ -19,7 +19,7 @@ def random_program(data_directory = None):
 
 
     #random gen for n steps
-    steps = random.randint(1, 3)
+    steps = random.randint(2, 5)
     for _ in range(steps - 1):
         canvas_class.regular_sketch_op()
         canvas_class.extrude_op()
