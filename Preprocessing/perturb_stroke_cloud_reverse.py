@@ -66,29 +66,49 @@ def build_stroke_cloud_from_node_features(stroke_node_features,
 
 
 
-def reconstruct_arc_points(stroke, num_points=10):
+import numpy as np
+
+def slerp(v0, v1, t):
+    """Spherical linear interpolation."""
+    v0 = v0 / (np.linalg.norm(v0) + 1e-8)
+    v1 = v1 / (np.linalg.norm(v1) + 1e-8)
+
+    dot = np.clip(np.dot(v0, v1), -1.0, 1.0)
+    theta = np.arccos(dot) * t
+    relative_vec = v1 - dot * v0
+    relative_vec /= np.linalg.norm(relative_vec) + 1e-8
+    return np.cos(theta) * v0 + np.sin(theta) * relative_vec
+
+def reconstruct_arc_points(stroke, num_points=10, arc_strength=1.0):
+    """
+    arc_strength: 0.0 = straight line
+                  1.0 = full arc
+    """
     start = np.array(stroke[0:3])
     end = np.array(stroke[3:6])
-    center = np.array(stroke[7:10])  # <-- correct indexing
+    center = np.array(stroke[7:10])
 
-    # Vectors from center to start and center to end
     vec_start = start - center
     vec_end = end - center
 
-    # Normalize them
     vec_start /= np.linalg.norm(vec_start) + 1e-8
     vec_end /= np.linalg.norm(vec_end) + 1e-8
 
     radius = np.linalg.norm(start - center)
 
-    # Create interpolation between vec_start and vec_end
     t_vals = np.linspace(0, 1, num_points)
 
     pts = []
     for t in t_vals:
-        vec = (1 - t) * vec_start + t * vec_end
-        vec /= np.linalg.norm(vec) + 1e-8
-        pt = center + radius * vec
+        # Interpolate along straight line
+        straight_pt = (1 - t) * start + t * end
+
+        # Interpolate along the arc using SLERP
+        arc_vec = slerp(vec_start, vec_end, t)
+        arc_pt = center + radius * arc_vec
+
+        # Mix straight and arc based on arc_strength
+        pt = (1 - arc_strength) * straight_pt + arc_strength * arc_pt
         pts.append(pt)
 
     return np.array(pts)
