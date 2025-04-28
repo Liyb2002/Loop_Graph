@@ -195,8 +195,8 @@ class Particle():
 
             # if len(self.past_programs) == 5:
             #     Encoders.helper.vis_brep(self.brep_edges)
-            #     used_indices = np.where(stroke_to_edge > 0.5)[0].tolist()
-            #     Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), used_indices, self.data_idx)
+            used_indices = np.where(stroke_to_edge > 0.5)[0].tolist()
+            # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), used_indices, self.data_idx)
 
             if self.mark_off_new_strokes(stroke_to_edge, stroke_to_edge_circle) == False:
                 print("No new feature added")
@@ -513,7 +513,7 @@ def predict_fillet(gnn_graph, data_idx):
     # _, fillet_stroke_idx = torch.max(fillet_selection_mask, dim=0)
 
     # print("gnn_graph['stroke'].x", gnn_graph['stroke'].x.shape)
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
+    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
     return fillet_selection_mask
 
 

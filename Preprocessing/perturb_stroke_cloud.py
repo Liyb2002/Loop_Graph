@@ -108,7 +108,7 @@ class perturbation_dataset_loader(Dataset):
         all_lines = Preprocessing.proc_CAD.perturbation_helper.compute_opacity(all_lines)
 
         perturbed_all_lines = Preprocessing.proc_CAD.perturbation_helper.do_perturb(all_lines, stroke_node_features)
-        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(perturbed_all_lines)
+        Preprocessing.cad2sketch_stroke_features.vis_feature_lines(perturbed_all_lines)
 
         perturbed_output_path = os.path.join(subfolder_path, 'perturbed_all_lines.json')
 
