@@ -52,62 +52,71 @@ def build_stroke_cloud_from_node_features(stroke_node_features,
             end = stroke[3:6]
             pts = np.linspace(start, end, num_points_straight)
 
-            jitter = np.random.normal(scale=0.01 * np.linalg.norm(end - start), size=pts.shape)
-            pts[1:-1] += jitter[1:-1]  # Only jitter interior points
             stroke_cloud.append(pts)
 
         elif stroke_type == 3:  # Arc
             pts = reconstruct_arc_points(stroke, num_points=num_points_arc)
-            # pts = perturb_arc_by_interpolation(pts)
             stroke_cloud.append(pts)
 
         elif stroke_type == 2:  # Circle
             pts = reconstruct_circle_points(stroke, num_points=num_points_circle)
-            # pts = perturb_circle_geometry(pts)
             stroke_cloud.append(pts)
 
     return stroke_cloud
 
 
+
 def reconstruct_arc_points(stroke, num_points=10):
     start = np.array(stroke[0:3])
     end = np.array(stroke[3:6])
+    center = np.array(stroke[7:10])  # <-- correct indexing
 
-    chord = end - start
-    chord_mid = (start + end) / 2
-    radius = np.linalg.norm(chord) / np.sqrt(2)
+    # Vectors from center to start and center to end
+    vec_start = start - center
+    vec_end = end - center
 
-    normal = np.cross(start - chord_mid, end - chord_mid)
-    normal /= np.linalg.norm(normal) + 1e-8
+    # Normalize them
+    vec_start /= np.linalg.norm(vec_start) + 1e-8
+    vec_end /= np.linalg.norm(vec_end) + 1e-8
 
-    perp = np.cross(normal, chord)
-    perp /= np.linalg.norm(perp) + 1e-8
-    center = chord_mid + radius / 2 * perp
+    radius = np.linalg.norm(start - center)
 
-    u = start - center
-    u /= np.linalg.norm(u) + 1e-8
-    v = np.cross(normal, u)
-
-    t_vals = np.linspace(0, np.pi/2, num_points)
+    # Create interpolation between vec_start and vec_end
+    t_vals = np.linspace(0, 1, num_points)
 
     pts = []
     for t in t_vals:
-        pt = center + radius * (np.cos(t) * u + np.sin(t) * v)
+        vec = (1 - t) * vec_start + t * vec_end
+        vec /= np.linalg.norm(vec) + 1e-8
+        pt = center + radius * vec
         pts.append(pt)
 
     return np.array(pts)
 
+
+
+
 def reconstruct_circle_points(stroke, num_points=20):
     center = np.array(stroke[0:3])
+    normal = np.array(stroke[3:6])
     radius = stroke[7]
 
-    t_vals = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
+    # Normalize the normal vector
+    normal = normal / np.linalg.norm(normal)
 
+    # Find two orthogonal vectors in the circle's plane
+    if np.allclose(normal, [0, 0, 1]):
+        u = np.array([1, 0, 0])
+    else:
+        u = np.cross(normal, [0, 0, 1])
+        u /= np.linalg.norm(u)
+    v = np.cross(normal, u)
+
+    t_vals = np.linspace(0, 2 * np.pi, num_points, endpoint=False)
     pts = []
+
     for t in t_vals:
-        x = center[0] + radius * np.cos(t)
-        y = center[1] + radius * np.sin(t)
-        z = center[2]
-        pts.append([x, y, z])
+        point = center + radius * (np.cos(t) * u + np.sin(t) * v)
+        pts.append(point)
 
     return np.array(pts)
