@@ -73,9 +73,9 @@ def remove_contained_lines(all_lines, stroke_node_features):
 
 
 
-def remove_contained_lines_opacity(all_lines, stroke_node_features):
+def remove_contained_lines_opacity(all_lines, stroke_node_features, is_feature_lines):
     """
-    For feature strokes (type == 1):
+    For NON-feature strokes (type == 0):
     - If contained in another stroke, set its opacity to 0
     - Otherwise, leave it unchanged.
 
@@ -88,7 +88,8 @@ def remove_contained_lines_opacity(all_lines, stroke_node_features):
     for i in range(num_strokes):
         stroke_i = stroke_node_features[i]
 
-        if stroke_i[-1] == 1:
+        # Check if NOT a feature line
+        if is_feature_lines[i][0] == 0:  
             contained = False
             for j in range(num_strokes):
                 if i == j:
@@ -107,6 +108,23 @@ def remove_contained_lines_opacity(all_lines, stroke_node_features):
 
     return all_lines, stroke_node_features
 
+
+def remove_random_lines(all_lines, stroke_node_features, is_feature_lines):
+    """
+    Randomly removes (sets opacity = 0) for non-feature lines with 50% probability.
+
+    Args:
+        all_lines: list of stroke objects.
+        stroke_node_features: array containing node features, where opacity is at index 6.
+        is_feature_lines: array of shape (num_strokes, 1), 1 if feature line else 0.
+    """
+    for idx, line in enumerate(all_lines):
+        if is_feature_lines[idx][0] == 0:  # If not a feature line
+            if np.random.rand() < 0.5:  # 50% chance
+                line["opacity"] = 0.1
+                stroke_node_features[idx][6] = 0.1  # Also update in node features if needed
+
+    return all_lines, stroke_node_features
 
 
 def duplicate_lines(all_lines, stroke_node_features):
@@ -243,14 +261,14 @@ def perturb_straight_line(pts):
     # Randomize perturbation strengths
 
     # For Synthetic
-    point_jitter_ratio = np.random.uniform(0.002, 0.005)
-    endpoint_shift_ratio = np.random.uniform(0.002, 0.005)
-    overdraw_ratio = np.random.uniform(0.005, 0.01)
+    point_jitter_ratio = np.random.uniform(0.001, 0.003)
+    endpoint_shift_ratio = np.random.uniform(0.01, 0.03)
+    overdraw_ratio = np.random.uniform(0.006, 0.1)
 
     # For cad2sketch
-    point_jitter_ratio = np.random.uniform(0.002, 0.005)
-    endpoint_shift_ratio = np.random.uniform(0.01, 0.05)
-    overdraw_ratio = np.random.uniform(0.001, 0.2)
+    # point_jitter_ratio = np.random.uniform(0.002, 0.005)
+    # endpoint_shift_ratio = np.random.uniform(0.01, 0.05)
+    # overdraw_ratio = np.random.uniform(0.001, 0.2)
 
     point_jitter = point_jitter_ratio * stroke_length
     endpoint_shift = endpoint_shift_ratio * stroke_length

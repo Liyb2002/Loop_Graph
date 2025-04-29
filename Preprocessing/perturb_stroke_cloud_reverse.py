@@ -1,32 +1,37 @@
 import random
 import numpy as np
 
-def stroke_node_features_to_polyline(stroke_node_features):
+import random
+
+def stroke_node_features_to_polyline(stroke_node_features, is_feature_line):
     """
     Convert stroke_node_features into a list of stroke objects (polyline format).
 
     Each stroke object has:
-    - type: "feature_line"
+    - type: "feature_line" or "normal_line"
     - feature_id: 0 (for now)
     - geometry: list of 3D points
     - id: unique id per stroke
-    - opacity: directly from stroke[6]
+    - opacity: random in [0.6, 0.8] for feature lines, [0.1, 0.3] otherwise
     """
     stroke_cloud = build_stroke_cloud_from_node_features(stroke_node_features)
 
     stroke_objects = []
 
     for idx, pts in enumerate(stroke_cloud):
-        opacity = stroke_node_features[idx][6]
-        if opacity < 0.6:
-            opacity = opacity * 0.2
+        if is_feature_line[idx][0] == 1:
+            opacity = random.uniform(0.6, 0.8)
+            stroke_type = "feature_line"
+        else:
+            opacity = random.uniform(0.1, 0.3)
+            stroke_type = "normal_line"
 
         stroke_obj = {
-            "type": "feature_line",
+            "type": stroke_type,
             "feature_id": 0,
             "geometry": pts.tolist(),
             "id": idx,
-            "opacity": stroke_node_features[idx][6]
+            "opacity": opacity
         }
         stroke_objects.append(stroke_obj)
 

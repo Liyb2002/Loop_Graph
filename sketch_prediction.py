@@ -28,7 +28,7 @@ optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.par
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
+save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction_synthetic')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -126,7 +126,7 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch, dat
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -200,7 +200,7 @@ def train():
             continue
         # Encoders.helper.vis_brep(output_brep_edges)
         # print("num_selected", num_selected)
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes, data_idx)
+        Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes, data_idx)
         # Encoders.helper. vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), stroke_cloud_loops)
 
         # Prepare the pair

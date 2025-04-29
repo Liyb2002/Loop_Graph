@@ -846,6 +846,26 @@ def bbox_useIntersections(stroke_node_features):
 
 
 
+def same_bbox(brep_bbox, stroke_cloud_bbox):
+    keys = ['x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max']
+    
+    # Compute diagonal size of brep_bbox as a reference scale
+    dx = abs(brep_bbox['x_max'] - brep_bbox['x_min'])
+    dy = abs(brep_bbox['y_max'] - brep_bbox['y_min'])
+    dz = abs(brep_bbox['z_max'] - brep_bbox['z_min'])
+    
+    tolerance_dist = 0.3 * max(dx, dy, dz)  # tolerance is 30% of largest axis
+
+    for key in keys:
+        val1 = brep_bbox[key]
+        val2 = stroke_cloud_bbox[key]
+
+        if abs(val1 - val2) > tolerance_dist:
+            return False
+
+    return True
+    
+
 def line_segments_intersect_3d(p1, p2, q1, q2, epsilon=1e-5):
     """
     Finds intersection point of two 3D line segments if they intersect (within epsilon).
@@ -2282,6 +2302,90 @@ def vis_stroke_node_features_and_highlights(stroke_node_features, added_feature_
     # Show plot
     plt.show()
 
+
+
+
+def vis_stroke_node_features_only_feature_lines(stroke_node_features, is_feature_lines):
+    # Initialize the 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.grid(False)
+    ax.axis('off')  # Turn off axis background and borders
+
+    # Initialize min and max limits
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    perturb_factor = 0.000002  # Adjusted perturbation factor for hand-drawn effect
+
+    # Plot only feature line strokes
+    for idx, (stroke, is_feature) in enumerate(zip(stroke_node_features, is_feature_lines)):
+        if not is_feature:
+            continue  # Skip non-feature lines
+
+        start, end = stroke[:3], stroke[3:6]
+
+        # Update min and max limits based on strokes (ignoring circles)
+        if stroke[-1] == 1:
+            # straight line
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+        
+        if stroke[-1] == 2:
+            # Circle face
+            x_values, y_values, z_values = plot_circle(stroke)
+            ax.plot(x_values, y_values, z_values, color='red', alpha=1, linewidth=0.5)
+            continue
+
+        if stroke[-1] == 3:
+            # Arc
+            x_values, y_values, z_values = plot_arc(stroke)
+            ax.plot(x_values, y_values, z_values, color='blue', alpha=1, linewidth=0.5)
+            continue
+
+        else:
+            # Hand-drawn effect for regular stroke line
+            x_values = np.array([start[0], end[0]])
+            y_values = np.array([start[1], end[1]])
+            z_values = np.array([start[2], end[2]])
+            
+            # Add perturbations for hand-drawn effect
+            perturbations = np.random.normal(0, perturb_factor, (10, 3))
+            t = np.linspace(0, 1, 10)
+            x_interpolated = np.linspace(x_values[0], x_values[1], 10) + perturbations[:, 0]
+            y_interpolated = np.linspace(y_values[0], y_values[1], 10) + perturbations[:, 1]
+            z_interpolated = np.linspace(z_values[0], z_values[1], 10) + perturbations[:, 2]
+
+            # Smooth curve with cubic splines
+            cs_x = CubicSpline(t, x_interpolated)
+            cs_y = CubicSpline(t, y_interpolated)
+            cs_z = CubicSpline(t, z_interpolated)
+            smooth_t = np.linspace(0, 1, 100)
+            smooth_x = cs_x(smooth_t)
+            smooth_y = cs_y(smooth_t)
+            smooth_z = cs_z(smooth_t)
+
+            # Plot perturbed line
+            ax.plot(smooth_x, smooth_y, smooth_z, color='black', alpha=1, linewidth=0.5)
+
+    # Compute the center and rescale
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # Remove axis ticks and labels
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+
+    # Show plot
+    plt.show()
 
 
 def vis_points(unique_points):

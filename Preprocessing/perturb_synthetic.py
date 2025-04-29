@@ -55,18 +55,42 @@ class perturbation_dataset_loader(Dataset):
             with open(full_path, 'rb') as f:
                 base_shape_data = pickle.load(f)
             
+
+            brep_folder_path = os.path.join(self.data_path, dir, 'canvas')
+            if os.path.exists(brep_folder_path) and os.path.isdir(brep_folder_path):
+                step_files = [f for f in os.listdir(brep_folder_path) if f.endswith('.step')]
+                step_files.sort(key=lambda x: int(re.search(r'step_(\d+)\.step', x).group(1)) if re.search(r'step_(\d+)\.step', x) else float('inf'))
+
+            stroke_operations_order_matrix = torch.tensor(base_shape_data['stroke_operations_order_matrix'], dtype=torch.float32)
             stroke_node_features = base_shape_data['stroke_node_features']
+            
+            is_feature_lines = (stroke_operations_order_matrix == 1).any(dim=1).int().unsqueeze(1)
+
+
             try:
-                stroke_cloud = Preprocessing.perturb_stroke_cloud_reverse.stroke_node_features_to_polyline(stroke_node_features)
-                stroke_cloud, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.remove_contained_lines_opacity(stroke_cloud, stroke_node_features)
+                stroke_cloud = Preprocessing.perturb_stroke_cloud_reverse.stroke_node_features_to_polyline(stroke_node_features, is_feature_lines)
+                stroke_cloud, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.remove_contained_lines_opacity(stroke_cloud, stroke_node_features, is_feature_lines)
+                # stroke_cloud, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.remove_random_lines(stroke_cloud, stroke_node_features, is_feature_lines)
                 perturbed_all_lines = Preprocessing.proc_CAD.perturbation_helper.do_perturb(stroke_cloud, stroke_node_features)
+            
+            
+                edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_files[-1]))
+                brep_bbox, _= Preprocessing.cad2sketch_stroke_features.bbox(edge_features_list)
+                stroke_cloud_bbox, _= Preprocessing.cad2sketch_stroke_features.bbox(stroke_node_features)
+                if not Preprocessing.cad2sketch_stroke_features.same_bbox(brep_bbox, stroke_cloud_bbox):
+                    # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(perturbed_all_lines)
+                    dir_to_remove = os.path.join(self.data_path, dir)
+                    shutil.rmtree(dir_to_remove)
+                    continue
+
+
             except Exception as e:
                 # print(f"Error during perturbation for {dir}")
                 dir_to_remove = os.path.join(self.data_path, dir)
                 shutil.rmtree(dir_to_remove)
                 continue
             
-
+            
             perturbed_output_path = os.path.join(self.data_path, dir, 'perturbed_all_lines.json')
             # print(f"Success Perturb {dir}")
             with open(perturbed_output_path, 'w') as f:
@@ -74,6 +98,7 @@ class perturbation_dataset_loader(Dataset):
 
             # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
             # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(perturbed_all_lines)
+            # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_only_feature_lines(stroke_node_features, is_feature_lines)
 
 
 
