@@ -164,3 +164,57 @@ def compute_fidelity_score(gt_brep_path, output_brep_path, matrix_path, strict =
     except Exception as e:
         print(f"Error computing fidelity score: {e}")
         return 0
+
+
+
+def compute_fidelity_direct(gt_brep_path, output_brep_path, strict = False, sample_density=250, tolerance=1e-5):
+    """
+    Computes the fidelity score based on Chamfer distances between two BREP files.
+    """
+    try:
+        # Read shapes
+        if not Path(gt_brep_path).exists():
+            return 0
+        
+        gt_shape = read_step(gt_brep_path)
+        output_shape = read_step(output_brep_path)
+
+
+        if gt_shape is None or output_shape is None:
+            print("Invalid shape detected, skipping fidelity computation.")
+            return 0
+
+        # Sample points
+        gt_points = sample_points_from_shape(gt_shape, tolerance, sample_density)
+        output_points = sample_points_from_shape(output_shape, tolerance, sample_density)
+
+        if gt_points.shape[0] == 0 or output_points.shape[0] == 0:
+            print("Insufficient points sampled, skipping fidelity computation.")
+            return 0
+
+        bbox_scale = compute_bbox_scale(gt_shape)
+
+        # Compute directional Chamfer distances
+        gt_to_output = chamfer_distance(gt_points, output_points, bbox_scale)
+        output_to_gt = chamfer_distance(output_points, gt_points, bbox_scale)
+
+        # print("gt_to_output", gt_to_output)
+        # print("output_to_gt", output_to_gt)
+
+        # Normalize distances using bounding box scale
+        norm_gt_to_output = gt_to_output / bbox_scale
+        norm_output_to_gt = output_to_gt / bbox_scale
+
+        # print(f"bbox_scale = {bbox_scale}")
+        # print(f"normalized gt_to_output = {norm_gt_to_output}")
+        # print(f"normalized output_to_gt = {norm_output_to_gt}")
+
+        fidelity_score = min(1, 3 / (1 + norm_gt_to_output + norm_output_to_gt))
+
+        if strict:
+            fidelity_score = 1 / (1 + gt_to_output * 1000 + output_to_gt * 1000)
+
+        return fidelity_score
+    except Exception as e:
+        print(f"Error computing fidelity score: {e}")
+        return 0

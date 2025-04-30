@@ -200,7 +200,7 @@ def train():
             continue
         # Encoders.helper.vis_brep(output_brep_edges)
         # print("num_selected", num_selected)
-        Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes, data_idx)
+        # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes, data_idx)
         # Encoders.helper. vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), stroke_cloud_loops)
 
         # Prepare the pair

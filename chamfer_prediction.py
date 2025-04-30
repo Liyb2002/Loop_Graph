@@ -30,7 +30,7 @@ batch_size = 16
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction')
+save_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction_synthetic')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -121,11 +121,11 @@ def compute_accuracy_eval_whole(valid_output, valid_batch_masks, hetero_batch):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0
-    epochs = 30
+    epochs = 50
 
     graphs = []
     stroke_selection_masks = []
@@ -133,7 +133,7 @@ def train():
     # Preprocess and build the graphs
     for data in tqdm(dataset, desc=f"Building Graphs"):
         # Extract the necessary elements from the dataset
-        program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
+        data_idx, program, program_whole, stroke_cloud_loops, stroke_node_features, strokes_perpendicular, output_brep_edges, stroke_operations_order_matrix, loop_neighboring_vertical, loop_neighboring_horizontal,loop_neighboring_contained, stroke_to_loop, stroke_to_edge = data
 
         if program[-1] != 'chamfer'or len(program) > stroke_operations_order_matrix.shape[1]:
             continue
@@ -161,7 +161,7 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
+        # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx, data_idx)
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -383,4 +383,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

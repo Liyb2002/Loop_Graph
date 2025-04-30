@@ -400,12 +400,10 @@ class Particle():
                     max_index = index
                     latest_step_file = os.path.join(canvas_dir, filename)
 
-            matrix_dir = Path(self.gt_brep_file_path).parent / "matrix.json"
             if latest_step_file:
-                self.true_value = fidelity_score.compute_fidelity_score(
+                self.true_value = fidelity_score.compute_fidelity_direct(
                     self.gt_brep_file_path,
                     latest_step_file,
-                    matrix_dir,
                     True,
                     30
                 )
@@ -442,7 +440,8 @@ sketch_graph_encoder = Encoders.gnn.gnn.SemanticModule()
 sketch_graph_decoder = Encoders.gnn.gnn.Sketch_Decoder()
 sketch_graph_encoder.eval()
 sketch_graph_decoder.eval()
-sketch_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
+# sketch_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
+sketch_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction_synthetic')
 sketch_graph_encoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_encoder.pth'), weights_only=True))
 sketch_graph_decoder.load_state_dict(torch.load(os.path.join(sketch_dir, 'graph_decoder.pth'), weights_only=True))
 
@@ -468,7 +467,8 @@ def do_sketch(gnn_graph, data_idx):
 # --------------------- Extrude Network --------------------- #
 extrude_graph_encoder = Encoders.gnn.gnn.SemanticModule()
 extrude_graph_decoder = Encoders.gnn.gnn.Extrude_Decoder()
-extrude_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction')
+# extrude_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction')
+extrude_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction_synthetic')
 extrude_graph_encoder.eval()
 extrude_graph_decoder.eval()
 extrude_graph_encoder.load_state_dict(torch.load(os.path.join(extrude_dir, 'graph_encoder.pth'), weights_only=True))
@@ -495,7 +495,8 @@ def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges, data
 # --------------------- Fillet Network --------------------- #
 fillet_graph_encoder = Encoders.gnn.gnn.SemanticModule()
 fillet_graph_decoder = Encoders.gnn.gnn.Fillet_Decoder()
-fillet_dir = os.path.join(current_dir, 'checkpoints', 'fillet_prediction')
+# fillet_dir = os.path.join(current_dir, 'checkpoints', 'fillet_prediction')
+fillet_dir = os.path.join(current_dir, 'checkpoints', 'fillet_prediction_synthetic')
 fillet_graph_encoder.eval()
 fillet_graph_decoder.eval()
 fillet_graph_encoder.load_state_dict(torch.load(os.path.join(fillet_dir, 'graph_encoder.pth'), weights_only=True))
@@ -513,7 +514,7 @@ def predict_fillet(gnn_graph, data_idx):
     # _, fillet_stroke_idx = torch.max(fillet_selection_mask, dim=0)
 
     # print("gnn_graph['stroke'].x", gnn_graph['stroke'].x.shape)
-    Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
+    # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
     return fillet_selection_mask
 
 
@@ -531,7 +532,8 @@ def do_fillet(gnn_graph, brep_edges, data_idx):
 # --------------------- Chamfer Network --------------------- #
 chamfer_graph_encoder = Encoders.gnn.gnn.SemanticModule()
 chamfer_graph_decoder = Encoders.gnn.gnn.Chamfer_Decoder()
-chanfer_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction')
+# chanfer_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction')
+chanfer_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction_synthetic')
 chamfer_graph_encoder.eval()
 chamfer_graph_decoder.eval()
 chamfer_graph_encoder.load_state_dict(torch.load(os.path.join(chanfer_dir, 'graph_encoder.pth'), weights_only=True))
@@ -548,7 +550,7 @@ def predict_chamfer(gnn_graph):
     # chamfer_stroke_idx =  (chamfer_selection_mask >= 0.3).nonzero(as_tuple=True)[0]
     # _, chamfer_stroke_idx = torch.topk(chamfer_selection_mask.flatten(), k=2)
     _, chamfer_stroke_idx = torch.max(chamfer_selection_mask, dim=0)
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
+    # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), chamfer_stroke_idx)
     
     return chamfer_selection_mask
 
