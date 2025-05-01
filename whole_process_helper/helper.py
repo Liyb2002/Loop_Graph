@@ -287,14 +287,12 @@ def points_fit_to_plane(ordered_points_tensor):
 
 # --------------------------------------------------------------------------- #
 
-import torch
-import torch.nn.functional as F
 
 def get_extrude_amount_from_extrude_face(gnn_graph, extruded_face_stroke_idx, sketch_face_stroke_idx, sketch_points):
     stroke_features = gnn_graph['stroke'].x  # (N, 12) where only [:6] are valid
 
     if sketch_points.shape[0] == 1:
-        return None
+        return get_extrude_amount_circle_from_extrude_face(stroke_features, sketch_points, extruded_face_stroke_idx)
 
     # Ensure index tensors
     extruded_idx_tensor = torch.tensor(extruded_face_stroke_idx, dtype=torch.long)
@@ -326,6 +324,46 @@ def get_extrude_amount_from_extrude_face(gnn_graph, extruded_face_stroke_idx, sk
     selected_prob = 1.0
 
     return amount, direction_normalized, selected_prob
+
+
+def get_extrude_amount_circle_from_extrude_face(stroke_features, sketch_points, extruded_face_stroke_idx):
+    center = sketch_points[0][:3]  # Assuming the first row corresponds to the circle and [:3] gives the center
+    radius = sketch_points[0][7]
+
+
+    for idx in extruded_face_stroke_idx:
+        stroke_feature = stroke_features[idx]
+        point1 = stroke_feature[:3]
+        point2 = stroke_feature[3:6]
+
+        if torch.norm(point1 - point2) < radius * 0.3:
+            continue
+        
+        dist1 = torch.norm(point1 - center)
+        dist2 = torch.norm(point2 - center)
+
+        # Check if one point is approximately on the circle
+        if abs(dist1 - radius) < radius * 0.3:
+            face_point = point1
+            extrude_to_point = point2
+            break
+        elif abs(dist2 - radius) < radius * 0.3:
+            face_point = point2
+            extrude_to_point = point1
+            break
+    else:
+        # fallback
+        return get_extrude_amount_circle_fallback(sketch_points, stroke_features)
+    
+    # Compute the direction and amount
+    raw_direction = extrude_to_point - face_point
+    extrude_amount = torch.norm(raw_direction)
+
+    direction = raw_direction / extrude_amount.item()
+
+    return extrude_amount, direction, 1.0
+
+
 
 
 def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges):
