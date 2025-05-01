@@ -22,6 +22,25 @@ def get_kth_operation(op_to_index_matrix, k):
 
 
 
+def get_extruded_face(kth_operation, extrude_strokes, stroke_cloud_loops):
+    # kth_operation and extrude_strokes are assumed to be numpy arrays with shape (num_strokes, 1)
+
+    extruded_face_mask = (kth_operation == 1) & (extrude_strokes < 0.5)
+    
+    chosen_strokes = (extruded_face_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen stroke
+    loop_chosen_mask = []
+    for loop in stroke_cloud_loops:
+        if all(stroke in chosen_strokes for stroke in loop):
+            loop_chosen_mask.append(1)  # Loop is chosen
+        else:
+            loop_chosen_mask.append(0)  # Loop is not chosen
+    
+    
+    loop_chosen_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).flatten()
+    
+    return loop_chosen_mask, chosen_strokes
+
+
 def get_all_operation_strokes(stroke_operations_order_matrix, program_whole, operation):
     # Find the indices in program_whole where the operation occurs
     ks = [i for i, op in enumerate(program_whole) if op == operation]

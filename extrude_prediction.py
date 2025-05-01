@@ -43,7 +43,6 @@ def save_models():
     torch.save(graph_encoder.state_dict(), os.path.join(save_dir, 'graph_encoder.pth'))
     torch.save(graph_decoder.state_dict(), os.path.join(save_dir, 'graph_decoder.pth'))
 
-
 # ------------------------------------------------------------------------------# 
 
 
@@ -315,7 +314,6 @@ def train():
             best_accuracy = val_accuracy
             print(f"New best accuracy: {best_accuracy:.4f}, saved model")
             save_models()
-
 
 
 

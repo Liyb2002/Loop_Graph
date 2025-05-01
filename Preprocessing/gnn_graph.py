@@ -370,7 +370,11 @@ class SketchLoopGraph(HeteroData):
                 for stroke_idx in strokes_represented_by_loop:
                     self['stroke'].x[stroke_idx, -1] = 2  # Update the last digit of the stroke feature to 2
 
-
+    def set_select_extrude_strokes(self, predicted_extrude_strokes):
+        for stroke_idx in predicted_extrude_strokes:
+            self['stroke'].x[int(stroke_idx.item()), -1] = 2
+        
+        
     def _full_shape(self):
         """
         Check if all loop nodes in the graph form a full_shape. 

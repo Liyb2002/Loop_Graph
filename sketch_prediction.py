@@ -310,7 +310,7 @@ def train():
 def eval():
     load_models()
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/small')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
     print(f"Total number of shape data: {len(dataset)}")
 
 
@@ -381,7 +381,6 @@ def eval():
         )
 
 
-        print("chosen_strokes", chosen_strokes)
         # print("gnn_graph['stroke'].x.cpu().numpy()", gnn_graph['stroke'].x.cpu().numpy().shape)
         Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), chosen_strokes , data_idx)
 
@@ -475,4 +474,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

@@ -194,9 +194,9 @@ class Particle():
             )
 
             # if len(self.past_programs) == 5:
-            #     Encoders.helper.vis_brep(self.brep_edges)
+            # Encoders.helper.vis_brep(self.brep_edges)
             used_indices = np.where(stroke_to_edge > 0.5)[0].tolist()
-            # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), used_indices, self.data_idx)
+            # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), used_indices, self.data_idx)
 
             if self.mark_off_new_strokes(stroke_to_edge, stroke_to_edge_circle) == False:
                 print("No new feature added")
