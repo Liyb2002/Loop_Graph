@@ -474,20 +474,38 @@ extrude_graph_decoder.eval()
 extrude_graph_encoder.load_state_dict(torch.load(os.path.join(extrude_dir, 'graph_encoder.pth'), weights_only=True))
 extrude_graph_decoder.load_state_dict(torch.load(os.path.join(extrude_dir, 'graph_decoder.pth'), weights_only=True))
 
+
+extrude_face_graph_encoder = Encoders.gnn.gnn.SemanticModule()
+extrude_face_graph_decoder = Encoders.gnn.gnn.Extruded_Face_Decoder()
+# extrude_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction')
+extrude_face_dir = os.path.join(current_dir, 'checkpoints', 'extruded_face_prediction_synthetic')
+extrude_face_graph_encoder.eval()
+extrude_face_graph_decoder.eval()
+extrude_face_graph_encoder.load_state_dict(torch.load(os.path.join(extrude_face_dir, 'graph_encoder.pth'), weights_only=True))
+extrude_face_graph_decoder.load_state_dict(torch.load(os.path.join(extrude_face_dir, 'graph_decoder.pth'), weights_only=True))
+
 def predict_extrude(gnn_graph, sketch_selection_mask, data_idx):
     gnn_graph.set_select_sketch(sketch_selection_mask)
-
     x_dict = extrude_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     extrude_selection_mask = extrude_graph_decoder(x_dict)
-    
-    extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+    gnn_graph.set_select_extrude_strokes(extrude_selection_mask)
+
+    x_dict2 = extrude_face_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+    extruded_face_mask = extrude_face_graph_decoder(x_dict2)
+
+    selected_loop_idx =  (extruded_face_mask >= 0.5).nonzero(as_tuple=True)[0]
+    extrude_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
+
+    selected_stroke_loop_idx =  (sketch_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+    sketch_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_stroke_loop_idx)
+
     # _, extrude_stroke_idx = torch.max(extrude_selection_mask, dim=0)
-    # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx, data_idx)
-    return extrude_selection_mask
+    Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx + sketch_stroke_idx, data_idx)
+    return extruded_face_mask
 
 def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges, data_idx):
-    extrude_selection_mask = predict_extrude(gnn_graph, sketch_selection_mask, data_idx)
-    extrude_amount, extrude_direction, selected_prob= whole_process_helper.helper.get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges)
+    extruded_face_mask = predict_extrude(gnn_graph, sketch_selection_mask, data_idx)
+    extrude_amount, extrude_direction, selected_prob= whole_process_helper.helper.get_extrude_amount(gnn_graph, sketch_selection_mask, extruded_face_mask, sketch_points, brep_edges)
     return extrude_amount, extrude_direction, selected_prob
 
 

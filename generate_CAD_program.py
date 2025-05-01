@@ -100,7 +100,7 @@ for data in tqdm(dataset, desc="Generating CAD Programs"):
     base_particle.init_stroke_info(stroke_cloud_loops, strokes_perpendicular, loop_neighboring_vertical, loop_neighboring_horizontal, loop_neighboring_contained)
     base_particle.set_gt_program(program)
     particle_list = []
-    for particle_id in range (50):
+    for particle_id in range (1):
         new_particle = copy.deepcopy(base_particle)
         new_particle.set_particle_id(particle_id, cur_output_dir)
         particle_list.append(new_particle)
