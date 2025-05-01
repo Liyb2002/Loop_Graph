@@ -494,18 +494,20 @@ def predict_extrude(gnn_graph, sketch_selection_mask, data_idx):
     extruded_face_mask = extrude_face_graph_decoder(x_dict2)
 
     selected_loop_idx =  (extruded_face_mask >= 0.5).nonzero(as_tuple=True)[0]
-    extrude_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
+    extruded_face_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
 
     selected_stroke_loop_idx =  (sketch_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
-    sketch_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_stroke_loop_idx)
+    sketch_face_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_stroke_loop_idx)
 
     # _, extrude_stroke_idx = torch.max(extrude_selection_mask, dim=0)
-    Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx + sketch_stroke_idx, data_idx)
-    return extruded_face_mask
+    # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx + sketch_stroke_idx, data_idx)
+    return extruded_face_stroke_idx, sketch_face_stroke_idx
 
 def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges, data_idx):
-    extruded_face_mask = predict_extrude(gnn_graph, sketch_selection_mask, data_idx)
-    extrude_amount, extrude_direction, selected_prob= whole_process_helper.helper.get_extrude_amount(gnn_graph, sketch_selection_mask, extruded_face_mask, sketch_points, brep_edges)
+    extruded_face_stroke_idx, sketch_face_stroke_idx = predict_extrude(gnn_graph, sketch_selection_mask, data_idx)
+    # extrude_amount, extrude_direction, selected_prob= whole_process_helper.helper.get_extrude_amount(gnn_graph, sketch_selection_mask, extruded_face_mask, sketch_points, brep_edges)
+    extrude_amount, extrude_direction, selected_prob= whole_process_helper.helper.get_extrude_amount_from_extrude_face(gnn_graph, extruded_face_stroke_idx, sketch_face_stroke_idx, sketch_points)
+
     return extrude_amount, extrude_direction, selected_prob
 
 

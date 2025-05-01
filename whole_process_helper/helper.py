@@ -287,6 +287,46 @@ def points_fit_to_plane(ordered_points_tensor):
 
 # --------------------------------------------------------------------------- #
 
+import torch
+import torch.nn.functional as F
+
+def get_extrude_amount_from_extrude_face(gnn_graph, extruded_face_stroke_idx, sketch_face_stroke_idx, sketch_points):
+    stroke_features = gnn_graph['stroke'].x  # (N, 12) where only [:6] are valid
+
+    if sketch_points.shape[0] == 1:
+        return None
+
+    # Ensure index tensors
+    extruded_idx_tensor = torch.tensor(extruded_face_stroke_idx, dtype=torch.long)
+    sketch_idx_tensor = torch.tensor(sketch_face_stroke_idx, dtype=torch.long)
+
+    # Get only the relevant part of the stroke features
+    extruded_strokes = stroke_features[extruded_idx_tensor][:, :6]
+    sketch_strokes = stroke_features[sketch_idx_tensor][:, :6]
+
+    def get_points_from_strokes(strokes):
+        p1 = strokes[:, :3]
+        p2 = strokes[:, 3:6]
+        return torch.cat([p1, p2], dim=0)
+
+    extruded_points = get_points_from_strokes(extruded_strokes)
+    sketch_face_points = get_points_from_strokes(sketch_strokes)
+
+    dists = torch.cdist(extruded_points, sketch_face_points)
+    min_dist, min_idx = dists.min(dim=1)
+    min_idx_flat = min_dist.argmin()
+
+    extrude_pt = extruded_points[min_idx_flat]
+    sketch_pt = sketch_face_points[min_idx[min_idx_flat]]
+
+    direction = extrude_pt - sketch_pt
+    amount = direction.norm()
+    direction_normalized = F.normalize(direction.unsqueeze(0), dim=1).squeeze(0)
+
+    selected_prob = 1.0
+
+    return amount, direction_normalized, selected_prob
+
 
 def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges):
     """
