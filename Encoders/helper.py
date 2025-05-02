@@ -84,7 +84,7 @@ def get_feature_strokes(gnn_graph):
 
 
 
-def is_perpendicular(line1, line2, tol=5e-6):
+def is_perpendicular(line1, line2, tol=5e-5):
     """Check if two lines (each defined by two 3D points) are perpendicular."""
     vec1 = np.array(line1[1]) - np.array(line1[0])
     vec2 = np.array(line2[1]) - np.array(line2[0])

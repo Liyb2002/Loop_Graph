@@ -31,8 +31,8 @@ batch_size = 16
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-extrude_strokes_save_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction_synthetic')
-extruded_face_save_dir = os.path.join(current_dir, 'checkpoints', 'extruded_face_prediction_synthetic')
+extrude_strokes_save_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction')
+extruded_face_save_dir = os.path.join(current_dir, 'checkpoints', 'extruded_face_prediction')
 os.makedirs(extrude_strokes_save_dir, exist_ok=True)
 os.makedirs(extruded_face_save_dir, exist_ok=True)
 
@@ -86,9 +86,8 @@ def train():
 
 
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/small')
     print(f"Total number of shape data: {len(dataset)}")
-
     graphs = []
     loop_selection_masks = []
 
@@ -113,6 +112,8 @@ def train():
         extrude_selection_mask = torch.tensor(extrude_selection_mask, dtype=torch.float)
 
         extrude_stroke_idx = (extrude_selection_mask == 1).nonzero(as_tuple=True)[0]  # Indices of chosen strokes
+        
+
         if len(extrude_stroke_idx) == 0:
             continue
 
@@ -147,12 +148,11 @@ def train():
         predicted_extrude_stroke_idx = (predicted_extrude_strokes > 0.5).nonzero(as_tuple=True)[0]
     
 
-
         gnn_graph.set_select_extrude_strokes(predicted_extrude_strokes)
         extruded_face_loop_mask, extruded_face_idx = Encoders.helper.get_extruded_face(kth_operation, extrude_selection_mask, stroke_cloud_loops)
         extrude_face_loop_idx = (extruded_face_loop_mask == 1).nonzero(as_tuple=True)[0]
-        if len(extrude_face_loop_idx) != 1:
-            continue
+        # if len(extrude_face_loop_idx) != 1:
+        #     continue
 
 
         gnn_graph.to_device_withPadding(device)
@@ -160,8 +160,8 @@ def train():
         graphs.append(gnn_graph)
         loop_selection_masks.append(extruded_face_loop_mask.unsqueeze(1))
 
-        # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), predicted_extrude_stroke_idx, data_idx)
-        # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), extruded_face_idx, data_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), predicted_extrude_stroke_idx, data_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extruded_face_idx, data_idx)
 
 
         

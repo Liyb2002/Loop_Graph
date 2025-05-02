@@ -460,30 +460,51 @@ def find_new_features_simple(prev_brep_edges, new_edge_features):
     used_prev_edges = set()  # store indices of prev_brep_edges considered used
     
     for new_edge_line in new_edge_features:
-        edge_start = np.array(new_edge_line[:3])
-        edge_end   = np.array(new_edge_line[3:6])
         
-        is_unique = True  # assume new_edge_line is unique unless we find an exact match
-        
-        for i, prev_brep_line in enumerate(prev_brep_edges):
-            brep_start = np.array(prev_brep_line[:3])
-            brep_end   = np.array(prev_brep_line[3:6])
+        if new_edge_line[-1] == 1:
+            edge_start = np.array(new_edge_line[:3])
+            edge_end   = np.array(new_edge_line[3:6])
             
-            # 1) Check if new edge exactly matches an existing one (forward or reversed).
-            if (np.allclose(edge_start, brep_start) and np.allclose(edge_end, brep_end)) or \
-               (np.allclose(edge_start, brep_end)   and np.allclose(edge_end, brep_start)):
-                # The new edge is not unique; also consider the old edge "used"
-                is_unique = False
-                break
+            is_unique = True  # assume new_edge_line is unique unless we find an exact match
             
-            # 2) Check if the new edge *contains* this previous edge
-            # if is_line_contained(prev_brep_line, new_edge_line):
-            #     is_unique = False
-            #     break
+            for i, prev_brep_line in enumerate(prev_brep_edges):
+                brep_start = np.array(prev_brep_line[:3])
+                brep_end   = np.array(prev_brep_line[3:6])
+                
+                # 1) Check if new edge exactly matches an existing one (forward or reversed).
+                if (np.allclose(edge_start, brep_start) and np.allclose(edge_end, brep_end)) or \
+                (np.allclose(edge_start, brep_end)   and np.allclose(edge_end, brep_start)):
+                    # The new edge is not unique; also consider the old edge "used"
+                    is_unique = False
+                    break
+                
+            
+            # After comparing with all prev edges:
+            if is_unique:
+                unique_edges.append(new_edge_line)
         
-        # After comparing with all prev edges:
-        if is_unique:
-            unique_edges.append(new_edge_line)
+        else:
+            edge_center = np.array(new_edge_line[:3])
+            
+            is_unique = True  # assume new_edge_line is unique unless we find an exact match
+            
+            for i, prev_brep_line in enumerate(prev_brep_edges):
+                if prev_brep_line[-1] == 1:
+                    continue
+
+                brep_center = np.array(prev_brep_line[:3])
+                
+                # 1) Check if new edge exactly matches an existing one (forward or reversed).
+                if (np.allclose(edge_center, brep_center)):
+                    # The new edge is not unique; also consider the old edge "used"
+                    is_unique = False
+                    break
+                
+            
+            # After comparing with all prev edges:
+            if is_unique:
+                unique_edges.append(new_edge_line)
+
     
     return unique_edges
 
@@ -3419,3 +3440,66 @@ def assign_point_meanings(construction_lines, feature_lines, subfolder_path):
         json.dump(labeled_data, f, indent=4)
 
     
+
+
+
+def get_extrude_amount(extrude_stroke_idx, stroke_node_features):
+    amounts = []
+    
+    for idx, stroke in enumerate(stroke_node_features):
+        if stroke[-1] == 1 and idx in extrude_stroke_idx:
+            pt1 = stroke[0:3]
+            pt2 = stroke[3:6]
+            amount = dist(pt1, pt2)
+            amounts.append(amount)
+
+    # Group amounts that are within 20% of each other
+    grouped = []
+    for amount in amounts:
+        found_group = False
+        for group in grouped:
+            if abs(amount - group[0]) / group[0] <= 0.2:
+                group.append(amount)
+                found_group = True
+                break
+        if not found_group:
+            grouped.append([amount])
+
+    # Find group with most elements and return average of that group
+    most_common_group = max(grouped, key=len)
+    return sum(most_common_group) / len(most_common_group) * 0.9
+
+
+def find_extruded_face_strokes(prev_sketch_strokes, extrude_amount, stroke_node_features):
+    num_strokes = len(stroke_node_features)
+    selected_stroke = np.zeros((num_strokes, 1))  # shape (num_strokes, 1), all zeros
+
+    # Get indices of strokes that are marked as 1
+    active_indices = np.where(prev_sketch_strokes[:, 0] == 1)[0]
+
+    for prev_sketch_stroke_idx in active_indices:
+        sketch_stroke = stroke_node_features[prev_sketch_stroke_idx]
+        pt1 = sketch_stroke[0:3]
+        pt2 = sketch_stroke[3:6]
+
+        for idx, stroke in enumerate(stroke_node_features):
+            if prev_sketch_stroke_idx == idx:
+                continue
+
+            extruded_pt1 = stroke[0:3]
+            extruded_pt2 = stroke[3:6]
+
+            print("dist(pt1, extruded_pt1) - extrude_amount)", abs(dist(pt1, extruded_pt1) - extrude_amount))
+            print("dist(pt2, extruded_pt2) - extrude_amount)", abs(dist(pt2, extruded_pt2) - extrude_amount))
+            print("extrude_amount", extrude_amount)
+            # Check both direct and reversed matching of endpoints
+            if (
+                abs(dist(pt1, extruded_pt1) - extrude_amount) < extrude_amount * 0.05 and
+                abs(dist(pt2, extruded_pt2) - extrude_amount) < extrude_amount * 0.05
+            ) or (
+                abs(dist(pt1, extruded_pt2) - extrude_amount) < extrude_amount * 0.05 and
+                abs(dist(pt2, extruded_pt1) - extrude_amount) < extrude_amount * 0.05
+            ):
+                selected_stroke[idx] = 1
+
+    return selected_stroke
