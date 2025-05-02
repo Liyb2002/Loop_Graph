@@ -1624,7 +1624,7 @@ def stroke_to_edge_circle_full(stroke_node_features, final_brep_edges):
         if stroke[-1] == 2:  # Circle stroke
             stroke_center = np.array(stroke[:3])
             for center1, center2, radius in paired_circle_faces:
-                if any(np.linalg.norm(stroke_center - center) < 0.1 for center in [center1, center2]):
+                if any(np.linalg.norm(stroke_center - center) < 0.3 * radius for center in [center1, center2]):
                     stroke_used_matrix[i] = 1
                     break
 

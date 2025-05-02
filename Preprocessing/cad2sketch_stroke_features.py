@@ -3471,8 +3471,11 @@ def get_extrude_amount(extrude_stroke_idx, stroke_node_features):
 
 
 def list_dist(pt1, pt2):
-    return ((pt1[0] - pt2[0]) ** 2 + (pt1[1] - pt2[1]) ** 2 + (pt1[2] - pt2[2]) ** 2) ** 0.5
+    return sum((a - b) ** 2 for a, b in zip(pt1, pt2)) ** 0.5
 
+
+def list_points_are_close(pt1, pt2, threshold):
+    return list_dist(pt1, pt2) < threshold
 
 def find_extruded_face_strokes(prev_sketch, merged_features):
     extruded_face_strokes = []
@@ -3480,36 +3483,78 @@ def find_extruded_face_strokes(prev_sketch, merged_features):
     for new_feature in merged_features:
         new_pt1 = new_feature[0:3]
         new_pt2 = new_feature[3:6]
-
         new_brep_length = list_dist(new_pt1, new_pt2)
 
         for prev_sketch_stroke in prev_sketch:
             sketch_pt1 = prev_sketch_stroke[0:3]
             sketch_pt2 = prev_sketch_stroke[3:6]
-
             sketch_length = list_dist(sketch_pt1, sketch_pt2)
 
             tolerance = sketch_length * 0.05
-
-            # Criteria 1: All four points are different
-            all_points_different = (
-                new_pt1 != sketch_pt1 and new_pt1 != sketch_pt2 and
-                new_pt2 != sketch_pt1 and new_pt2 != sketch_pt2
-            )
-
+            min_length = min(new_brep_length, sketch_length)
 
             # Criteria 2: Lengths are within tolerance
             lengths_similar = abs(new_brep_length - sketch_length) <= tolerance
 
-            # Criteria 3: Corresponding points are the same within tolerance
+            # Criteria 3: Endpoints approximately match (with tolerance)
             points_match = (
                 abs(list_dist(new_pt1, sketch_pt1) - list_dist(new_pt2, sketch_pt2)) <= tolerance or
                 abs(list_dist(new_pt1, sketch_pt2) - list_dist(new_pt2, sketch_pt1)) <= tolerance
             )
 
-
-            if all_points_different and lengths_similar and points_match:
+            if lengths_similar and points_match:
                 extruded_face_strokes.append(new_feature)
-                break  # Optional: avoid matching the same stroke multiple times
-    
-    return extruded_face_strokes
+                break
+
+    # Double check: remove any stroke that shares a point with any previous sketch stroke
+    filtered_strokes = []
+    for stroke in extruded_face_strokes:
+        pt1, pt2 = stroke[0:3], stroke[3:6]
+        stroke_length = list_dist(pt1, pt2)
+
+        has_common_point = False
+        for prev_stroke in prev_sketch:
+            prev_pt1, prev_pt2 = prev_stroke[0:3], prev_stroke[3:6]
+            prev_length = list_dist(prev_pt1, prev_pt2)
+            min_length = min(stroke_length, prev_length)
+
+            if (list_points_are_close(pt1, prev_pt1, min_length * 0.5) or
+                list_points_are_close(pt1, prev_pt2, min_length * 0.5) or
+                list_points_are_close(pt2, prev_pt1, min_length * 0.5) or
+                list_points_are_close(pt2, prev_pt2, min_length * 0.5)):
+                has_common_point = True
+                break
+
+        if not has_common_point:
+            filtered_strokes.append(stroke)
+
+    return filtered_strokes
+
+
+
+def find_extruded_face_strokes_cylinder(prev_sketch, new_features_cylinder):
+    center = None
+    radius = None
+
+    # Step 1: Extract cylinder sketch info
+    for cylinder_sketch in prev_sketch:
+        if cylinder_sketch[-1] == 2:
+            center = cylinder_sketch[0:3]
+            radius = cylinder_sketch[7]
+            break
+
+    if center is None or radius is None:
+        return None  # No cylinder sketch found
+
+    # Step 2: Initialize tracking for best match
+    max_dist = -1
+    best_feature = None
+
+    for cylinder_feature in new_features_cylinder:
+        if cylinder_feature[-1] == 2:
+            dist_to_center = list_dist(cylinder_feature[0:3], center)
+            if dist_to_center > radius * 0.1 and dist_to_center > max_dist:
+                max_dist = dist_to_center
+                best_feature = cylinder_feature
+
+    return [best_feature]

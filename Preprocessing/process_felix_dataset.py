@@ -225,23 +225,28 @@ class cad2sketch_dataset_loader(Dataset):
                 final_cylinder_features += new_features_cylinder
 
             if program[idx]['operation'][0] == 'sketch':
-                prev_sketch = Preprocessing.cad2sketch_stroke_features.only_merge_brep(new_features)
+                if len(new_features_cylinder) != 0:
+                    prev_sketch = new_features_cylinder
+                else:
+                    prev_sketch = Preprocessing.cad2sketch_stroke_features.only_merge_brep(new_features)
 
 
             if program[idx]['operation'][0] == 'extrude':
                 if len(new_features_cylinder) != 0:
-                    pass
+                    extruded_face_features = Preprocessing.cad2sketch_stroke_features.find_extruded_face_strokes_cylinder(prev_sketch, new_features_cylinder)
+                    loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge_circle_full(stroke_node_features, extruded_face_features)
                 else:
                     merged_features = Preprocessing.cad2sketch_stroke_features.only_merge_brep(new_features)
                     extruded_face_features = Preprocessing.cad2sketch_stroke_features.find_extruded_face_strokes(prev_sketch, merged_features)
-
                     loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, extruded_face_features)
-                    selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
+                    
+                selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
 
-                    if selected_indices not in stroke_cloud_loops:
-                        stroke_cloud_loops.append(selected_indices)
+                print("selected_indices", len(selected_indices))
+                if selected_indices not in stroke_cloud_loops:
+                    stroke_cloud_loops.append(selected_indices)
 
-                    stroke_operations_order_matrix[loop_strokes[:, 0] == 1, idx] = 2
+                stroke_operations_order_matrix[loop_strokes[:, 0] == 1, idx] = 2
 
 
         # 3) Compute Loop Neighboring Information
