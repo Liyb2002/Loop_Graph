@@ -149,19 +149,39 @@ def train():
     
 
         gnn_graph.set_select_extrude_strokes(predicted_extrude_strokes)
-        extruded_face_loop_mask, extruded_face_idx = Encoders.helper.get_extruded_face(kth_operation, extrude_selection_mask, stroke_cloud_loops)
-        extrude_face_loop_idx = (extruded_face_loop_mask == 1).nonzero(as_tuple=True)[0]
-        # if len(extrude_face_loop_idx) != 1:
-        #     continue
+
+        # this is the logic to find the extruded face loop
+        extrude_face_loop_idx = (kth_operation == 2).nonzero(as_tuple=True)[0]
+        loop_chosen_mask = []
+        for loop in stroke_cloud_loops:
+            chosen_count = sum(1 for stroke in loop if stroke in extrude_face_loop_idx)
+            if chosen_count == len(loop) :
+                loop_chosen_mask.append(1)  # Loop is chosen
+            else:
+                loop_chosen_mask.append(0)  # Loop is not chosen
+        
+        loop_chosen_mask = torch.tensor(loop_chosen_mask, dtype=torch.float).flatten()
+
+        # Find the indices where the value is 1
+        ones_indices = (loop_chosen_mask == 1).nonzero(as_tuple=True)[0]
+        
+        if len(ones_indices) > 1:
+            # Set all to 0
+            loop_chosen_mask[ones_indices] = 0
+            # Set only the first occurrence to 1
+            loop_chosen_mask[ones_indices[0]] = 1
+
+        # Reshape to (-1, 1) as in the original
+        loop_selection_mask = loop_chosen_mask.reshape(-1, 1)
 
 
         gnn_graph.to_device_withPadding(device)
-        extruded_face_loop_mask = extruded_face_loop_mask.to(device)
+        loop_selection_mask = loop_selection_mask.to(device)
         graphs.append(gnn_graph)
-        loop_selection_masks.append(extruded_face_loop_mask.unsqueeze(1))
+        loop_selection_masks.append(loop_selection_mask)
 
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), predicted_extrude_stroke_idx, data_idx)
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extruded_face_idx, data_idx)
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_face_loop_idx, data_idx)
 
 
         

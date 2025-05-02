@@ -133,11 +133,7 @@ class cad2sketch_dataset_loader(Dataset):
         for idx, step_file in enumerate(step_files):
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
             edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
-            
-            if program[idx]['operation'][0] == 'sketch':
-                new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
-            else:
-                new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
+            new_edge_features_list = Preprocessing.cad2sketch_stroke_features.only_merge_brep(edge_features_list)
             
             # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_edge_features_list  + cylinder_features))
             stroke_node_features, num_add_edges, added_feature_lines= Preprocessing.proc_CAD.helper.ensure_brep_edges(stroke_node_features, new_edge_features_list)
@@ -199,6 +195,7 @@ class cad2sketch_dataset_loader(Dataset):
         final_cylinder_features = []
         new_features = []
 
+        prev_sketch = None
         for idx, step_file in enumerate(step_files):
             edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_file))
             edge_features_list, cylinder_features= Preprocessing.cad2sketch_stroke_features.rotate_matrix(edge_features_list, cylinder_features, rotation_matrix)
@@ -226,10 +223,25 @@ class cad2sketch_dataset_loader(Dataset):
 
                 final_brep_edges += new_features
                 final_cylinder_features += new_features_cylinder
-        
-            if program[idx]['operation'][0] == 'extrude':
-                Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_features + new_features_cylinder))
 
+            if program[idx]['operation'][0] == 'sketch':
+                prev_sketch = Preprocessing.cad2sketch_stroke_features.only_merge_brep(new_features)
+
+
+            if program[idx]['operation'][0] == 'extrude':
+                if len(new_features_cylinder) != 0:
+                    pass
+                else:
+                    merged_features = Preprocessing.cad2sketch_stroke_features.only_merge_brep(new_features)
+                    extruded_face_features = Preprocessing.cad2sketch_stroke_features.find_extruded_face_strokes(prev_sketch, merged_features)
+
+                    loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, extruded_face_features)
+                    selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
+
+                    if selected_indices not in stroke_cloud_loops:
+                        stroke_cloud_loops.append(selected_indices)
+
+                    stroke_operations_order_matrix[loop_strokes[:, 0] == 1, idx] = 2
 
 
         # 3) Compute Loop Neighboring Information
@@ -297,15 +309,19 @@ class cad2sketch_dataset_loader(Dataset):
 
 
             # 6) We need to build the stroke_operations_order_matrix
-            if program[idx]['operation'][0] != 'sketch':
-                new_stroke_to_edge_straight = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_features)
-                new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, new_features_cylinder)
-                new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.union_matrices(new_stroke_to_edge_straight, new_stroke_to_edge_circle)
+            new_stroke_to_edge_straight = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, new_features)
+            new_stroke_to_edge_circle = Preprocessing.proc_CAD.helper.stroke_to_edge_circle(stroke_node_features, new_features_cylinder)
+            new_stroke_to_edge_matrix = Preprocessing.proc_CAD.helper.union_matrices(new_stroke_to_edge_straight, new_stroke_to_edge_circle)
             
-                chosen_strokes = np.where((new_stroke_to_edge_matrix == 1).any(axis=1))[0]
+            # chosen_strokes = np.where((new_stroke_to_edge_matrix == 1).any(axis=1))[0]
+        
+            if program[idx]['operation'][0] == 'extrude':
+                new_values = np.array(new_stroke_to_edge_matrix).flatten()
+                mask = stroke_operations_order_matrix[:, idx].flatten() != 2
+                stroke_operations_order_matrix[mask, idx] = new_values[mask]
 
+            if program[idx]['operation'][0] == 'fillet':
                 stroke_operations_order_matrix[:, idx] = np.array(new_stroke_to_edge_matrix).flatten()
-
 
             # 7) Write the data to file
             output_file_path = os.path.join(data_directory, f'shape_info_{file_count}.pkl')

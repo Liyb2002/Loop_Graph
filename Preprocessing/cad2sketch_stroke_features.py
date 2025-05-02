@@ -3470,36 +3470,46 @@ def get_extrude_amount(extrude_stroke_idx, stroke_node_features):
     return sum(most_common_group) / len(most_common_group) * 0.9
 
 
-def find_extruded_face_strokes(prev_sketch_strokes, extrude_amount, stroke_node_features):
-    num_strokes = len(stroke_node_features)
-    selected_stroke = np.zeros((num_strokes, 1))  # shape (num_strokes, 1), all zeros
+def list_dist(pt1, pt2):
+    return ((pt1[0] - pt2[0]) ** 2 + (pt1[1] - pt2[1]) ** 2 + (pt1[2] - pt2[2]) ** 2) ** 0.5
 
-    # Get indices of strokes that are marked as 1
-    active_indices = np.where(prev_sketch_strokes[:, 0] == 1)[0]
 
-    for prev_sketch_stroke_idx in active_indices:
-        sketch_stroke = stroke_node_features[prev_sketch_stroke_idx]
-        pt1 = sketch_stroke[0:3]
-        pt2 = sketch_stroke[3:6]
+def find_extruded_face_strokes(prev_sketch, merged_features):
+    extruded_face_strokes = []
 
-        for idx, stroke in enumerate(stroke_node_features):
-            if prev_sketch_stroke_idx == idx:
-                continue
+    for new_feature in merged_features:
+        new_pt1 = new_feature[0:3]
+        new_pt2 = new_feature[3:6]
 
-            extruded_pt1 = stroke[0:3]
-            extruded_pt2 = stroke[3:6]
+        new_brep_length = list_dist(new_pt1, new_pt2)
 
-            print("dist(pt1, extruded_pt1) - extrude_amount)", abs(dist(pt1, extruded_pt1) - extrude_amount))
-            print("dist(pt2, extruded_pt2) - extrude_amount)", abs(dist(pt2, extruded_pt2) - extrude_amount))
-            print("extrude_amount", extrude_amount)
-            # Check both direct and reversed matching of endpoints
-            if (
-                abs(dist(pt1, extruded_pt1) - extrude_amount) < extrude_amount * 0.05 and
-                abs(dist(pt2, extruded_pt2) - extrude_amount) < extrude_amount * 0.05
-            ) or (
-                abs(dist(pt1, extruded_pt2) - extrude_amount) < extrude_amount * 0.05 and
-                abs(dist(pt2, extruded_pt1) - extrude_amount) < extrude_amount * 0.05
-            ):
-                selected_stroke[idx] = 1
+        for prev_sketch_stroke in prev_sketch:
+            sketch_pt1 = prev_sketch_stroke[0:3]
+            sketch_pt2 = prev_sketch_stroke[3:6]
 
-    return selected_stroke
+            sketch_length = list_dist(sketch_pt1, sketch_pt2)
+
+            tolerance = sketch_length * 0.05
+
+            # Criteria 1: All four points are different
+            all_points_different = (
+                new_pt1 != sketch_pt1 and new_pt1 != sketch_pt2 and
+                new_pt2 != sketch_pt1 and new_pt2 != sketch_pt2
+            )
+
+
+            # Criteria 2: Lengths are within tolerance
+            lengths_similar = abs(new_brep_length - sketch_length) <= tolerance
+
+            # Criteria 3: Corresponding points are the same within tolerance
+            points_match = (
+                abs(list_dist(new_pt1, sketch_pt1) - list_dist(new_pt2, sketch_pt2)) <= tolerance or
+                abs(list_dist(new_pt1, sketch_pt2) - list_dist(new_pt2, sketch_pt1)) <= tolerance
+            )
+
+
+            if all_points_different and lengths_similar and points_match:
+                extruded_face_strokes.append(new_feature)
+                break  # Optional: avoid matching the same stroke multiple times
+    
+    return extruded_face_strokes
