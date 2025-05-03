@@ -215,6 +215,8 @@ class cad2sketch_dataset_loader(Dataset):
 
                 if program[idx]['operation'][0] != 'sketch':
                     new_features = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_brep_edges, edge_features_list) 
+                    new_features = Preprocessing.cad2sketch_stroke_features.only_merge_brep(new_features)
+                    new_features, additional_features= Preprocessing.cad2sketch_stroke_features.find_implicit_features(final_brep_edges, new_features)
                     new_features_cylinder = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_cylinder_features, cylinder_features)
                 else:
                     # sketch operation
@@ -223,6 +225,8 @@ class cad2sketch_dataset_loader(Dataset):
 
                 final_brep_edges += new_features
                 final_cylinder_features += new_features_cylinder
+
+
 
             if program[idx]['operation'][0] == 'sketch':
                 if len(new_features_cylinder) != 0:
@@ -234,19 +238,29 @@ class cad2sketch_dataset_loader(Dataset):
             if program[idx]['operation'][0] == 'extrude':
                 if len(new_features_cylinder) != 0:
                     extruded_face_features = Preprocessing.cad2sketch_stroke_features.find_extruded_face_strokes_cylinder(prev_sketch, new_features_cylinder)
+                    
+                    if extruded_face_features is None or extruded_face_features[0] is None:
+                        return False
                     loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge_circle_full(stroke_node_features, extruded_face_features)
                 else:
-                    merged_features = Preprocessing.cad2sketch_stroke_features.only_merge_brep(new_features)
-                    extruded_face_features = Preprocessing.cad2sketch_stroke_features.find_extruded_face_strokes(prev_sketch, merged_features)
+                    extruded_face_features = Preprocessing.cad2sketch_stroke_features.find_extruded_face_strokes(prev_sketch, new_features)
                     loop_strokes = Preprocessing.proc_CAD.helper.stroke_to_edge(stroke_node_features, extruded_face_features)
                     
                 selected_indices = np.nonzero(loop_strokes == 1)[0].tolist()
+                if len(selected_indices) < 3 and len(new_features_cylinder) == 0:
+                    return False
+                    # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(prev_sketch))
+                    # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(new_features + prev_sketch))
+                    # Preprocessing.cad2sketch_stroke_features.vis_brep(Preprocessing.proc_CAD.helper.pad_brep_features(extruded_face_features))
 
-                print("selected_indices", len(selected_indices))
+
                 if selected_indices not in stroke_cloud_loops:
                     stroke_cloud_loops.append(selected_indices)
 
                 stroke_operations_order_matrix[loop_strokes[:, 0] == 1, idx] = 2
+
+
+
 
 
         # 3) Compute Loop Neighboring Information
@@ -284,6 +298,8 @@ class cad2sketch_dataset_loader(Dataset):
 
                 if len(edge_features_list) + len(cylinder_features) > 5:
                     new_features = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_brep_edges, edge_features_list) 
+                    new_features = Preprocessing.cad2sketch_stroke_features.only_merge_brep(new_features)
+                    new_features, additional_features= Preprocessing.cad2sketch_stroke_features.find_implicit_features(final_brep_edges, new_features)
                     new_features_cylinder = Preprocessing.cad2sketch_stroke_features.find_new_features_simple(final_cylinder_features, cylinder_features)
                 else:
                     # sketch operation

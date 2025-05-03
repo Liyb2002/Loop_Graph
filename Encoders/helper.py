@@ -93,6 +93,12 @@ def is_perpendicular(line1, line2, tol=5e-5):
     return abs(dot_product) < tol
 
 
+def min_distance_to_endpoints(p1, p2, endpoints):
+    distances = [np.linalg.norm(np.array(p1) - np.array(ep)) for ep in endpoints] + \
+                [np.linalg.norm(np.array(p2) - np.array(ep)) for ep in endpoints]
+    return min(distances)
+
+
 def point_matches(p, endpoints, threshold):
     """Return True if point `p` is within `threshold` distance of any point in `endpoints`."""
     for ep in endpoints:
@@ -100,22 +106,38 @@ def point_matches(p, endpoints, threshold):
             return True
     return False
 
+
+def is_colinear_with_extension(line1, line2, tolerance=1e-6):
+    # Check if line1 is on the extension of line2
+    p1, p2 = np.array(line1[0]), np.array(line1[1])
+    q1, q2 = np.array(line2[0]), np.array(line2[1])
+    v1 = p2 - p1
+    v2 = q2 - q1
+
+    # Check if directions are parallel (cross product near zero)
+    if np.linalg.norm(np.cross(v1, v2)) > tolerance:
+        return False
+
+    # Project p1 onto line q1-q2
+    if np.linalg.norm(np.cross(v2, p1 - q1)) > tolerance and \
+       np.linalg.norm(np.cross(v2, p2 - q1)) > tolerance:
+        return False
+
+    return True
+
+
 def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_node_features):
     num_strokes = stroke_node_features.shape[0]
     extrude_strokes = np.zeros((num_strokes, 1), dtype=int)
-    
-    # Determine if the sketch is a circle
-    from_circle = False
-    for i in range(num_strokes):
-        if sketch_selection_mask[i] == 1:
-            if stroke_node_features[i][-1] == 2:
-                from_circle = True
-                break
 
-    if from_circle: 
+    from_circle = any(
+        sketch_selection_mask[i] == 1 and stroke_node_features[i][-1] == 2
+        for i in range(num_strokes)
+    )
+
+    if from_circle:
         return choose_extrude_strokes_from_circle(stroke_selection_mask, sketch_selection_mask, stroke_node_features)
 
-    # Collect sketch lines and endpoints
     sketch_lines = []
     sketch_endpoints = []
     for i in range(num_strokes):
@@ -123,37 +145,44 @@ def choose_extrude_strokes(stroke_selection_mask, sketch_selection_mask, stroke_
             p1 = tuple(stroke_node_features[i][:3])
             p2 = tuple(stroke_node_features[i][3:6])
             sketch_lines.append((p1, p2))
-            sketch_endpoints.append(p1)
-            sketch_endpoints.append(p2)
+            sketch_endpoints.extend([p1, p2])
 
-    # First pass: extrude if perpendicular to all sketch lines
+    if len(sketch_endpoints) == 0:
+        return extrude_strokes
+    
     for i in range(num_strokes):
         if stroke_selection_mask[i] == 1:
             p1 = tuple(stroke_node_features[i][:3])
             p2 = tuple(stroke_node_features[i][3:6])
             candidate_line = (p1, p2)
-
-            if all(is_perpendicular(candidate_line, sketch_line) for sketch_line in sketch_lines):
+            length = np.linalg.norm(np.array(p2) - np.array(p1))
+            if all(is_perpendicular(candidate_line, sketch_line) for sketch_line in sketch_lines) and \
+               min_distance_to_endpoints(p1, p2, sketch_endpoints) < 0.2 * length:
                 extrude_strokes[i] = 1
 
-    # Fallback: no valid extrude strokes found
+    for i in range(num_strokes):
+        if extrude_strokes[i] == 1:
+            p1 = tuple(stroke_node_features[i][:3])
+            p2 = tuple(stroke_node_features[i][3:6])
+            line = (p1, p2)
+            for sketch_line in sketch_lines:
+                if is_colinear_with_extension(line, sketch_line):
+                    extrude_strokes[i] = 0
+                    break
+    
+    # fallback
     if not np.any(extrude_strokes):
         for i in range(num_strokes):
             if stroke_node_features[i][-1] != 1:
                 continue
-
             p1 = tuple(stroke_node_features[i][:3])
             p2 = tuple(stroke_node_features[i][3:6])
             candidate_line = (p1, p2)
-
+            length = np.linalg.norm(np.array(p2) - np.array(p1))
+            threshold = 0.2 * length
             if all(is_perpendicular(candidate_line, sketch_line) for sketch_line in sketch_lines):
-                # Compute stroke length and matching threshold
-                stroke_len = np.linalg.norm(np.array(p2) - np.array(p1))
-                threshold = stroke_len * 0.2
-
                 match_count = int(point_matches(p1, sketch_endpoints, threshold)) + \
                               int(point_matches(p2, sketch_endpoints, threshold))
-
                 if match_count == 1:
                     extrude_strokes[i] = 1
 

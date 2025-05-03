@@ -510,6 +510,60 @@ def find_new_features_simple(prev_brep_edges, new_edge_features):
 
 
 
+def is_colinear_with_extension(line1, line2, tolerance=1e-5):
+    # line1 and line2 are tuples/lists of (p1, p2)
+    p1, p2 = np.array(line1[0]), np.array(line1[1])
+    q1, q2 = np.array(line2[0]), np.array(line2[1])
+    v1 = p2 - p1
+    v2 = q2 - q1
+
+    # Check if direction vectors are parallel (cross product is near zero)
+    if np.linalg.norm(np.cross(v1, v2)) > tolerance:
+        return False
+
+    # Check that at least one point of line1 lies on the infinite line of line2
+    if np.linalg.norm(np.cross(v2, p1 - q1)) < tolerance:
+        return True
+    if np.linalg.norm(np.cross(v2, p2 - q1)) < tolerance:
+        return True
+
+    return False
+
+def find_implicit_features(final_brep_edges, new_features):
+    additional_features = []
+
+    for new_feature in new_features:
+        edge_start = np.array(new_feature[:3])
+        edge_end = np.array(new_feature[3:6])
+        stroke_length = dist(edge_start, edge_end)
+        new_line = (edge_start, edge_end)
+
+        for final_brep_edge in final_brep_edges:
+            brep_start = np.array(final_brep_edge[:3])
+            brep_end = np.array(final_brep_edge[3:6])
+            brep_line = (brep_start, brep_end)
+
+            # Skip if they are colinear
+            if not is_colinear_with_extension(new_line, brep_line):
+                continue
+
+            if dist(edge_start, brep_start) < stroke_length * 0.05:
+                new_edge = list(edge_end) + list(brep_end) + new_feature[6:]
+                additional_features.append(new_edge)
+            elif dist(edge_start, brep_end) < stroke_length * 0.05:
+                new_edge = list(edge_end) + list(brep_start) + new_feature[6:]
+                additional_features.append(new_edge)
+            elif dist(edge_end, brep_start) < stroke_length * 0.05:
+                new_edge = list(edge_start) + list(brep_end) + new_feature[6:]
+                additional_features.append(new_edge)
+            elif dist(edge_end, brep_end) < stroke_length * 0.05:
+                new_edge = list(edge_start) + list(brep_start) + new_feature[6:]
+                additional_features.append(new_edge)
+
+    new_features.extend(additional_features)
+    return new_features, additional_features
+
+
 # ------------------------------------------------------------------------------------# 
 def fit_straight_line(points):
     """
@@ -3490,13 +3544,13 @@ def find_extruded_face_strokes(prev_sketch, merged_features):
             sketch_pt2 = prev_sketch_stroke[3:6]
             sketch_length = list_dist(sketch_pt1, sketch_pt2)
 
-            tolerance = sketch_length * 0.05
+            tolerance = sketch_length * 0.1
             min_length = min(new_brep_length, sketch_length)
 
-            # Criteria 2: Lengths are within tolerance
+            # Criteria 1: Lengths are within tolerance
             lengths_similar = abs(new_brep_length - sketch_length) <= tolerance
 
-            # Criteria 3: Endpoints approximately match (with tolerance)
+            # Criteria 2: Endpoints approximately match (with tolerance)
             points_match = (
                 abs(list_dist(new_pt1, sketch_pt1) - list_dist(new_pt2, sketch_pt2)) <= tolerance or
                 abs(list_dist(new_pt1, sketch_pt2) - list_dist(new_pt2, sketch_pt1)) <= tolerance
@@ -3505,7 +3559,7 @@ def find_extruded_face_strokes(prev_sketch, merged_features):
             if lengths_similar and points_match:
                 extruded_face_strokes.append(new_feature)
                 break
-
+    
     # Double check: remove any stroke that shares a point with any previous sketch stroke
     filtered_strokes = []
     for stroke in extruded_face_strokes:
@@ -3518,10 +3572,10 @@ def find_extruded_face_strokes(prev_sketch, merged_features):
             prev_length = list_dist(prev_pt1, prev_pt2)
             min_length = min(stroke_length, prev_length)
 
-            if (list_points_are_close(pt1, prev_pt1, min_length * 0.5) or
-                list_points_are_close(pt1, prev_pt2, min_length * 0.5) or
-                list_points_are_close(pt2, prev_pt1, min_length * 0.5) or
-                list_points_are_close(pt2, prev_pt2, min_length * 0.5)):
+            if (list_points_are_close(pt1, prev_pt1, min_length * 0.1) or
+                list_points_are_close(pt1, prev_pt2, min_length * 0.1) or
+                list_points_are_close(pt2, prev_pt1, min_length * 0.1) or
+                list_points_are_close(pt2, prev_pt2, min_length * 0.1)):
                 has_common_point = True
                 break
 
@@ -3544,7 +3598,7 @@ def find_extruded_face_strokes_cylinder(prev_sketch, new_features_cylinder):
             break
 
     if center is None or radius is None:
-        return None  # No cylinder sketch found
+        return [None]  # No cylinder sketch found
 
     # Step 2: Initialize tracking for best match
     max_dist = -1

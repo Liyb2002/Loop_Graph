@@ -31,7 +31,7 @@ batch_size = 16
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction_synthetic')
+save_dir = os.path.join(current_dir, 'checkpoints', 'extrude_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -116,7 +116,7 @@ def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, data_indice
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0
@@ -192,7 +192,7 @@ def train():
         # print("extrude_stroke_idx", extrude_stroke_idx)
         # print("gnn_graph['stroke'].x.cpu().numpy()", stroke_node_features.shape)
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx, data_idx)
-        # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx, data_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx, data_idx)
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), all_kth_stroke, data_idx)
 
 
