@@ -65,6 +65,8 @@ def build_stroke_cloud_from_node_features(stroke_node_features,
 
         elif stroke_type == 3:  # Arc
             pts = reconstruct_arc_points(stroke, num_points=num_points_arc)
+            if pts.size == 0:
+                return []
             stroke_cloud.append(pts)
 
         elif stroke_type == 2:  # Circle
@@ -74,78 +76,71 @@ def build_stroke_cloud_from_node_features(stroke_node_features,
     return stroke_cloud
 
 
+import numpy as np
 
 import numpy as np
 
 def reconstruct_arc_points(stroke, num_points=10):
     """
-    Reconstruct a 1/4 circle arc based on center, start, and end points.
-    The arc is axis-aligned (XY, YZ, or XZ plane).
+    Reconstruct a 1/4 circle arc from start, end, and center.
+    Only returns the arc if it passes geometric checks (no 3/4 circles).
     """
     start = np.array(stroke[0:3])
     end = np.array(stroke[3:6])
     center = np.array(stroke[7:10])
-    
-    # Determine the plane
+
+    # Detect axis-aligned plane
     tol = 1e-4
     if abs(start[0] - center[0]) < tol and abs(end[0] - center[0]) < tol:
-        plane = 'YZ'
-        idx1, idx2 = 1, 2
-        fixed_idx = 0
+        const_axis = 0
+        var_axes = [1, 2]
     elif abs(start[1] - center[1]) < tol and abs(end[1] - center[1]) < tol:
-        plane = 'XZ'
-        idx1, idx2 = 0, 2
-        fixed_idx = 1
+        const_axis = 1
+        var_axes = [0, 2]
     elif abs(start[2] - center[2]) < tol and abs(end[2] - center[2]) < tol:
-        plane = 'XY'
-        idx1, idx2 = 0, 1
-        fixed_idx = 2
+        const_axis = 2
+        var_axes = [0, 1]
     else:
-        raise ValueError("Arc is not axis-aligned.")
+        return np.empty((0, 3))
 
-    # Project to 2D plane
-    start_2d = np.array([start[idx1], start[idx2]])
-    center_2d = np.array([center[idx1], center[idx2]])
+    # Project to 2D
+    start_2d = start[var_axes] - center[var_axes]
+    end_2d = end[var_axes] - center[var_axes]
+    angle_start = np.arctan2(start_2d[1], start_2d[0])
+    angle_end = np.arctan2(end_2d[1], end_2d[0])
+    radius = np.linalg.norm(start_2d)
+    max_valid_dist = radius + 1e-3  # small tolerance
 
-    radius = np.linalg.norm(start_2d - center_2d)
+    def sample_arc(angle0, angle1):
+        angles = np.linspace(angle0, angle1, num_points)
+        arc_2d = np.stack([
+            radius * np.cos(angles),
+            radius * np.sin(angles)
+        ], axis=1)
+        arc_3d = np.zeros((num_points, 3))
+        arc_3d[:, var_axes[0]] = arc_2d[:, 0] + center[var_axes[0]]
+        arc_3d[:, var_axes[1]] = arc_2d[:, 1] + center[var_axes[1]]
+        arc_3d[:, const_axis] = center[const_axis]
+        return arc_3d
 
-    # Compute starting angle
-    start_angle = np.arctan2(start_2d[1] - center_2d[1], start_2d[0] - center_2d[0])
+    # Try CCW direction
+    arc_ccw_3d = sample_arc(angle_start, angle_end)
+    if all(
+        min(np.linalg.norm(pt - start), np.linalg.norm(pt - end)) <= max_valid_dist
+        for pt in arc_ccw_3d
+    ):
+        return arc_ccw_3d
 
-    # Since it's a 1/4 circle, the end angle is start + 90 degrees
-    # But we have to decide CW or CCW depending on end point
+    # Try CW direction
+    arc_cw_3d = sample_arc(angle_end, angle_start)
+    if all(
+        min(np.linalg.norm(pt - start), np.linalg.norm(pt - end)) <= max_valid_dist
+        for pt in arc_cw_3d
+    ):
+        return arc_cw_3d
 
-    # Predict two possibilities
-    ccw_end_angle = start_angle + (np.pi / 2)   # +90 degree
-    cw_end_angle  = start_angle - (np.pi / 2)   # -90 degree
-
-    # Project end point
-    end_2d = np.array([end[idx1], end[idx2]])
-    target_vec = end_2d - center_2d
-
-    # Compare which angle (ccw or cw) is closer to the actual end
-    ccw_vec = np.array([np.cos(ccw_end_angle), np.sin(ccw_end_angle)])
-    cw_vec = np.array([np.cos(cw_end_angle), np.sin(cw_end_angle)])
-
-    if np.linalg.norm(target_vec/np.linalg.norm(target_vec) - ccw_vec) < np.linalg.norm(target_vec/np.linalg.norm(target_vec) - cw_vec):
-        chosen_end_angle = ccw_end_angle
-    else:
-        chosen_end_angle = cw_end_angle
-
-    # Now sample angles between start and chosen_end_angle
-    angles = np.linspace(start_angle, chosen_end_angle, num_points)
-
-    # Generate points
-    points = []
-    for theta in angles:
-        point_2d = center_2d + radius * np.array([np.cos(theta), np.sin(theta)])
-        point = np.array(center)
-        point[idx1] = point_2d[0]
-        point[idx2] = point_2d[1]
-        points.append(point)
-
-    return np.array(points)
-
+    # If neither direction is valid, reject
+    return np.empty((0, 3))
 
 
 def reconstruct_circle_points(stroke, num_points=20):

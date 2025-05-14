@@ -30,7 +30,7 @@ batch_size = 16
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'fillet_prediction_synthetic')
+save_dir = os.path.join(current_dir, 'checkpoints', 'fillet_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -99,8 +99,9 @@ def compute_accuracy_eval(valid_output, valid_batch_masks, hetero_batch, data_in
 # ------------------------------------------------------------------------------# 
 
 def train():
+    print("DO FILLET PREDICTION")
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
     print(f"Total number of shape data: {len(dataset)}")
 
     epochs = 50
@@ -151,7 +152,7 @@ def train():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
-        # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
 
 
     print(f"Total number of preprocessed graphs: {len(graphs)}")
@@ -159,8 +160,8 @@ def train():
 
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
-    train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
-    train_masks, val_masks = stroke_selection_masks[:split_index], stroke_selection_masks[split_index:]
+    train_graphs, val_graphs = graphs[:], graphs[:]
+    train_masks, val_masks = stroke_selection_masks[:], stroke_selection_masks[:]
 
     # Convert train and validation graphs to HeteroData
     hetero_train_graphs = [Preprocessing.gnn_graph.convert_to_hetero_data(graph) for graph in train_graphs]
@@ -335,10 +336,10 @@ def eval():
         graphs.append(gnn_graph)
         stroke_selection_masks.append(stroke_selection_matrix)
 
-        if len(graphs) > 2000:
+        if len(graphs) > 200:
             break
         
-        
+        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), [], data_idx)
         Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
 
         
@@ -395,4 +396,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-train()
+eval()

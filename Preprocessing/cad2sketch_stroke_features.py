@@ -1521,6 +1521,7 @@ def vis_feature_lines(feature_lines):
     ax.set_frame_on(False)
     ax.grid(False)
     ax.set_axis_off()
+    ax.view_init(elev=-121, azim=-104, roll=90)  # Match the provided camera inclination and azimuth
 
     # Initialize bounding box
     x_min, x_max = float('inf'), float('-inf')
@@ -1535,7 +1536,7 @@ def vis_feature_lines(feature_lines):
         # Use the precomputed opacity
         alpha = stroke.get("opacity", 0.5)
         # linewidth = 0.5 + alpha  # make thicker for higher opacity
-        linewidth = 0.6
+        linewidth = 0.8
 
         for j in range(1, len(geometry)):
             start = geometry[j - 1]

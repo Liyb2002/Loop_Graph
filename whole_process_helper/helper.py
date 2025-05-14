@@ -1101,7 +1101,7 @@ def resample_particles(particle_list, finished_particles):
 
 # --------------------------------------------------------------------------- #
 
-def find_top_different_particles(finished_particles, cur_output_dir, num_output_particles = 30):
+def find_top_different_particles(finished_particles, cur_output_dir, num_output_particles = 3):
     """
     Finds the top 3 particles with different brep_edges and renames their directories.
 

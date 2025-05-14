@@ -79,8 +79,6 @@ class cad2sketch_dataset_loader(Dataset):
         print("Generating Dataset:", subfolder_path)
         
         final_edges_file_path = os.path.join(subfolder_path, 'perturbed_all_lines.json')
-        all_edges_file_path = os.path.join(subfolder_path, 'unique_edges.json')
-        strokes_dict_path = os.path.join(subfolder_path, 'strokes_dict.json')
         program_path = os.path.join(subfolder_path, 'program.json')
 
         # Check if required JSON files exist, printing which one is missing
@@ -88,10 +86,6 @@ class cad2sketch_dataset_loader(Dataset):
         
         if not os.path.exists(final_edges_file_path):
             missing_files.append("final_edges.json")
-        if not os.path.exists(all_edges_file_path):
-            missing_files.append("unique_edges.json")
-        if not os.path.exists(strokes_dict_path):
-            missing_files.append("strokes_dict.json")
         if not os.path.exists(program_path):
             missing_files.append("program_path.json")
 
@@ -148,6 +142,11 @@ class cad2sketch_dataset_loader(Dataset):
 
         connected_stroke_nodes = Preprocessing.proc_CAD.helper.connected_strokes(stroke_node_features)
         strokes_perpendicular, strokes_non_perpendicular =  Preprocessing.proc_CAD.helper.stroke_relations(stroke_node_features, connected_stroke_nodes)
+
+        # for idxxx in [3, 24, 2, 10]:
+        #     connected_indices = np.where(strokes_perpendicular[idxxx] == 1)[0]
+            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_by_index_list(all_lines, stroke_node_features, [idxxx])
+            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_by_index_list(all_lines, stroke_node_features, connected_indices)
 
 
         stroke_operations_order_matrix = np.zeros((stroke_node_features.shape[0], len(step_files)))

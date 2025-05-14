@@ -28,7 +28,7 @@ optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.par
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction_synthetic')
+save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -125,8 +125,9 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch, dat
 
 
 def train():
+    print("DO SKETCH PREDICTION")
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -474,4 +475,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

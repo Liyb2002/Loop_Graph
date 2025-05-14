@@ -19,7 +19,7 @@ import Preprocessing.proc_CAD.perturbation_helper
 
 class perturbation_dataset_loader(Dataset):
     def __init__(self):
-        self.data_path = os.path.join(os.getcwd(), 'dataset', 'whole')
+        self.data_path = os.path.join(os.getcwd(), 'dataset', 'mid')
         self.data_dirs = [d for d in os.listdir(self.data_path) if os.path.isdir(os.path.join(self.data_path, d))]
         
         print(f"Number of data directories: {len(self.data_dirs)}")
@@ -33,6 +33,7 @@ class perturbation_dataset_loader(Dataset):
 
     def do_perturbation(self):
         for dir in tqdm(self.data_dirs, desc="Perturbing data"):
+            print("dir", dir)
             shape_info_dir = os.path.join(self.data_path, dir, 'shape_info')
             pattern = re.compile(r'shape_info_(\d+)\.pkl')
 
@@ -69,6 +70,11 @@ class perturbation_dataset_loader(Dataset):
 
             try:
                 stroke_cloud = Preprocessing.perturb_stroke_cloud_reverse.stroke_node_features_to_polyline(stroke_node_features, is_feature_lines)
+                if len(stroke_cloud) == 0:
+                    dir_to_remove = os.path.join(self.data_path, dir)
+                    shutil.rmtree(dir_to_remove)
+                    continue
+
                 stroke_cloud, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.remove_contained_lines_opacity(stroke_cloud, stroke_node_features, is_feature_lines)
                 # stroke_cloud, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.remove_random_lines(stroke_cloud, stroke_node_features, is_feature_lines)
                 perturbed_all_lines = Preprocessing.proc_CAD.perturbation_helper.do_perturb(stroke_cloud, stroke_node_features)

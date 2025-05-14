@@ -995,46 +995,37 @@ def coplanr_neighorbing_loop(matrix1, matrix2):
 def stroke_relations(stroke_node_features, connected_stroke_nodes):
     num_strokes = stroke_node_features.shape[0]
     
-    # Initialize the result matrices with zeros
+    # Initialize result matrices
     strokes_perpendicular = np.zeros((num_strokes, num_strokes), dtype=int)
     strokes_non_perpendicular = np.zeros((num_strokes, num_strokes), dtype=int)
     
-
-    # consider the circle case:
+    # Handle the circle case (assumes this modifies strokes_perpendicular in-place)
     strokes_perpendicular = stroke_relations_circle(stroke_node_features, strokes_perpendicular)
 
-    # Function to calculate the direction vector of a stroke
     def get_direction_vector(stroke_features):
-        point1 = stroke_features[:3]  # First 3D point
-        point2 = stroke_features[3:6]  # Second 3D point
-        return point2 - point1  # Direction vector
+        point1 = stroke_features[:3]
+        point2 = stroke_features[3:6]
+        vector = point2 - point1
+        norm = np.linalg.norm(vector)
+        return vector / norm if norm != 0 else vector  # Avoid divide by zero
 
-    # Iterate over all pairs of strokes
     for i in range(num_strokes):
         for j in range(num_strokes):
             if connected_stroke_nodes[i, j] == 1:
+                vec_i = get_direction_vector(stroke_node_features[i])
+                vec_j = get_direction_vector(stroke_node_features[j])
 
-                vector_i = get_direction_vector(stroke_node_features[i])
-                vector_j = get_direction_vector(stroke_node_features[j])
+                dot_product = np.dot(vec_i, vec_j)
                 
-                # Calculate the cross product
-                cross_product = np.cross(vector_i, vector_j)
-                
-                # Calculate the dot product
-                dot_product = np.dot(vector_i, vector_j)
-                
-                # Check if the strokes are perpendicular
-                if np.isclose(dot_product, 0, atol=1e-7, rtol=0):
+
+                if abs(dot_product) < 0.15 and not np.allclose(vec_i, vec_j, atol=1e-1) and not np.allclose(vec_i, -vec_j, atol=1e-1):
                     strokes_perpendicular[i, j] = 1
                 else:
                     strokes_non_perpendicular[i, j] = 1
             else:
-                # If not connected, they remain 0 in both matrices
                 strokes_perpendicular[i, j] = 0
                 strokes_non_perpendicular[i, j] = 0
-    
 
-            
     return strokes_perpendicular, strokes_non_perpendicular
     
 

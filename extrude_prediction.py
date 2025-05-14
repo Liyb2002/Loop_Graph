@@ -115,6 +115,7 @@ def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, data_indice
 
 
 def train():
+    print("DO EXTRUDE PREDICTION")
     # Load the dataset
     dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
     print(f"Total number of shape data: {len(dataset)}")
@@ -200,8 +201,6 @@ def train():
 
     # Split the dataset into training and validation sets (80-20 split)
     split_index = int(0.8 * len(graphs))
-    # train_graphs, val_graphs = graphs[:split_index], graphs[split_index:]
-    # train_masks, val_masks = stroke_selection_masks[:split_index], stroke_selection_masks[split_index:]
     train_graphs, val_graphs = graphs[:], graphs[:]
     train_masks, val_masks = stroke_selection_masks[:], stroke_selection_masks[:]
 
@@ -220,7 +219,7 @@ def train():
     mask_val_loader = DataLoader(padded_val_masks, batch_size=16, shuffle=False)
 
     # Training and validation loop
-    epochs = 15  # Number of epochs
+    epochs = 30  # Number of epochs
     best_accuracy = 0.0
 
     for epoch in range(epochs):
@@ -327,7 +326,7 @@ def eval():
     batch_size = 16
 
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/small')
     print(f"Total number of shape data: {len(dataset)}")
 
     graphs = []
@@ -399,8 +398,8 @@ def eval():
         if len(graphs) > 50:
             break
         
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx, data_idx)
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx, data_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), sketch_stroke_idx, data_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx, data_idx)
 
         
     print(f"Total number of preprocessed graphs: {len(graphs)}")

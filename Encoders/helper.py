@@ -938,7 +938,6 @@ def vis_brep_with_indices(brep, indices):
 # 0-2: point1, 3-5: point2, 6:alpha_value, 7-9: random point in the line
 
 
-
 def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, alpha_value=0.7):
     """
     Visualizes selected strokes in 3D space with a hand-drawn effect.
@@ -962,6 +961,10 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
+    # === Set Camera View ===
+    ax.view_init(elev=-150, azim=57, roll=0)  # Match the provided camera inclination and azimuth
+    # ax.dist = 7  # Simulate distance/zoom, optional
+
     # Clean plot styling
     ax.set_xticks([])
     ax.set_yticks([])
@@ -981,8 +984,6 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
         if len(geometry) < 2:
             continue
 
-        # Assign opacity if not already in the line
-
         alpha = stroke["opacity"]
 
         for j in range(1, len(geometry)):
@@ -997,7 +998,7 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
                     [start[1], end[1]],
                     [start[2], end[2]],
                     color='black',
-                    linewidth=0.6,  # thicker for higher opacity
+                    linewidth=0.6,
                     alpha=alpha)
 
     # === Rescale view ===
@@ -1023,7 +1024,7 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
                         [start[1], end[1]],
                         [start[2], end[2]],
                         color='red',
-                        linewidth=1.0,
+                        linewidth=2.0,
                         alpha=alpha_value)
         else:
             stroke = stroke_node_features[idx]
@@ -1033,11 +1034,10 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
                     [start[1], end[1]],
                     [start[2], end[2]],
                     color='red',
-                    linewidth=1.0,
+                    linewidth=2.0,
                     alpha=alpha_value)
 
     plt.show()
-
 
 
 
@@ -1058,11 +1058,12 @@ def vis_selected_strokes_synthetic(stroke_node_features, selected_stroke_idx, da
 
     # Load the already-processed all_lines
     final_edges_file_path = os.path.join(
-        os.getcwd(), 'dataset', 'whole', data_idx, 'perturbed_all_lines.json')
+        os.getcwd(), 'dataset', 'mid', data_idx, 'perturbed_all_lines.json')
     all_lines = read_json(final_edges_file_path)
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
+    ax.view_init(elev=-30, azim=50, roll=100)  # Match the provided camera inclination and azimuth
 
     # Clean plot styling
     ax.set_xticks([])
@@ -1125,8 +1126,8 @@ def vis_selected_strokes_synthetic(stroke_node_features, selected_stroke_idx, da
                         [start[1], end[1]],
                         [start[2], end[2]],
                         color='red',
-                        linewidth=1.0,
-                        alpha=alpha_value)
+                        linewidth=3.0,
+                        alpha=1.0)
         else:
             stroke = stroke_node_features[idx]
             start = stroke[0:3]
@@ -1135,8 +1136,8 @@ def vis_selected_strokes_synthetic(stroke_node_features, selected_stroke_idx, da
                     [start[1], end[1]],
                     [start[2], end[2]],
                     color='red',
-                    linewidth=1.0,
-                    alpha=alpha_value)
+                    linewidth=3.0,
+                    alpha=1.0)
 
     plt.show()
 
