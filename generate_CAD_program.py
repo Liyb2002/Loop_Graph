@@ -33,7 +33,7 @@ import copy
 import re
 
 # --------------------- Dataset --------------------- #
-dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/small', return_data_path=True)
+dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_cleaned', return_data_path=True)
 
 
 # --------------------- Directory --------------------- #
