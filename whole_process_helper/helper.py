@@ -362,9 +362,7 @@ def get_extrude_amount_circle_from_extrude_face(stroke_features, sketch_points, 
     direction = raw_direction / extrude_amount.item()
 
     return extrude_amount, direction, 1.0
-
-
-
+    
 
 def get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges):
     """

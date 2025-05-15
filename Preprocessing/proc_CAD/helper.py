@@ -575,29 +575,54 @@ def face_to_stroke(stroke_cloud_faces, stroke_features):
 #----------------------------------------------------------------------------------#
 
 
-def chosen_face_id(boundary_points, edge_features):
-    print("edge_features", len(edge_features))
-    print("boundary_points", len(boundary_points))
 
-
-def is_planar(points, tol=1e-5):
+def is_planar(points, tol=0.17):
     if len(points) < 3:
-        return True  # 2 points are trivially planar
+        return True
 
+    points = np.array(points)
     p0, p1, p2 = points[:3]
-    v1 = np.array(p1) - np.array(p0)
-    v2 = np.array(p2) - np.array(p0)
+
+    v1 = p1 - p0
+    v2 = p2 - p0
     normal = np.cross(v1, v2)
-    if np.linalg.norm(normal) < tol:
-        return False  # points are colinear
 
     normal = normal / np.linalg.norm(normal)
+
     for p in points[3:]:
-        if abs(np.dot(np.array(p) - np.array(p0), normal)) > tol:
+        dist = abs(np.dot(p - p0, normal))
+        if dist > tol:
             return False
+    
     return True
 
     
+def no_colinear(group_points, tol=1e-6):
+    """
+    Return True if no three points in the group are colinear.
+    
+    Parameters:
+        group_points: list of 3D points
+        tol: numerical tolerance for detecting colinearity
+        
+    Returns:
+        True if all point triplets are non-colinear, False otherwise
+    """
+    points = np.array(group_points)
+    
+    if len(points) < 3:
+        return True  # Less than 3 points can't be colinear
+
+    for p1, p2, p3 in combinations(points, 3):
+        v1 = np.array(p2) - np.array(p1)
+        v2 = np.array(p3) - np.array(p1)
+        cross = np.cross(v1, v2)
+        if np.linalg.norm(cross) < tol:
+            return False  # These three are colinear
+
+    return True
+
+
 
 #----------------------------------------------------------------------------------#
 import numpy as np
@@ -681,18 +706,18 @@ def face_aggregate_networkx(stroke_matrix):
     unique_groups = list(set(frozenset(group) for group in valid_groups))
 
 
-    # final_groups = []
-    # for group in unique_groups:
-    #     group_points = []
-    #     for edge_id in group:
-    #         stroke = stroke_matrix[edge_id]
-    #         group_points.append(stroke[:3])  # start point
-    #         group_points.append(stroke[3:6]) # end point
+    final_groups = []
+    for group in unique_groups:
+        group_points = []
+        for edge_id in group:
+            stroke = stroke_matrix[edge_id]
+            group_points.append(stroke[:3])  # start point
+            group_points.append(stroke[3:6]) # end point
         
-    #     if is_planar(group_points):
-    #         final_groups.append(group)
+        if is_planar(group_points) and no_colinear(group_points):
+            final_groups.append(group)
 
-    return unique_groups
+    return final_groups
 
 
 

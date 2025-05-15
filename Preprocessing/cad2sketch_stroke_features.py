@@ -2794,7 +2794,7 @@ def extract_only_construction_lines(final_edges_data):
 
 
 
-def point_on_line_extension(p, a, b, tol=1e-7):
+def point_on_line_extension(p, a, b, tol=1e-3):
     """
     Check if point p lies on the infinite line defined by points a and b.
     """
