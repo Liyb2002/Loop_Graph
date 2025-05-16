@@ -1058,12 +1058,11 @@ def vis_selected_strokes_synthetic(stroke_node_features, selected_stroke_idx, da
 
     # Load the already-processed all_lines
     final_edges_file_path = os.path.join(
-        os.getcwd(), 'dataset', 'mid', data_idx, 'perturbed_all_lines.json')
+        os.getcwd(), 'dataset', 'new_render', data_idx, 'perturbed_all_lines.json')
     all_lines = read_json(final_edges_file_path)
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.view_init(elev=-30, azim=50, roll=100)  # Match the provided camera inclination and azimuth
 
     # Clean plot styling
     ax.set_xticks([])

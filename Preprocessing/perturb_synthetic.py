@@ -19,7 +19,7 @@ import Preprocessing.proc_CAD.perturbation_helper
 
 class perturbation_dataset_loader(Dataset):
     def __init__(self):
-        self.data_path = os.path.join(os.getcwd(), 'dataset', 'mid')
+        self.data_path = os.path.join(os.getcwd(), 'dataset', 'new_render')
         self.data_dirs = [d for d in os.listdir(self.data_path) if os.path.isdir(os.path.join(self.data_path, d))]
         
         print(f"Number of data directories: {len(self.data_dirs)}")

@@ -339,8 +339,8 @@ def eval():
         if len(graphs) > 200:
             break
         
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), [], data_idx)
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
+        Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), [], data_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), fillet_stroke_idx, data_idx)
 
         
     print(f"Total number of preprocessed graphs: {len(graphs)}")

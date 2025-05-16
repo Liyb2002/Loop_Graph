@@ -642,7 +642,9 @@ def face_aggregate_networkx(stroke_matrix):
     list: A list of sets of stroke indices that form valid planar loops (triangles or quads).
     """
     
-    stroke_matrix = np.array(stroke_matrix)[:, :6]
+    full_stroke_matrix = np.array(stroke_matrix)          
+    stroke_matrix = full_stroke_matrix[:, :6]
+    stroke_type = full_stroke_matrix[:, -1]
     G = nx.Graph()
     edge_to_stroke_id = {}
 
@@ -657,6 +659,9 @@ def face_aggregate_networkx(stroke_matrix):
 
     # Build graph with custom closeness-based point matching
     for idx, stroke in enumerate(stroke_matrix):
+        if stroke_type[idx] != 1:
+            continue
+
         start_raw = tuple(stroke[:3])
         end_raw = tuple(stroke[3:])
 

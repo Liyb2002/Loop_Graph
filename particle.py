@@ -193,10 +193,10 @@ class Particle():
             stroke_to_edge
         )
 
-        # if len(self.past_programs) == 3:
-        #     Encoders.helper.vis_brep(self.brep_edges)
-        #     used_indices = np.where(stroke_to_edge > 0.5)[0].tolist()
-        #     Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), used_indices, self.data_idx)
+        if len(self.past_programs) == 7:
+            Encoders.helper.vis_brep(self.brep_edges)
+            used_indices = np.where(stroke_to_edge > 0.5)[0].tolist()
+            Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), used_indices, self.data_idx)
 
         if self.mark_off_new_strokes(stroke_to_edge, stroke_to_edge_circle) == False:
             print("No new feature added")
@@ -485,25 +485,45 @@ extrude_face_graph_decoder.eval()
 extrude_face_graph_encoder.load_state_dict(torch.load(os.path.join(extrude_face_dir, 'graph_encoder.pth'), weights_only=True))
 extrude_face_graph_decoder.load_state_dict(torch.load(os.path.join(extrude_face_dir, 'graph_decoder.pth'), weights_only=True))
 
-def predict_extrude(gnn_graph, sketch_selection_mask, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox):
+def predict_extrude(gnn_graph, sketch_selection_mask, data_idx):
     gnn_graph.set_select_sketch(sketch_selection_mask)
-
     x_dict = extrude_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
     extrude_selection_mask = extrude_graph_decoder(x_dict)
-    
-    extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+    gnn_graph.set_select_extrude_strokes(extrude_selection_mask)
+
+    # selected_extrude_stroke_idx =  (extrude_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+    # print("selected_extrude_stroke_idx", selected_extrude_stroke_idx)
+
+
+
+    x_dict2 = extrude_face_graph_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+    extruded_face_mask = extrude_face_graph_decoder(x_dict2)
+
+
+    selected_loop_idx =  (extruded_face_mask >= 0.5).nonzero(as_tuple=True)[0]
+
+    if len(selected_loop_idx) == 0:
+        return extrude_selection_mask, None, True
+
+    extruded_face_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_loop_idx)
+
+    selected_stroke_loop_idx =  (sketch_selection_mask >= 0.5).nonzero(as_tuple=True)[0]
+    sketch_face_stroke_idx = Encoders.helper.find_selected_strokes_from_loops(gnn_graph['stroke', 'represents', 'loop'].edge_index, selected_stroke_loop_idx)
+
     # _, extrude_stroke_idx = torch.max(extrude_selection_mask, dim=0)
-    # Encoders.helper.vis_selected_strokes_bbox(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
-    return extrude_selection_mask
+    # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), extrude_stroke_idx + sketch_stroke_idx, data_idx)
+    return extruded_face_stroke_idx, sketch_face_stroke_idx, False
 
-def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox):
-    # extrude_selection_mask = predict_extrude(gnn_graph, sketch_selection_mask, data_idx, lifted_stroke_node_features_bbox, cleaned_stroke_node_features_bbox)
-    # extrude_amount, extrude_direction, selected_prob= whole_process_helper.helper.get_extrude_amount(gnn_graph, extrude_selection_mask, sketch_points, brep_edges)
+def do_extrude(gnn_graph, sketch_selection_mask, sketch_points, brep_edges, data_idx):
+    extruded_face_stroke_idx, sketch_face_stroke_idx, isFallback= predict_extrude(gnn_graph, sketch_selection_mask, data_idx)
     
+    if isFallback:
+        # extruded_face_stroke_idx is actually extrude_selection_mask in this case
+        extrude_amount, extrude_direction, selected_prob= whole_process_helper.helper.get_extrude_amount(gnn_graph, extruded_face_stroke_idx, sketch_points, brep_edges)
+    else:
+        extrude_amount, extrude_direction, selected_prob= whole_process_helper.helper.get_extrude_amount_from_extrude_face(gnn_graph, extruded_face_stroke_idx, sketch_face_stroke_idx, sketch_points)
 
-    extrude_amount, extrude_direction = whole_process_helper.helper.get_extrude_fallback(sketch_points, gnn_graph)
-    
-    return extrude_amount, extrude_direction, 1.0
+    return extrude_amount, extrude_direction, selected_prob
 
 
 
