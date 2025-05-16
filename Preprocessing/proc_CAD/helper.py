@@ -1059,47 +1059,46 @@ def stroke_relations(stroke_node_features, connected_stroke_nodes):
     return strokes_perpendicular, strokes_non_perpendicular
     
 
-
 def stroke_relations_circle(stroke_node_features, strokes_perpendicular):
-    
+    """
+    Find all strokes that are perpendicular to a circle (or cylinder base),
+    meaning the stroke points lie on the circle and the direction is close to the sketch normal.
+    """
+
     num_strokes = stroke_node_features.shape[0]
     EPSILON = 5e-5
+    DEGREE_TOLERANCE = np.cos(np.deg2rad(10))  # cosine of 10 degrees
 
     for i in range(num_strokes):
-        # we find a circle
-    
-        sketch_center = None
-        sketch_radius = 0
-        cylinder_height = 0
-
-        if stroke_node_features[i][-1] == 2:
+        if stroke_node_features[i][-1] == 2:  # Circle
             sketch_center = stroke_node_features[i][0:3]
+            sketch_normal = stroke_node_features[i][3:6]
             sketch_radius = stroke_node_features[i][7]
 
-            # Find matching circle with same radius but different center
-            for i_2 in range(num_strokes):
-                if stroke_node_features[i_2][-1] == 2:
-                    center = stroke_node_features[i_2][0:3]
-                    radius = stroke_node_features[i_2][7]
-                    if np.linalg.norm(np.array(center) - np.array(sketch_center)) > 100 * EPSILON and abs(radius - sketch_radius) < EPSILON:
-                        cylinder_height = dist(center, sketch_center)
-                        break
-            
             for j in range(num_strokes):
-                if stroke_node_features[j][-1] == 1:
+                if stroke_node_features[j][-1] == 1:  # Line
                     point_1 = stroke_node_features[j][0:3]
                     point_2 = stroke_node_features[j][3:6]
-                    length = dist(point_1, point_2)
 
-                    if abs(length - cylinder_height) < EPSILON:
-                        d1 = dist(point_1, sketch_center)
-                        d2 = dist(point_2, sketch_center)
-                        if abs(d1 - sketch_radius) < EPSILON or abs(d2 - sketch_radius) < EPSILON:
-                            strokes_perpendicular[i][j] = 1
-                            strokes_perpendicular[j][i] = 1
-        
+                    # Distances from endpoints to the circle center
+                    d1 = np.linalg.norm(point_1 - sketch_center)
+                    d2 = np.linalg.norm(point_2 - sketch_center)
+
+                    # Direction vector of the line (normalized)
+                    direction_vec = point_2 - point_1
+                    direction_vec_norm = np.linalg.norm(direction_vec)
+                    if direction_vec_norm == 0:
+                        continue  # skip degenerate stroke
+                    direction_vec = direction_vec / direction_vec_norm
+
+                    # Check if one end lies on the circle and if the direction is nearly perpendicular to the normal
+                    dot_product = abs(np.dot(direction_vec, sketch_normal))  # cosine of angle between vectors
+
+                    if (abs(d1) < sketch_radius * 1.2 or abs(d2) < sketch_radius * 1.2) and dot_product >= DEGREE_TOLERANCE:
+                        strokes_perpendicular[i][j] = 1
+                        strokes_perpendicular[j][i] = 1
+
     return strokes_perpendicular
-
 
 
 

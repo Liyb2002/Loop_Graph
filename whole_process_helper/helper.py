@@ -935,16 +935,16 @@ def find_valid_sketch(gnn_graph, sketch_selection_mask):
     if len(valid_indices) == 0:
         return [-1], -1
 
-    top_probs = sketch_selection_mask[valid_indices]
+    top_probs = sketch_selection_mask[valid_indices].squeeze()
     top_probs = torch.maximum(top_probs, torch.tensor(0.2))
     normalized_probs = top_probs / top_probs.sum()
-    
-    # Sample an index based on the normalized probabilities
-    sampled_index = torch.multinomial(normalized_probs, num_samples=1)[0].item() 
+
+    sampled_index = torch.multinomial(normalized_probs, num_samples=1).item()
     final_index = valid_indices[sampled_index]
     final_prob = max(normalized_probs[sampled_index].item(), top_probs[sampled_index].item())
-    
+
     return [final_index], final_prob
+
 
 
 # --------------------------------------------------------------------------- #
