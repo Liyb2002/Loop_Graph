@@ -1259,10 +1259,14 @@ def connected_strokes(stroke_node_features):
     # Iterate over each pair of strokes
     # Iterate over each pair of strokes
     for i in range(num_strokes):
+        if stroke_node_features[i, -1] == 2:
+            continue
         stroke_i_start = stroke_node_features[i, :3]
         stroke_i_end = stroke_node_features[i, 3:6]
 
         for j in range(i + 1, num_strokes):
+            if stroke_node_features[j, -1] == 2:
+                continue
             stroke_j_start = stroke_node_features[j, :3]
             stroke_j_end = stroke_node_features[j, 3:6]
 
@@ -1285,18 +1289,17 @@ def connected_strokes(stroke_node_features):
             radius = stroke_node_features[i, 7]
 
             for j in range(num_strokes):
-                if i == j:
+                if i == j or stroke_node_features[j, -1] != 1:
                     continue
 
                 stroke_j_start = stroke_node_features[j, :3]
                 stroke_j_end = stroke_node_features[j, 3:6]
 
-                if Preprocessing.proc_CAD.global_thresholding.circle_radius_close(center, radius, stroke_j_start) or Preprocessing.proc_CAD.global_thresholding.circle_radius_close(center, radius, stroke_j_end):
+                if dist(center, stroke_j_start) < radius * 1.2 or dist(center, stroke_j_end) < radius * 1.2:
                     connected[i, j] = 1
                     connected[j, i] = 1
 
     return connected
- 
 
 
 #----------------------------------------------------------------------------------#
