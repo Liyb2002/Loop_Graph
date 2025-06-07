@@ -154,7 +154,7 @@ def duplicate_lines(all_lines, stroke_node_features):
         if stroke_type == 3:
             prob = 0.5
         elif stroke_type == 2:
-            prob = 0.5
+            prob = 0.8
         else:
             prob = 0.1
 
@@ -261,14 +261,14 @@ def perturb_straight_line(pts):
     # Randomize perturbation strengths
 
     # For Synthetic
-    point_jitter_ratio = np.random.uniform(0.001, 0.003)
-    endpoint_shift_ratio = np.random.uniform(0.01, 0.03)
-    overdraw_ratio = np.random.uniform(0.006, 0.1)
+    # point_jitter_ratio = np.random.uniform(0.001, 0.003)
+    # endpoint_shift_ratio = np.random.uniform(0.01, 0.03)
+    # overdraw_ratio = np.random.uniform(0.006, 0.1)
 
     # For cad2sketch
-    # point_jitter_ratio = np.random.uniform(0.002, 0.005)
-    # endpoint_shift_ratio = np.random.uniform(0.01, 0.05)
-    # overdraw_ratio = np.random.uniform(0.001, 0.2)
+    point_jitter_ratio = np.random.uniform(0.002, 0.005)
+    endpoint_shift_ratio = np.random.uniform(0.01, 0.05)
+    overdraw_ratio = np.random.uniform(0.005, 0.1)
 
     point_jitter = point_jitter_ratio * stroke_length
     endpoint_shift = endpoint_shift_ratio * stroke_length
@@ -415,7 +415,7 @@ def perturb_circle_geometry(pts):
 
     # === Add extension line beyond the circle ===
     num_extra_points = np.random.randint(1, 4)  # 1 to 3 extra points
-    extension_spacing = np.random.uniform(0.05, 0.1) * radius
+    extension_spacing = np.random.uniform(0.1, 0.2) * radius
 
     # Tangent direction at end
     tangent = new_pts[-1] - new_pts[-2]

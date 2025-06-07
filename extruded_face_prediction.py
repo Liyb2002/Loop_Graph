@@ -320,6 +320,7 @@ def eval():
     loop_selection_masks = []
 
     # Preprocess and build the graphs (same as in training)
+    count = 0
     for data in tqdm(dataset, desc=f"Building Graphs"):
         if data is None:
             continue
@@ -409,26 +410,24 @@ def eval():
         loop_selection_masks.append(loop_selection_mask)
 
 
-        x_dict = extruded_face_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
-        predicted_extruded_face_loops = extruded_face_decoder(x_dict)
-        predicted_extruded_face_loop_idx = torch.argmax(predicted_extruded_face_loops).item()
-        predicted_extruded_face_stroke_idx = stroke_cloud_loops[predicted_extruded_face_loop_idx]
+        # x_dict = extruded_face_encoder(gnn_graph.x_dict, gnn_graph.edge_index_dict)
+        # predicted_extruded_face_loops = extruded_face_decoder(x_dict)
+        # predicted_extruded_face_loop_idx = torch.argmax(predicted_extruded_face_loops).item()
+        # predicted_extruded_face_stroke_idx = stroke_cloud_loops[extruded_face_loop_idx]
         
-        # combined_idx = torch.cat([sketch_stroke_idx, remain_stroke_idx], dim=0)
-        combined_idx = torch.cat([sketch_stroke_idx, torch.tensor(predicted_extruded_face_stroke_idx)])
+        combined_idx = torch.cat([sketch_stroke_idx, extruded_face_loop_idx], dim=0)
 
-        print("remain_stroke_idx", remain_stroke_idx)
-        if ones_indices[0].item() != predicted_extruded_face_loop_idx:
-            print("predicted_extruded_face_loop_idx", predicted_extruded_face_loop_idx)
-            print("predicted_extruded_face_stroke_idx", predicted_extruded_face_stroke_idx)
-            print('data_idx', data_idx)
-            print("combined_idx", combined_idx)
-        Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), [], data_idx)
-
+        # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(), [], data_idx)
+        # Encoders.helper.vis_used_strokes(gnn_graph['stroke'].x.cpu().numpy(), data_idx)
         # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),  [], data_idx)
-        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),  [], data_idx)
+        # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(),  sketch_stroke_idx, data_idx)
+        Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(),  sketch_stroke_idx,  data_idx)
+        Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(),  combined_idx,  data_idx)
 
 
+        # Encoders.helper.vis_selected_strokes_render(gnn_graph['stroke'].x.cpu().numpy(),combined_idx, data_idx)
+
+        count += 1
 
 
 #---------------------------------- Public Functions ----------------------------------#

@@ -962,7 +962,7 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
     ax = fig.add_subplot(111, projection='3d')
 
     # === Set Camera View ===
-    ax.view_init(elev=-150, azim=57, roll=0)  # Match the provided camera inclination and azimuth
+    # ax.view_init(elev=-150, azim=57, roll=0)  # Match the provided camera inclination and azimuth
     # ax.dist = 7  # Simulate distance/zoom, optional
 
     # Clean plot styling
@@ -1038,6 +1038,206 @@ def vis_selected_strokes(stroke_node_features, selected_stroke_idx, data_idx, al
                     alpha=alpha_value)
 
     plt.show()
+
+
+
+
+def vis_selected_strokes_render(stroke_node_features, selected_stroke_idx, data_idx, alpha_value=0.7):
+    """
+    Visualizes selected strokes in 3D space with a rotating camera and saves a rendered animation.
+    """
+    import os
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    from matplotlib.animation import FuncAnimation
+    import json
+
+    def read_json(path):
+        with open(path) as f:
+            return json.load(f)
+
+    # Load the already-processed all_lines
+    final_edges_file_path = os.path.join(
+        os.getcwd(), 'dataset', 'cad2sketch_annotated', data_idx, 'perturbed_all_lines.json')
+    all_lines = read_json(final_edges_file_path)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Clean plot styling
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.set_frame_on(False)
+    ax.grid(False)
+    ax.set_axis_off()
+
+    # Bounding box init
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # === First pass: plot all strokes ===
+    for stroke in all_lines:
+        geometry = stroke["geometry"]
+        if len(geometry) < 2:
+            continue
+        for j in range(1, len(geometry)):
+            start = geometry[j - 1]
+            end = geometry[j]
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]],
+                    color='black', linewidth=0.6, alpha=stroke["opacity"])
+
+    # === Second pass: highlight selected strokes in red ===
+    for idx in selected_stroke_idx:
+        if idx < len(all_lines):
+            geometry = all_lines[idx]["geometry"]
+            if len(geometry) < 2:
+                continue
+            for j in range(1, len(geometry)):
+                start = geometry[j - 1]
+                end = geometry[j]
+                ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]],
+                        color='red', linewidth=2.0, alpha=alpha_value)
+        else:
+            stroke = stroke_node_features[idx]
+            start = stroke[0:3]
+            end = stroke[3:6]
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]],
+                    color='red', linewidth=2.0, alpha=alpha_value)
+
+    # === Rescale view ===
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # === Animate camera ===
+    # Store the initial azimuth
+    azim0 = ax.azim  # this gets the default starting azimuth
+
+    # Animation update function
+    def update(frame):
+        azim = azim0 + frame  # rotate from starting azimuth
+        ax.view_init(elev=15, azim=azim)
+        return fig,
+
+    # Create animation (1° per frame, 360° total)
+    anim = FuncAnimation(fig, update, frames=360, interval=10, blit=False)
+
+    # Save the animation
+    output_path = os.path.join('/Users/yuanboli/Desktop', f"rotation_{data_idx}.mp4")
+    anim.save(output_path, fps=36, dpi=300)
+    print(f"Saved animation to {output_path}")
+
+
+
+
+
+
+
+def vis_selected_strokes_render_synthetic(stroke_node_features, selected_stroke_idx, data_idx, alpha_value=0.7):
+    """
+    Visualizes selected strokes in 3D space with a rotating camera and saves a rendered animation.
+    """
+    import os
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    from matplotlib.animation import FuncAnimation
+    import json
+
+    def read_json(path):
+        with open(path) as f:
+            return json.load(f)
+
+    # Load the already-processed all_lines
+    final_edges_file_path = os.path.join(
+        os.getcwd(), 'dataset', 'new_render', data_idx, 'perturbed_all_lines.json')
+    all_lines = read_json(final_edges_file_path)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Clean plot styling
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.set_frame_on(False)
+    ax.grid(False)
+    ax.set_axis_off()
+
+    # Bounding box init
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # === First pass: plot all strokes ===
+    for stroke in all_lines:
+        geometry = stroke["geometry"]
+        if len(geometry) < 2:
+            continue
+        for j in range(1, len(geometry)):
+            start = geometry[j - 1]
+            end = geometry[j]
+            x_min, x_max = min(x_min, start[0], end[0]), max(x_max, start[0], end[0])
+            y_min, y_max = min(y_min, start[1], end[1]), max(y_max, start[1], end[1])
+            z_min, z_max = min(z_min, start[2], end[2]), max(z_max, start[2], end[2])
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]],
+                    color='black', linewidth=0.6, alpha=stroke["opacity"])
+
+    # === Second pass: highlight selected strokes in red ===
+    for idx in selected_stroke_idx:
+        if idx < len(all_lines):
+            geometry = all_lines[idx]["geometry"]
+            if len(geometry) < 2:
+                continue
+            for j in range(1, len(geometry)):
+                start = geometry[j - 1]
+                end = geometry[j]
+                ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]],
+                        color='red', linewidth=2.0, alpha=alpha_value)
+        else:
+            stroke = stroke_node_features[idx]
+            start = stroke[0:3]
+            end = stroke[3:6]
+            ax.plot([start[0], end[0]], [start[1], end[1]], [start[2], end[2]],
+                    color='red', linewidth=2.0, alpha=alpha_value)
+
+    # === Rescale view ===
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    z_center = (z_min + z_max) / 2
+    max_diff = max(x_max - x_min, y_max - y_min, z_max - z_min)
+
+    ax.set_xlim([x_center - max_diff / 2, x_center + max_diff / 2])
+    ax.set_ylim([y_center - max_diff / 2, y_center + max_diff / 2])
+    ax.set_zlim([z_center - max_diff / 2, z_center + max_diff / 2])
+
+    # === Animate camera ===
+    # Store the initial azimuth
+    azim0 = ax.azim  # this gets the default starting azimuth
+
+    # Animation update function
+    def update(frame):
+        azim = azim0 + frame  # rotate from starting azimuth
+        ax.view_init(elev=15, azim=azim)
+        return fig,
+
+    # Create animation (1° per frame, 360° total)
+    anim = FuncAnimation(fig, update, frames=360, interval=10, blit=False)
+
+    # Save the animation
+    output_path = os.path.join('/Users/yuanboli/Desktop', f"rotation_{data_idx}.mp4")
+    anim.save(output_path, fps=36, dpi=300)
+    print(f"Saved animation to {output_path}")
+
 
 
 
@@ -1158,9 +1358,9 @@ def vis_used_strokes(stroke_node_features, data_idx, alpha_value=0.7):
     
     # Initialize the 3D plot
     final_edges_file_path = os.path.join(
-    os.getcwd(), 'dataset', 'cad2sketch_annotated', data_idx, 'final_edges.json')
-    final_edges_data = read_json(final_edges_file_path)
-    all_lines = extract_all_lines(final_edges_data)
+    os.getcwd(), 'dataset', 'cad2sketch_annotated', data_idx, 'perturbed_all_lines.json')
+    all_lines = read_json(final_edges_file_path)
+    # all_lines = extract_all_lines(final_edges_data)
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -1182,6 +1382,8 @@ def vis_used_strokes(stroke_node_features, data_idx, alpha_value=0.7):
     for stroke in all_lines:
         geometry = stroke["geometry"]
 
+        alpha = stroke["opacity"]
+
         if len(geometry) < 2:
             continue
 
@@ -1199,7 +1401,8 @@ def vis_used_strokes(stroke_node_features, data_idx, alpha_value=0.7):
                     [start[1], end[1]], 
                     [start[2], end[2]], 
                     color='black', 
-                    linewidth=0.5)
+                    linewidth=0.5,
+                    alpha = alpha)
 
     # Compute the center and rescale
     x_center = (x_min + x_max) / 2
@@ -1226,7 +1429,7 @@ def vis_used_strokes(stroke_node_features, data_idx, alpha_value=0.7):
                     ax.plot([start[0], end[0]],
                             [start[1], end[1]],
                             [start[2], end[2]],
-                            color='red',
+                            color='blue',
                             linewidth=1.0)
             else:
                 stroke = stroke_node_features[idx]
@@ -1235,7 +1438,7 @@ def vis_used_strokes(stroke_node_features, data_idx, alpha_value=0.7):
                 ax.plot([start[0], end[0]],
                         [start[1], end[1]],
                         [start[2], end[2]],
-                        color='red',
+                        color='blue',
                         linewidth=1.0)
 
     plt.show()

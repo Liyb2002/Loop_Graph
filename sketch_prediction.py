@@ -29,6 +29,7 @@ optimizer = optim.Adam(list(graph_encoder.parameters()) + list(graph_decoder.par
 
 current_dir = os.getcwd()
 save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction')
+joint_save_dir = os.path.join(current_dir, 'checkpoints', 'sketch_prediction_join')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -37,8 +38,8 @@ def load_models():
 
 
 def save_models():
-    torch.save(graph_encoder.state_dict(), os.path.join(save_dir, 'graph_encoder.pth'))
-    torch.save(graph_decoder.state_dict(), os.path.join(save_dir, 'graph_decoder.pth'))
+    torch.save(graph_encoder.state_dict(), os.path.join(joint_save_dir, 'graph_encoder.pth'))
+    torch.save(graph_decoder.state_dict(), os.path.join(joint_save_dir, 'graph_decoder.pth'))
 
 
 # ------------------------------------------------------------------------------# 
@@ -125,9 +126,10 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch, dat
 
 
 def train():
+    load_models()
     print("DO SKETCH PREDICTION")
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0

@@ -102,12 +102,17 @@ class parsed_program():
 
         
         if self.canvas is None:
+            # this is the first sketch
             self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
         else:
-            if random.random() < 0.4:
-                self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
-            else:
+        
+            # Simulate the new body
+            new_part = Preprocessing.proc_CAD.build123.protocol.simulate_extrude(self.prev_sketch, extrude_amount)
+
+            if Preprocessing.proc_CAD.build123.protocol.has_volume_overlap(self.canvas.part, new_part):
                 self.canvas = Preprocessing.proc_CAD.build123.protocol.build_subtract(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
+            else:
+                self.canvas = Preprocessing.proc_CAD.build123.protocol.build_extrude(self.Op_idx, self.canvas, self.prev_sketch, extrude_amount, self.output, self.data_directory)
 
         self.Op_idx += 1
         

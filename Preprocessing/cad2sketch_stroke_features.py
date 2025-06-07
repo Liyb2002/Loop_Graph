@@ -1521,7 +1521,7 @@ def vis_feature_lines(feature_lines):
     ax.set_frame_on(False)
     ax.grid(False)
     ax.set_axis_off()
-    ax.view_init(elev=-121, azim=-104, roll=90)  # Match the provided camera inclination and azimuth
+    # ax.view_init(elev=-121, azim=-104, roll=90)  # Match the provided camera inclination and azimuth
 
     # Initialize bounding box
     x_min, x_max = float('inf'), float('-inf')

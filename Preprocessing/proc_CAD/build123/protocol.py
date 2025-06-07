@@ -160,3 +160,15 @@ def build_chamfer(count, canvas, target_edge, radius, output, data_dir):
 
 
     return canvas
+
+
+
+def simulate_extrude(sketch, amount):
+    with BuildPart() as temp:
+        extrude(sketch, amount=amount)
+    return temp.part
+
+def has_volume_overlap(canvas, new_part):
+    intersection = canvas & new_part
+    return intersection.volume > new_part.volume * 0.5
+
