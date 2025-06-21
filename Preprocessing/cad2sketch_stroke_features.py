@@ -2805,6 +2805,29 @@ def point_on_line_extension(p, a, b, tol=1e-3):
     return np.linalg.norm(cross) < tol
 
 
+def point_on_line(p, a, b, tol=1e-3):
+    """
+    Check if point p lies on the finite line segment defined by points a and b.
+    """
+    a, b, p = np.array(a), np.array(b), np.array(p)
+    ab = b - a
+    ap = p - a
+    cross = np.cross(ab, ap)
+
+    # Check collinearity
+    if np.linalg.norm(cross) > tol:
+        return False
+
+    # Check if p lies between a and b
+    dot_product = np.dot(ap, ab)
+    if dot_product < 0:
+        return False  # p is before a
+    if dot_product > np.dot(ab, ab):
+        return False  # p is beyond b
+
+    return True
+
+
 def split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix):
     stroke_node_features = np.array(stroke_node_features)
     add_feature_lines = []
@@ -2820,73 +2843,78 @@ def split_and_merge_stroke_cloud(stroke_node_features, is_feature_line_matrix):
 
     unique_points = list(unique_points)
 
-
     # Step 2.1: Find sets of collinear points
     collinear_candidate_sets = []
 
     for i, stroke in enumerate(stroke_node_features):
-        if stroke[-1] != 1 or not is_feature_line_matrix[i]:
-            continue
-        p1 = tuple(np.round(stroke[:3], 5))
-        p2 = tuple(np.round(stroke[3:6], 5))
-        collinear_candidate_sets.append(set([p1, p2]))
+        if stroke[-1] == 1 and is_feature_line_matrix[i]:
+            p1 = tuple(np.round(stroke[:3], 5))
+            p2 = tuple(np.round(stroke[3:6], 5))
+            collinear_candidate_sets.append(set([p1, p2]))
 
     # Step 2.2: Enrich each set with all other points that lie on the same line
+    collinear_sets = []
     for point in unique_points:
         for s in collinear_candidate_sets:
-            s_list = list(s)
-            if len(s_list) >= 2:
-                p1, p2 = s_list[0], s_list[1]
-                if point != p1 and point != p2 and point_on_line_extension(point, p1, p2):
-                    s.add(point)
+            if len(s) == 2:
+                s_list = list(s)
+                dist_collinear = np.linalg.norm(np.array(list(s)[0]) - np.array(list(s)[1]))
+                ref = s_list[0]  # pick first point as reference
 
-    # Step 2.3: Sort and deduplicate sets
-    normalized_sets = []
-    seen_sets = set()
+                is_collinear = all(point_on_line(point, ref, other) for other in s if other != point)
+                is_far_enough = all(np.linalg.norm(np.array(point) - np.array(other)) > dist_collinear * 0.2 for other in s)
 
-    for s in collinear_candidate_sets:
-        if len(s) > 2:
-            sorted_tuple = tuple(sorted(s))
-            if sorted_tuple not in seen_sets:
-                seen_sets.add(sorted_tuple)
-                normalized_sets.append(sorted_tuple)
+                if is_collinear and is_far_enough:
+                    new_set = set(s)
+                    new_set.add(point)
+                    collinear_sets.append(new_set)
 
-    # Step 2.4: Final result
-    collinear_sets = normalized_sets
 
-    # for c_set in collinear_candidate_sets:
+    # for c_set in collinear_sets:
     #     print("set", c_set)
 
     # Step 3: From each collinear set, generate all segments (in order of distance)
     for col_set in collinear_sets:
-        col_set_np = np.array(col_set)
-        # Sort by distance along the first axis
+        col_set_np = np.array(list(col_set))
+
+        if len(col_set_np) != 3:
+            continue  # skip if malformed set
+
+        # Use the first point as anchor
         anchor = col_set_np[0]
-        sorted_points = sorted(col_set_np, key=lambda x: np.linalg.norm(x - anchor))
-        for i in range(len(sorted_points) - 1):
-            pt1 = sorted_points[i]
-            pt2 = sorted_points[i + 1]
+        others = [pt for pt in col_set_np if not np.allclose(pt, anchor)]
+
+        for pt in others:
+            pt1 = anchor
+            pt2 = pt
             new_line = np.concatenate([pt1, pt2])
+
             # Check if line already exists
             exists = False
-            for stroke in stroke_node_features:
+            for stroke in list(stroke_node_features) + list(add_feature_lines):
                 s = np.round(stroke[:3], 4)
                 e = np.round(stroke[3:6], 4)
-                if (np.allclose(s, pt1) and np.allclose(e, pt2)) or \
-                   (np.allclose(s, pt2) and np.allclose(e, pt1)):
+                tol = 0.1 * np.linalg.norm(s - e)
+
+                if (np.linalg.norm(s - pt1) < tol and np.linalg.norm(e - pt2) < tol) or \
+                (np.linalg.norm(s - pt2) < tol and np.linalg.norm(e - pt1) < tol):
                     exists = True
                     break
+
             if not exists:
-                # Add feature stroke
-                new_line = list(new_line) + [0] + [0, 0, 0, 1]
-                add_feature_lines.append(new_line)
+                # Add feature stroke with custom attributes
+                new_line_with_attr = list(new_line) + [0] + [0, 0, 0, 1]
+                add_feature_lines.append(new_line_with_attr)
         
+
+
     updated_strokes = np.concatenate([stroke_node_features, np.array(add_feature_lines)], axis=0) \
         if add_feature_lines else stroke_node_features
 
     return updated_strokes, np.array(add_feature_lines)
 
-import numpy as np
+
+
 
 def are_colinear(p1, p2, p3):
     v1 = np.array(p2) - np.array(p1)
