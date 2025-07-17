@@ -597,7 +597,7 @@ def is_planar(points, tol=0.17):
     return True
 
     
-def no_colinear(group_points, tol=1e-6):
+def no_colinear(group_points, tol=1e-5):
     """
     Return True if no three points in the group are colinear.
     
