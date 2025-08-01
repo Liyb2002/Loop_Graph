@@ -134,9 +134,9 @@ class cad2sketch_dataset_loader(Dataset):
             # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_brep_sameGraph(stroke_node_features, new_edge_features_list)
 
             # if num_add_edges !=0:
-            # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_highlights(stroke_node_features, added_feature_lines)
-            #     print("num_add_edges", num_add_edges)
-            #     print("-----")
+                # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_and_highlights(stroke_node_features, added_feature_lines)
+                # print("num_add_edges", num_add_edges)
+                # print("-----")
         stroke_operations_order_matrix = None
 
 
@@ -155,7 +155,10 @@ class cad2sketch_dataset_loader(Dataset):
         stroke_cloud_loops = Preprocessing.proc_CAD.helper.face_aggregate_networkx(stroke_node_features) + Preprocessing.proc_CAD.helper.face_aggregate_circle(stroke_node_features)
         stroke_cloud_loops = Preprocessing.proc_CAD.helper.reorder_loops(stroke_cloud_loops)
         stroke_cloud_loops = [list(loop) for loop in stroke_cloud_loops]
-        Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_node_features, stroke_cloud_loops)
+        # Preprocessing.cad2sketch_stroke_features.vis_feature_lines_loop_all(all_lines, stroke_node_features, stroke_cloud_loops)
+        
+        print("stroke_node_features", stroke_node_features.shape)
+        print("number loops", len(stroke_cloud_loops))
         # Ensure sketch loops exist:
         prev_sketch_strokes = 0
         for idx, step_file in enumerate(step_files):

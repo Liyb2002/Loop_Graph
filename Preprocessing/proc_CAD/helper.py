@@ -7,6 +7,7 @@ import pyrr
 import json 
 import torch
 import math
+from numpy.linalg import norm
 
 import matplotlib.pyplot as plt
 from itertools import permutations, combinations
@@ -597,32 +598,66 @@ def is_planar(points, tol=0.17):
     return True
 
     
-def no_colinear(group_points, tol=1e-5):
+def no_colinear(group_points, angle_threshold_deg=5):
     """
-    Return True if no three points in the group are colinear.
+    Returns True if all triplets of points are non-colinear based on angle only.
     
     Parameters:
         group_points: list of 3D points
-        tol: numerical tolerance for detecting colinearity
+        angle_threshold_deg: the minimal angle (in degrees) to consider points as non-colinear.
         
     Returns:
-        True if all point triplets are non-colinear, False otherwise
+        True if all point triplets are non-colinear, False otherwise.
     """
     points = np.array(group_points)
-    
     if len(points) < 3:
-        return True  # Less than 3 points can't be colinear
+        return True
+
+    
+    # Convert threshold to cosine for more efficient checking
+    cos_thresh = np.cos(np.deg2rad(angle_threshold_deg))
 
     for p1, p2, p3 in combinations(points, 3):
         v1 = np.array(p2) - np.array(p1)
         v2 = np.array(p3) - np.array(p1)
-        cross = np.cross(v1, v2)
-        if np.linalg.norm(cross) < tol:
-            return False  # These three are colinear
+
+        norm_v1 = norm(v1)
+        norm_v2 = norm(v2)
+
+        # Skip if any vector is degenerate (exact same points)
+        if norm_v1 == 0 or norm_v2 == 0:
+            continue
+
+        # Normalize the direction vectors
+        unit_v1 = v1 / norm_v1
+        unit_v2 = v2 / norm_v2
+
+
+        cos_angle = np.dot(unit_v1, unit_v2)
+
+        # If vectors are nearly aligned (angle ~0 or ~180), then colinear
+        if abs(cos_angle) > cos_thresh:
+            return False
+        
 
     return True
 
 
+
+def unique_points(group_points, avg_dist):
+    unique = []
+    threshold = 0.2 * avg_dist
+
+    for i, point in enumerate(group_points):
+        too_close = False
+        for existing in unique:
+            if np.linalg.norm(point - existing) < threshold:
+                too_close = True
+                break
+        if not too_close:
+            unique.append(point)
+
+    return unique
 
 #----------------------------------------------------------------------------------#
 import numpy as np
@@ -710,15 +745,21 @@ def face_aggregate_networkx(stroke_matrix):
     # Remove duplicates
     unique_groups = list(set(frozenset(group) for group in valid_groups))
 
-
+    print("unique_groups", len(unique_groups))
     final_groups = []
     for group in unique_groups:
         group_points = []
+
+        avg_dist = 0
         for edge_id in group:
             stroke = stroke_matrix[edge_id]
             group_points.append(stroke[:3])  # start point
             group_points.append(stroke[3:6]) # end point
+            avg_dist += dist(stroke[:3], stroke[3:6])
         
+        avg_dist = avg_dist / len(group)
+        group_points = unique_points(group_points, avg_dist)
+
         if is_planar(group_points) and no_colinear(group_points):
             final_groups.append(group)
 
