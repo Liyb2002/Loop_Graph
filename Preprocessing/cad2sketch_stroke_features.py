@@ -1385,7 +1385,6 @@ def enlarge_stroke_node_features(stroke_node_features, factor=1.2):
     return np.array(enlarged_strokes, dtype=np.float32)
 
 
-import open3d as o3d
 
 def sample_stroke_points(stroke, num_points=10):
     p0 = stroke[:3]

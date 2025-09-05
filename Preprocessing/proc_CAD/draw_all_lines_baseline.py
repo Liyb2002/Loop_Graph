@@ -55,6 +55,7 @@ class create_stroke_cloud():
                 self.finishing_production()
                 return   
         
+        
         return
 
 
@@ -410,10 +411,10 @@ class create_stroke_cloud():
         # Now, we need to generate the construction lines
         if op == 'sketch':
             construction_lines = Preprocessing.proc_CAD.line_utils.midpoint_lines(new_edges)
-            construction_lines += Preprocessing.proc_CAD.line_utils.diagonal_lines(new_edges)                
+            # construction_lines += Preprocessing.proc_CAD.line_utils.diagonal_lines(new_edges)                
 
         if op == 'extrude':
-            construction_lines = Preprocessing.proc_CAD.line_utils.projection_lines(new_edges)
+            # construction_lines = Preprocessing.proc_CAD.line_utils.projection_lines(new_edges)
             construction_lines += Preprocessing.proc_CAD.line_utils.bounding_box_lines(new_edges)
             # construction_lines = Preprocessing.proc_CAD.line_utils.grid_lines(self.edges, new_edges)
 
@@ -822,7 +823,7 @@ class create_stroke_cloud():
         
         self.adj_edges()
         self.map_id_to_count()
-        # self.vis_stroke_cloud(self.directory, True)
+        self.vis_stroke_cloud(self.directory, True)
         # self.vis_brep()
 
 
