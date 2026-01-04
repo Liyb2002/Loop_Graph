@@ -26,7 +26,7 @@ class dataset_generator():
         self.dataset_name = 'dataset/datasetB'
         os.makedirs(self.dataset_name, exist_ok=True)
 
-        self.generate_dataset(self.dataset_name, number_data = 10, start =self.compute_start_idx())
+        self.generate_dataset(self.dataset_name, number_data = 100, start =self.compute_start_idx())
     
 
     def compute_start_idx(self):

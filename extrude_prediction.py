@@ -117,7 +117,7 @@ def compute_accuracy_eval(output, loop_selection_mask, hetero_batch, data_indice
 def train():
     print("DO EXTRUDE PREDICTION")
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_annotated')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/datasetB')
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0

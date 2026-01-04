@@ -30,7 +30,7 @@ batch_size = 16
 # ------------------------------------------------------------------------------# 
 
 current_dir = os.getcwd()
-save_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction_synthetic')
+save_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction')
 os.makedirs(save_dir, exist_ok=True)
 
 def load_models():
@@ -121,7 +121,7 @@ def compute_accuracy_eval_whole(valid_output, valid_batch_masks, hetero_batch):
 
 def train():
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/whole')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/datasetB')
     print(f"Total number of shape data: {len(dataset)}")
 
     best_val_accuracy = 0
@@ -383,4 +383,4 @@ def eval():
 #---------------------------------- Public Functions ----------------------------------#
 
 
-eval()
+train()

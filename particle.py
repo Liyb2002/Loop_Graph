@@ -199,7 +199,6 @@ class Particle():
             # Encoders.helper.vis_selected_strokes(gnn_graph['stroke'].x.cpu().numpy(), used_indices, self.data_idx)
 
             if self.mark_off_new_strokes(stroke_to_edge, stroke_to_edge_circle) == False:
-                print("No new feature added")
                 self.correct_termination_check()
                 return
 
@@ -414,7 +413,7 @@ class Particle():
             self.valid_particle = False
             return
         
-        if len(self.past_programs) > 7 and random.random() > 0.5:
+        if len(self.past_programs) >= 7 and random.random() > 0.5:
             self.success_terminate = True
             self.valid_particle = False 
             return 
@@ -463,7 +462,6 @@ def do_sketch(gnn_graph, data_idx):
     normal = [1, 0, 0]
     sketch_selection_mask = whole_process_helper.helper.clean_mask(sketch_selection_mask, selected_loop_idx)
     return sketch_selection_mask, sketch_points, normal, selected_loop_idx, idx_prob
-
 
 # --------------------- Extrude Network --------------------- #
 extrude_graph_encoder = Encoders.gnn.gnn.SemanticModule()
@@ -569,8 +567,8 @@ def do_fillet(gnn_graph, brep_edges, data_idx):
 # --------------------- Chamfer Network --------------------- #
 chamfer_graph_encoder = Encoders.gnn.gnn.SemanticModule()
 chamfer_graph_decoder = Encoders.gnn.gnn.Chamfer_Decoder()
-# chanfer_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction')
-chanfer_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction_synthetic')
+chanfer_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction')
+# chanfer_dir = os.path.join(current_dir, 'checkpoints', 'chamfer_prediction_synthetic')
 chamfer_graph_encoder.eval()
 chamfer_graph_decoder.eval()
 chamfer_graph_encoder.load_state_dict(torch.load(os.path.join(chanfer_dir, 'graph_encoder.pth'), weights_only=True))

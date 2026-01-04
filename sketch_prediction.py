@@ -127,7 +127,7 @@ def compute_accuracy_with_lvl(valid_output, valid_batch_masks, hetero_batch, dat
 def train():
     print("DO SKETCH PREDICTION")
     # Load the dataset
-    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/new')
+    dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/datasetB')
     print(f"Total number of shape data: {len(dataset)}")
     
     best_val_accuracy = 0
@@ -200,7 +200,7 @@ def train():
         if num_selected != 1:
             continue
         # Encoders.helper.vis_brep(output_brep_edges)
-        Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes, data_idx)
+        # Encoders.helper.vis_selected_strokes_synthetic(gnn_graph['stroke'].x.cpu().numpy(),chosen_strokes, data_idx)
         # Encoders.helper.vis_left_graph_loops(gnn_graph['stroke'].x.cpu().numpy(), gnn_graph['loop'].x.cpu().numpy(), stroke_cloud_loops)
 
         # Prepare the pair

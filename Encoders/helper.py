@@ -1277,6 +1277,7 @@ def vis_selected_strokes_synthetic(stroke_node_features, selected_stroke_idx, da
     z_min, z_max = float('inf'), float('-inf')
 
     # === First pass: plot all strokes ===
+    print("all_lines", all_lines)
     for i, stroke in enumerate(all_lines):
         geometry = stroke["geometry"]
         if len(geometry) < 2:
