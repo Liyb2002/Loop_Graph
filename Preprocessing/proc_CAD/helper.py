@@ -745,7 +745,6 @@ def face_aggregate_networkx(stroke_matrix):
     # Remove duplicates
     unique_groups = list(set(frozenset(group) for group in valid_groups))
 
-    print("unique_groups", len(unique_groups))
     final_groups = []
     for group in unique_groups:
         group_points = []

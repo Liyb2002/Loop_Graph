@@ -55,7 +55,7 @@ def generate_random_extrude():
 
 
 def generate_random_fillet():
-    random_float = np.random.uniform(1, 2)
+    random_float = np.random.uniform(0.5, 1)
     return random_float
  
 def generate_random_cylinder_radius():

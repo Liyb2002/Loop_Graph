@@ -49,26 +49,20 @@ def build_sketch(count, canvas, Points_list, output, data_dir, tempt_idx=0):
 
 
 def build_circle(count, radius, point, normal, output, data_dir):
-    if radius <= 0:
-        raise ValueError("radius must be > 0")
-
     brep_dir = os.path.join(data_dir, "canvas", f"brep_{count}.step")
+    stl_dir = os.path.join(data_dir, "canvas", f"vis_{count}.stl")
 
-    # Build the circle on the specified plane
-    with BuildSketch(
-        Plane(origin=(point[0], point[1], point[2]),
-              z_dir=(normal[0], normal[1], normal[2]))
-    ) as s:
-        Circle(radius=radius)
-
-    # Make a planar face from the closed profile(s)
-    face = s.face  # <- use the builder's face property
-
+    
+    with BuildSketch(Plane(origin=(point[0], point[1], point[2]), z_dir=(normal[0], normal[1], normal[2])) )as perimeter:
+        Circle(radius = radius)
+    
+    face = perimeter.sketch.face()
+    
     if output:
-        export_step(face, brep_dir)  # STEP surface of the circular face
+        export_step(perimeter.sketch, brep_dir)
 
-    # Return the sketch object (if you need the face, return `face` instead)
-    return s.sketch
+    return perimeter.sketch
+
 
 
 
@@ -108,8 +102,8 @@ def build_subtract(count, canvas, target_face, extrude_amount, output, data_dir)
         extrude( target_face, amount= extrude_amount, mode=Mode.SUBTRACT)
 
     if output:
-        _ = canvas.part.export_stl(stl_dir)
-        _ = canvas.part.export_step(step_dir)
+        export_stl(canvas.part, stl_dir)
+        export_step(canvas.part, step_dir)
 
 
     return canvas

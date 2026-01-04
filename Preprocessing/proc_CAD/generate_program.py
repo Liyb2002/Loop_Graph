@@ -12,6 +12,17 @@ import os
 import math
 from Preprocessing.proc_CAD.basic_class import Face, Edge, Vertex
 
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.generic):
+            return obj.item()  # converts float32/int64/etc → Python scalar
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+
+
 class Brep:
     def __init__(self):
         self.Faces = []
@@ -174,8 +185,7 @@ class Brep:
                 sketch_face.vertices[i], new_vertices[i],
                 new_vertices[(i + 1) % num_vertices], sketch_face.vertices[(i + 1) % num_vertices]
             ]
-            normal = [0,0,0]
-            # normal = Preprocessing.proc_CAD.helper.compute_normal(side_face_vertices, new_vertices[(i + 2) % num_vertices])
+            normal = Preprocessing.proc_CAD.helper.compute_normal(side_face_vertices, new_vertices[(i + 2) % num_vertices])
             side_face = Face(side_face_id, side_face_vertices, normal)
             self.Faces.append(side_face)
 
@@ -394,7 +404,8 @@ class Brep:
         self.write_terminate(data)  
 
         with open(filename, 'w') as f:
-            json.dump(data, f, indent=4)
+            json.dump(data, f, indent=4, cls=NumpyEncoder)
+
         
         print(f"Data saved to {filename}")
 
@@ -564,9 +575,6 @@ class Brep:
             # For each vertex, get the minimum distance to point_1 or point_2
             d1 = min(distance(pos_1, point_1), distance(pos_1, point_2))
             d2 = min(distance(pos_2, point_1), distance(pos_2, point_2))
-
-            print(f"Closest distances: {d1:.6f}, {d2:.6f}")
-            print("-------------")
 
             # Check if the points match (considering floating point tolerance)
             if (is_close(point_1, pos_1) and is_close(point_2, pos_2)) or \

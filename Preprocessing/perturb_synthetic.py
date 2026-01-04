@@ -19,7 +19,7 @@ import Preprocessing.proc_CAD.perturbation_helper
 
 class perturbation_dataset_loader(Dataset):
     def __init__(self):
-        self.data_path = os.path.join(os.getcwd(), 'dataset', 'new_render')
+        self.data_path = os.path.join(os.getcwd(), 'dataset', 'new')
         self.data_dirs = [d for d in os.listdir(self.data_path) if os.path.isdir(os.path.join(self.data_path, d))]
         
         print(f"Number of data directories: {len(self.data_dirs)}")
@@ -68,33 +68,33 @@ class perturbation_dataset_loader(Dataset):
             is_feature_lines = (stroke_operations_order_matrix == 1).any(dim=1).int().unsqueeze(1)
 
 
-            try:
-                stroke_cloud = Preprocessing.perturb_stroke_cloud_reverse.stroke_node_features_to_polyline(stroke_node_features, is_feature_lines)
-                if len(stroke_cloud) == 0:
-                    dir_to_remove = os.path.join(self.data_path, dir)
-                    shutil.rmtree(dir_to_remove)
-                    continue
-
-                stroke_cloud, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.remove_contained_lines_opacity(stroke_cloud, stroke_node_features, is_feature_lines)
-                # stroke_cloud, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.remove_random_lines(stroke_cloud, stroke_node_features, is_feature_lines)
-                perturbed_all_lines = Preprocessing.proc_CAD.perturbation_helper.do_perturb(stroke_cloud, stroke_node_features)
-            
-            
-                edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_files[-1]))
-                brep_bbox, _= Preprocessing.cad2sketch_stroke_features.bbox(edge_features_list)
-                stroke_cloud_bbox, _= Preprocessing.cad2sketch_stroke_features.bbox(stroke_node_features)
-                if not Preprocessing.cad2sketch_stroke_features.same_bbox(brep_bbox, stroke_cloud_bbox):
-                    # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(perturbed_all_lines)
-                    dir_to_remove = os.path.join(self.data_path, dir)
-                    shutil.rmtree(dir_to_remove)
-                    continue
-
-
-            except Exception as e:
-                # print(f"Error during perturbation for {dir}")
+            # try:
+            stroke_cloud = Preprocessing.perturb_stroke_cloud_reverse.stroke_node_features_to_polyline(stroke_node_features, is_feature_lines)
+            if len(stroke_cloud) == 0:
                 dir_to_remove = os.path.join(self.data_path, dir)
                 shutil.rmtree(dir_to_remove)
                 continue
+
+            stroke_cloud, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.remove_contained_lines_opacity(stroke_cloud, stroke_node_features, is_feature_lines)
+            # stroke_cloud, stroke_node_features = Preprocessing.proc_CAD.perturbation_helper.remove_random_lines(stroke_cloud, stroke_node_features, is_feature_lines)
+            perturbed_all_lines = Preprocessing.proc_CAD.perturbation_helper.do_perturb(stroke_cloud, stroke_node_features)
+        
+        
+            edge_features_list, cylinder_features = Preprocessing.SBGCN.brep_read.create_graph_from_step_file(os.path.join(brep_folder_path, step_files[-1]))
+            brep_bbox, _= Preprocessing.cad2sketch_stroke_features.bbox(edge_features_list)
+            stroke_cloud_bbox, _= Preprocessing.cad2sketch_stroke_features.bbox(stroke_node_features)
+            if not Preprocessing.cad2sketch_stroke_features.same_bbox(brep_bbox, stroke_cloud_bbox):
+                Preprocessing.cad2sketch_stroke_features.vis_feature_lines(perturbed_all_lines)
+                dir_to_remove = os.path.join(self.data_path, dir)
+                shutil.rmtree(dir_to_remove)
+                continue
+
+
+            # except Exception as e:
+            #     # print(f"Error during perturbation for {dir}")
+            #     dir_to_remove = os.path.join(self.data_path, dir)
+            #     shutil.rmtree(dir_to_remove)
+            #     continue
             
             
             perturbed_output_path = os.path.join(self.data_path, dir, 'perturbed_all_lines.json')

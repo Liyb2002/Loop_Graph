@@ -115,7 +115,6 @@ def rectangle_midpoint_lines(edges):
     return midpoint_edges
 
 
-
 # -------------------- Diagonal Lines -------------------- #
 def diagonal_lines(edges):
 
@@ -292,101 +291,68 @@ def bounding_box_lines(edges):
 
 
 # -------------------- Grid Lines -------------------- #
-def grid_lines(prev_edges, edges):
+def grid_lines(edges):
     """
-    Creates grid lines by extending the edges of the bounding box defined by the input edges.
-    1) Finds the min and max values in the x, y, and z axes for the input edges to define a bounding box.
-    2) Extends each edge of the bounding box to the nearest intersection with any edge in prev_edges.
-    Returns a list of Edge objects.
+    Build the 12 grid lines that form the axis-aligned bounding box (AABB)
+    around the given edges.
+
+    Assumptions:
+      - Each item in `edges` is an Edge with `vertices` iterable
+      - Each Vertex has `.position` as a 3-tuple (x, y, z)
+      - Classes Vertex(id: str, position: tuple[float, float, float]) and
+        Edge(id: str, vertices: tuple[Vertex, Vertex]) exist
+
+    Returns:
+      list[Edge]: the 12 edges (as new Edge objects) of the AABB.
     """
-    # Step 1: Find the min and max values in the x, y, and z axes for the input edges
+    if not edges:
+        return []
+
+    # Step 1: find bounds
     x_min = y_min = z_min = float('inf')
     x_max = y_max = z_max = float('-inf')
 
-    for edge in edges:
-        for vertex in edge.vertices:
-            pos = vertex.position
-            x_min, x_max = min(x_min, pos[0]), max(x_max, pos[0])
-            y_min, y_max = min(y_min, pos[1]), max(y_max, pos[1])
-            z_min, z_max = min(z_min, pos[2]), max(z_max, pos[2])
+    for e in edges:
+        for v in e.vertices:
+            x, y, z = v.position
+            if x < x_min: x_min = x
+            if x > x_max: x_max = x
+            if y < y_min: y_min = y
+            if y > y_max: y_max = y
+            if z < z_min: z_min = z
+            if z > z_max: z_max = z
 
-    # Step 2: Define the 8 vertices of the bounding box
-    bbox_vertices = [
-        (x_min, y_min, z_min), (x_min, y_min, z_max),
-        (x_min, y_max, z_min), (x_min, y_max, z_max),
-        (x_max, y_min, z_min), (x_max, y_min, z_max),
-        (x_max, y_max, z_min), (x_max, y_max, z_max)
+    # Step 2: define the 8 corners in a consistent order
+    corners = [
+        (x_min, y_min, z_min),  # 0
+        (x_min, y_min, z_max),  # 1
+        (x_min, y_max, z_min),  # 2
+        (x_min, y_max, z_max),  # 3
+        (x_max, y_min, z_min),  # 4
+        (x_max, y_min, z_max),  # 5
+        (x_max, y_max, z_min),  # 6
+        (x_max, y_max, z_max),  # 7
     ]
 
-    # Define the 12 edges of the bounding box
-    bbox_edges_indices = [
-        (0, 1), (1, 3), (3, 2), (2, 0),  # Bottom face
-        (4, 5), (5, 7), (7, 6), (6, 4),  # Top face
-        (0, 4), (1, 5), (2, 6), (3, 7)   # Vertical edges
+    # Step 3: the 12 AABB edges by vertex index pairs
+    edge_indices = [
+        (0, 1), (1, 3), (3, 2), (2, 0),  # "left" face verticals in z and edges in y
+        (4, 5), (5, 7), (7, 6), (6, 4),  # "right" face
+        (0, 4), (1, 5), (2, 6), (3, 7),  # cross connections in x
     ]
 
-    grid_edges = []  # To store the new grid lines
-    edge_count = 0  # Unique ID counter for new edges
+    # Step 4: create vertices and edges
+    # One Vertex per corner to share across edges
+    grid_vertices = [
+        Vertex(id=f'grid_vert_{i}', position=pos) for i, pos in enumerate(corners)
+    ]
 
-    # Step 3: Extend each edge of the bounding box to the nearest intersection with any edge in prev_edges
-    for v1_idx, v2_idx in bbox_edges_indices:
-        vertex1 = bbox_vertices[v1_idx]
-        vertex2 = bbox_vertices[v2_idx]
+    grid_edges = []
+    for i, (a, b) in enumerate(edge_indices):
+        va = grid_vertices[a]
+        vb = grid_vertices[b]
+        grid_edges.append(Edge(id=f'grid_edge_{i}', vertices=(va, vb)))
 
-        # Determine which axis is changing
-        different_axis = None
-        for i in range(3):
-            if vertex1[i] != vertex2[i]:
-                different_axis = i
-                break
-
-        if different_axis is None:
-            continue  # Should not happen, as all edges should have one varying axis
-
-        # Initial values to extend the edge
-        extend_neg = None  # For extending in the negative direction
-        extend_pos = None  # For extending in the positive direction
-
-        # Check for intersections with prev_edges
-        for other_edge_id, other_edge in prev_edges.items():
-            for vertex in other_edge.vertices:
-                pos = vertex.position[different_axis]
-
-                # Extend in the negative direction for min values
-                if pos < min(vertex1[different_axis], vertex2[different_axis]):
-                    if extend_neg is None or pos > extend_neg:
-                        extend_neg = pos
-
-                # Extend in the positive direction for max values
-                if pos > max(vertex1[different_axis], vertex2[different_axis]):
-                    if extend_pos is None or pos < extend_pos:
-                        extend_pos = pos
-
-        # Extend edges in the negative direction if applicable
-        if extend_neg is not None:
-            new_vertex1_pos = list(vertex1)
-            new_vertex2_pos = list(vertex2)
-            new_vertex1_pos[different_axis] = extend_neg
-            new_vertex2_pos[different_axis] = extend_neg
-            new_vertex1 = Vertex(id=f'grid_vert_{edge_count}_neg1', position=tuple(new_vertex1_pos))
-            new_vertex2 = Vertex(id=f'grid_vert_{edge_count}_neg2', position=tuple(new_vertex2_pos))
-            new_edge_neg = Edge(id=f'grid_line_{edge_count}_neg', vertices=(new_vertex1, new_vertex2))
-            grid_edges.append(new_edge_neg)
-            edge_count += 1
-
-        # Extend edges in the positive direction if applicable
-        if extend_pos is not None:
-            new_vertex3_pos = list(vertex1)
-            new_vertex4_pos = list(vertex2)
-            new_vertex3_pos[different_axis] = extend_pos
-            new_vertex4_pos[different_axis] = extend_pos
-            new_vertex3 = Vertex(id=f'grid_vert_{edge_count}_pos1', position=tuple(new_vertex3_pos))
-            new_vertex4 = Vertex(id=f'grid_vert_{edge_count}_pos2', position=tuple(new_vertex4_pos))
-            new_edge_pos = Edge(id=f'grid_line_{edge_count}_pos', vertices=(new_vertex3, new_vertex4))
-            grid_edges.append(new_edge_pos)
-            edge_count += 1
-
-    print('num', len(grid_edges))
     return grid_edges
 
 

@@ -4,7 +4,7 @@ import Preprocessing.process_felix_dataset
 import Preprocessing.perturb_synthetic
 import Preprocessing.generate_dataset_baseline
 
-target = 'small'
+target = 'datasetB'
 def run():
     
     # d_generator = Preprocessing.perturb_synthetic.perturbation_dataset_loader()

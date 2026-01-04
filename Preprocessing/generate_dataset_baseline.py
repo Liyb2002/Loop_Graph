@@ -23,10 +23,10 @@ class dataset_generator():
         # if os.path.exists('dataset'):
         #     shutil.rmtree('dataset')
 
-        self.dataset_name = 'dataset/new'
+        self.dataset_name = 'dataset/datasetB'
         os.makedirs(self.dataset_name, exist_ok=True)
 
-        self.generate_dataset(self.dataset_name, number_data = 1, start =self.compute_start_idx())
+        self.generate_dataset(self.dataset_name, number_data = 10, start =self.compute_start_idx())
     
 
     def compute_start_idx(self):
@@ -68,20 +68,20 @@ class dataset_generator():
         os.makedirs(data_directory, exist_ok=True)
 
         # Generate a new program & save the brep
-        # try:
+        try:
             # Pass in the directory to the simple_gen function
-        Preprocessing.proc_CAD.proc_gen.random_program(data_directory)
-        # Preprocessing.proc_CAD.proc_gen.simple_gen(data_directory)
+            Preprocessing.proc_CAD.proc_gen.random_program(data_directory)
+            # Preprocessing.proc_CAD.proc_gen.simple_gen(data_directory)
 
         # Create brep for the new program and pass in the directory
-        valid_parse = Preprocessing.proc_CAD.Program_to_STL.run(data_directory)
-        stroke_cloud_class = Preprocessing.proc_CAD.draw_all_lines_baseline.create_stroke_cloud_class(data_directory, False)
-        stroke_cloud_class.read_all()
+            valid_parse = Preprocessing.proc_CAD.Program_to_STL.run(data_directory)
+            stroke_cloud_class = Preprocessing.proc_CAD.draw_all_lines_baseline.create_stroke_cloud_class(data_directory, False)
+            stroke_cloud_class.read_all()
 
-        # except Exception as e:
-        #     print(f"An error occurred: {e}")
-        #     shutil.rmtree(data_directory)
-        #     return False
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            shutil.rmtree(data_directory)
+            return False
         
         if not valid_parse:
             print("not valid valid_parse")
