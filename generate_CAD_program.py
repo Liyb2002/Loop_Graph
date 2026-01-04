@@ -115,6 +115,6 @@ for data in tqdm(dataset, desc="Generating CAD Programs"):
         # resample particles
         particle_list, finished_particles= whole_process_helper.helper.resample_particles(particle_list, finished_particles)
 
-    whole_process_helper.helper.find_top_different_particles(finished_particles, cur_output_dir)
+    # whole_process_helper.helper.find_top_different_particles(finished_particles, cur_output_dir)
 
     data_produced += 1
