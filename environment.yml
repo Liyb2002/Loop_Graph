@@ -1,4 +1,4 @@
-name: baseline_sketch
+name: CADrawer
 channels:
   - pytorch
   - conda-forge

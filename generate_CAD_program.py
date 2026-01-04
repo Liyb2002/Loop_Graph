@@ -39,6 +39,7 @@ dataset = Preprocessing.dataloader.Program_Graph_Dataset('dataset/cad2sketch_ann
 # --------------------- Directory --------------------- #
 current_dir = os.getcwd()
 output_dir = os.path.join(current_dir, 'program_output_dataset')
+os.makedirs(output_dir, exist_ok=True)
 
 
 

@@ -20,8 +20,8 @@ import re
 class dataset_generator():
 
     def __init__(self):
-        # if os.path.exists('dataset'):
-        #     shutil.rmtree('dataset')
+        if os.path.exists('dataset'):
+            shutil.rmtree('dataset')
 
         self.dataset_name = 'dataset/datasetB'
         os.makedirs(self.dataset_name, exist_ok=True)
@@ -35,7 +35,7 @@ class dataset_generator():
 
         pattern = re.compile(r'.*_(\d+)$')
         
-        largest_number = 0
+        largest_number = 100
         
         # List all directories and retrieve the number at the end of the format
         for d in os.listdir(data_path):
