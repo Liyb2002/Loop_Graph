@@ -68,7 +68,7 @@ run_predictions.sh
 For testing on extra self-designed data, please use the following system to input and uplift sketches to 3D:
 
 - **Paper:** [https://repo-sam.inria.fr/d3/cad2sketch/cad2sketch_paper.pdf](https://www-sop.inria.fr/reves/Basilic/2025/WB25/)  
-- **Original dataset:** [https://repo-sam.inria.fr/d3/cad2sketch/cad2sketch_dataset.g](https://gitlab.inria.fr/D3/blender-addon-symmetry-sketch)
+- **Github repo:** [https://repo-sam.inria.fr/d3/cad2sketch/cad2sketch_dataset.g](https://gitlab.inria.fr/D3/blender-addon-symmetry-sketch)
 
 
 
