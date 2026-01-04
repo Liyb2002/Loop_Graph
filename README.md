@@ -3,6 +3,10 @@
 This is the official implementation for the paper **CADrawer: Autoregressive Generation of CAD Program**.  
 Our system takes **3D sketches** as input and outputs **CAD programs**.
 
+Paper Link : [TBD]
+
+If you have any problems, feel free to ask help from yuanboli at brown dot edu.
+
 ---
 
 ## Prerequisite
