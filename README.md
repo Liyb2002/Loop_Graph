@@ -24,7 +24,7 @@ However, the original dataset only contains CAD programs and does not include th
 It also does not contain perturbations of strokes.
 
 We implement our own version of Dataset A, which includes the B-rep generation process and stroke perturbations.  
-It can be found at: [google drive] (https://drive.google.com/drive/folders/1eEomAZ0Ju_r_dClBIOx5vRbvfPeKS6Gk?usp=drive_link)
+It can be found at: https://drive.google.com/drive/folders/1eEomAZ0Ju_r_dClBIOx5vRbvfPeKS6Gk?usp=drive_link
 
 
 ### Dataset B
@@ -35,6 +35,7 @@ To generate Dataset B, run:
 
 ```bash
 python generate_dataset.py
+```
 
 For more control over the number of data samples and program length, please consult:
 preprocessing/generate_dataset_baseline.py
@@ -55,8 +56,10 @@ Results will be saved to: /program_output_dataset
 
 
 ## Training
-Please run the following script to train all required models: bash run_predictions.sh
-
+Please run the following script to train all required models: 
+```bash
+run_predictions.sh
+```
 
 ## UI
 For testing on extra self-designed data, please use the following system to input and uplift sketches to 3D:
