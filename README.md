@@ -9,6 +9,7 @@ Our system takes **3D sketches** as input and outputs **CAD programs**.
 
 ```bash
 conda env create -f environment.yml
+```bash
 
 
 ## Dataset
