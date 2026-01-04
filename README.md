@@ -14,6 +14,9 @@ If you have any problems, feel free to ask help from yuanboli at brown dot edu.
 ```bash
 conda env create -f environment.yml
 ```
+Quick notes: the code was written using Build123d==0.5.0 version. But pip might automatically install Build123d==0.9.0
+The authors has adapted the code for Build123d==0.9.0, so it should work fine. But if any problem happens, please switch back to Build123d==0.5.0.
+Or you may manually edit the code using Build123d in /proc_CAD/build123/protocol.py
 
 ## Dataset
 
