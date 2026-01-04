@@ -50,7 +50,10 @@ https://drive.google.com/drive/folders/1b8nFyN5CjrROkTvIogoKSCM5nBmydPzm?usp=sha
 
 Please copy the entire folder and place it under: /checkpoints
 
-Run the following command for testing: python generate_CAD_program.py
+Run the following command for testing: 
+```bash
+python generate_CAD_program.py
+```
 
 Results will be saved to: /program_output_dataset
 
