@@ -102,9 +102,9 @@ class perturbation_dataset_loader(Dataset):
             with open(perturbed_output_path, 'w') as f:
                 json.dump(perturbed_all_lines, f, indent=4)
 
-            # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
-            # Preprocessing.cad2sketch_stroke_features.vis_feature_lines(perturbed_all_lines)
-            # Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_only_feature_lines(stroke_node_features, is_feature_lines)
+            Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features(stroke_node_features)
+            Preprocessing.cad2sketch_stroke_features.vis_feature_lines(perturbed_all_lines)
+            Preprocessing.cad2sketch_stroke_features.vis_stroke_node_features_only_feature_lines(stroke_node_features, is_feature_lines)
 
 
 
