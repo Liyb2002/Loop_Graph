@@ -24,9 +24,7 @@ However, the original dataset only contains CAD programs and does not include th
 It also does not contain perturbations of strokes.
 
 We implement our own version of Dataset A, which includes the B-rep generation process and stroke perturbations.  
-It can be found at:
-
-https://drive.google.com/drive/folders/1eEomAZ0Ju_r_dClBIOx5vRbvfPeKS6Gk?usp=drive_link
+It can be found at: [google drive] (https://drive.google.com/drive/folders/1eEomAZ0Ju_r_dClBIOx5vRbvfPeKS6Gk?usp=drive_link)
 
 
 ### Dataset B
