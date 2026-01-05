@@ -70,6 +70,10 @@ Please run the following script to train all required models:
 ```bash
 run_predictions.sh
 ```
+This bash script will train all the required tasks networks. 
+To train and evaluate a specific task's network, please refer to its trainning code (e.g fillet_prediction.py).
+You may toggle the train() and eval() function at the end of the code for evaluation purposes.
+
 
 ## UI
 For testing on extra self-designed data, please use the following system to input and uplift sketches to 3D:
