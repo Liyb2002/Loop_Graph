@@ -47,7 +47,7 @@ Dataset A is originally created by **CAD2Sketch**.
 However, the original dataset only contains CAD programs and does not include the B-rep generation process.  
 It also does not contain perturbations of strokes.
 
-We implement our own version of Dataset A, which includes the B-rep generation process and stroke perturbations.  
+We produced our own version of Dataset A, which contains the same data, while also includes the B-rep generation process and stroke perturbations.  
 It can be found at: https://drive.google.com/drive/folders/1eEomAZ0Ju_r_dClBIOx5vRbvfPeKS6Gk?usp=drive_link
 
 
