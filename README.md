@@ -14,6 +14,22 @@ If you have any problems, feel free to ask help from yuanboli at brown dot edu.
 ```bash
 conda env create -f environment.yml
 ```
+
+This code is build on certain modules from CAD2Sketch, the following command lines would be necessary for data generation and trainning, but not for quick testing:
+
+```bash
+git clone https://gitlab.inria.fr/D3/pylowstroke.git
+cd pylowstroke
+pip install -r requirements.txt
+pip install .
+cd ..
+
+git clone https://gitlab.inria.fr/D3/blender-addon-symmetry-sketch.git
+cd blender-addon-symmetry-sketch
+pip install -r requirements.txt
+pip install .
+```
+
 Quick notes: the code was written using Build123d==0.5.0 version. But pip might automatically install Build123d==0.9.0
 The authors has adapted the code for Build123d==0.9.0, so it should work fine. But if any problem happens, please switch back to Build123d==0.5.0.
 Or you may manually edit the code using Build123d in /proc_CAD/build123/protocol.py
